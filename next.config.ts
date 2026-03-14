@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Allow larger file uploads (PDFs, DOCX) up to 20MB
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "20mb",
+    },
+  },
 };
 
 export default nextConfig;

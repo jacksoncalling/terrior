@@ -1,0 +1,1331 @@
+{
+  "nodes": [
+    {
+      "id": "node_1",
+      "label": "Specialized",
+      "type": "brand",
+      "description": "American premium bicycle manufacturer known for performance road and mountain bikes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_2",
+      "label": "Scott",
+      "type": "brand",
+      "description": "Swiss brand known for lightweight, high-performance bikes across various disciplines.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_3",
+      "label": "Cannondale",
+      "type": "brand",
+      "description": "American brand known for innovative designs in road, mountain, and gravel bikes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_4",
+      "label": "Factor",
+      "type": "brand",
+      "description": "British high-end brand specializing in performance road and track bikes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_5",
+      "label": "Cervélo",
+      "type": "brand",
+      "description": "Canadian brand renowned for aerodynamic road and triathlon bikes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_6",
+      "label": "Wilier",
+      "type": "brand",
+      "description": "Italian brand with a long history, known for elegant and performance-oriented road bikes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_7",
+      "label": "Marin Bikes",
+      "type": "brand",
+      "description": "Californian brand offering a range of bikes, including gravel and mountain.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_8",
+      "label": "Carbon",
+      "type": "frame_material",
+      "description": "Lightweight, stiff, and compliant material for high-performance bikes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_9",
+      "label": "Aluminium",
+      "type": "frame_material",
+      "description": "Durable, stiff, and cost-effective material, offering good performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_10",
+      "label": "Steel",
+      "type": "frame_material",
+      "description": "Classic material known for comfort, durability, and smooth ride quality.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_11",
+      "label": "Road",
+      "type": "riding_style",
+      "description": "General category for paved road cycling, from casual to competitive.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_12",
+      "label": "Race/Aero",
+      "type": "riding_style",
+      "description": "Designed for speed, stiffness, and aerodynamic efficiency in competitive racing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_13",
+      "label": "Endurance/Gran Fondo",
+      "type": "riding_style",
+      "description": "Focuses on comfort, stability, and vibration damping for long rides.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_14",
+      "label": "Gravel",
+      "type": "riding_style",
+      "description": "Versatile for mixed terrain, including paved roads, dirt, and light trails.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_15",
+      "label": "Triathlon & Time Trial",
+      "type": "riding_style",
+      "description": "Optimized for aerodynamic efficiency and sustained speed in solo efforts.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_16",
+      "label": "Track/Fixed",
+      "type": "riding_style",
+      "description": "Designed for velodrome racing, single-speed, and no brakes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_17",
+      "label": "Entry (under €2.000)",
+      "type": "price_tier",
+      "description": "Affordable bikes, good for beginners or casual riders.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_18",
+      "label": "Mid-Range (€2.000–€4.000)",
+      "type": "price_tier",
+      "description": "Good performance, often with advanced features or materials.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_19",
+      "label": "Premium (€4.000–€7.000)",
+      "type": "price_tier",
+      "description": "High-performance bikes with advanced components and lightweight frames.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_20",
+      "label": "High-End (over €7.000)",
+      "type": "price_tier",
+      "description": "Top-tier performance, cutting-edge technology, and premium materials.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_21",
+      "label": "Shimano 105 Di2",
+      "type": "groupset",
+      "description": "Shimano electronic 12-speed road groupset, 2x capable, mid-tier performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_22",
+      "label": "Shimano Ultegra Di2",
+      "type": "groupset",
+      "description": "Shimano electronic 12-speed road groupset, 2x capable, high-tier performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_23",
+      "label": "Shimano 105",
+      "type": "groupset",
+      "description": "Shimano mechanical 12-speed road groupset, 2x capable, mid-tier performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_24",
+      "label": "SRAM Force AXS",
+      "type": "groupset",
+      "description": "SRAM electronic 12-speed road groupset, 2x capable, high-tier performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_25",
+      "label": "SRAM Force AXS 1x",
+      "type": "groupset",
+      "description": "SRAM electronic 12-speed gravel/road groupset, 1x specific, high-tier performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_26",
+      "label": "SRAM Rival AXS",
+      "type": "groupset",
+      "description": "SRAM electronic 12-speed road groupset, 2x capable, premium-tier performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_27",
+      "label": "Shimano GRX RX400",
+      "type": "groupset",
+      "description": "Shimano mechanical 10-speed gravel groupset, 2x capable, entry-tier performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_28",
+      "label": "Track Drivetrain",
+      "type": "groupset",
+      "description": "Single-speed drivetrain for track cycling, no brakes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_29",
+      "label": "Factor OSTRO V.A.M 2.0",
+      "type": "bike",
+      "description": "Aero carbon race bike for competitive road racing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_30",
+      "label": "Specialized Tarmac SL8 Comp Di2",
+      "type": "bike",
+      "description": "Carbon race bike with electronic shifting for competitive road racing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_31",
+      "label": "Scott Foil RC 10",
+      "type": "bike",
+      "description": "Aero carbon race bike for road, triathlon, and time trial.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_32",
+      "label": "Scott Addict 30",
+      "type": "bike",
+      "description": "Carbon road bike for general road cycling.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_33",
+      "label": "Cervélo S5 Force AXS",
+      "type": "bike",
+      "description": "High-performance aero carbon race bike with electronic shifting.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_34",
+      "label": "Cervélo Caledonia-5 Rival AXS",
+      "type": "bike",
+      "description": "Carbon endurance road bike with electronic shifting for long rides.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_35",
+      "label": "Cannondale CAAD14 3",
+      "type": "bike",
+      "description": "Performance aluminum road bike with carbon fork for road cycling.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_36",
+      "label": "Cannondale CAAD14 1",
+      "type": "bike",
+      "description": "High-performance aluminum road bike with 1x electronic shifting.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_37",
+      "label": "Cannondale SuperSix Evo 3",
+      "type": "bike",
+      "description": "Lightweight carbon race bike for all-around road performance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_38",
+      "label": "Specialized Roubaix SL8 Comp Di2",
+      "type": "bike",
+      "description": "Carbon endurance road bike with electronic shifting for comfort.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_39",
+      "label": "Specialized Tarmac SL8 Pro Force AXS",
+      "type": "bike",
+      "description": "Top-tier aero carbon race bike with electronic shifting.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_40",
+      "label": "Specialized Roubaix SL8 Sport Shimano 105",
+      "type": "bike",
+      "description": "Carbon endurance/gravel bike with mechanical shifting for comfort on mixed terrain.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_41",
+      "label": "Scott Foil RC 30",
+      "type": "bike",
+      "description": "Aero carbon race bike for road, triathlon, and time trial.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_42",
+      "label": "Scott Addict RC 20",
+      "type": "bike",
+      "description": "High-performance carbon race bike with electronic shifting for road racing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_43",
+      "label": "Scott Foil RC 20",
+      "type": "bike",
+      "description": "Aero carbon race bike with electronic shifting for road racing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_44",
+      "label": "Specialized Tarmac SL8 Expert Ultegra Di2",
+      "type": "bike",
+      "description": "High-performance carbon race bike with electronic shifting.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_45",
+      "label": "Cervélo Soloist 105 Di2",
+      "type": "bike",
+      "description": "Aero carbon race bike with electronic shifting for fast road riding.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_46",
+      "label": "Marin Bikes Nicasio 2",
+      "type": "bike",
+      "description": "Steel gravel bike with mechanical shifting for mixed terrain adventures.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_47",
+      "label": "Wilier Filante SL",
+      "type": "bike",
+      "description": "Aero carbon race bike with electronic shifting for competitive road racing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_48",
+      "label": "Factor MONZA Force PM",
+      "type": "bike",
+      "description": "High-performance carbon race bike with electronic shifting and power meter.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_49",
+      "label": "Factor MONZA Ultegra",
+      "type": "bike",
+      "description": "High-performance carbon race bike with electronic shifting.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_50",
+      "label": "Factor Raiden",
+      "type": "bike",
+      "description": "Carbon track bike for velodrome racing, single-speed, no brakes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel_1",
+      "sourceId": "node_29",
+      "targetId": "node_4",
+      "type": "MADE_BY",
+      "description": "Factor manufactures the OSTRO V.A.M 2.0."
+    },
+    {
+      "id": "rel_2",
+      "sourceId": "node_30",
+      "targetId": "node_1",
+      "type": "MADE_BY",
+      "description": "Specialized manufactures the Tarmac SL8 Comp Di2."
+    },
+    {
+      "id": "rel_3",
+      "sourceId": "node_31",
+      "targetId": "node_2",
+      "type": "MADE_BY",
+      "description": "Scott manufactures the Foil RC 10."
+    },
+    {
+      "id": "rel_4",
+      "sourceId": "node_32",
+      "targetId": "node_2",
+      "type": "MADE_BY",
+      "description": "Scott manufactures the Addict 30."
+    },
+    {
+      "id": "rel_5",
+      "sourceId": "node_33",
+      "targetId": "node_5",
+      "type": "MADE_BY",
+      "description": "Cervélo manufactures the S5 Force AXS."
+    },
+    {
+      "id": "rel_6",
+      "sourceId": "node_34",
+      "targetId": "node_5",
+      "type": "MADE_BY",
+      "description": "Cervélo manufactures the Caledonia-5 Rival AXS."
+    },
+    {
+      "id": "rel_7",
+      "sourceId": "node_35",
+      "targetId": "node_3",
+      "type": "MADE_BY",
+      "description": "Cannondale manufactures the CAAD14 3."
+    },
+    {
+      "id": "rel_8",
+      "sourceId": "node_36",
+      "targetId": "node_3",
+      "type": "MADE_BY",
+      "description": "Cannondale manufactures the CAAD14 1."
+    },
+    {
+      "id": "rel_9",
+      "sourceId": "node_37",
+      "targetId": "node_3",
+      "type": "MADE_BY",
+      "description": "Cannondale manufactures the SuperSix Evo 3."
+    },
+    {
+      "id": "rel_10",
+      "sourceId": "node_38",
+      "targetId": "node_1",
+      "type": "MADE_BY",
+      "description": "Specialized manufactures the Roubaix SL8 Comp Di2."
+    },
+    {
+      "id": "rel_11",
+      "sourceId": "node_39",
+      "targetId": "node_1",
+      "type": "MADE_BY",
+      "description": "Specialized manufactures the Tarmac SL8 Pro Force AXS."
+    },
+    {
+      "id": "rel_12",
+      "sourceId": "node_40",
+      "targetId": "node_1",
+      "type": "MADE_BY",
+      "description": "Specialized manufactures the Roubaix SL8 Sport Shimano 105."
+    },
+    {
+      "id": "rel_13",
+      "sourceId": "node_41",
+      "targetId": "node_2",
+      "type": "MADE_BY",
+      "description": "Scott manufactures the Foil RC 30."
+    },
+    {
+      "id": "rel_14",
+      "sourceId": "node_42",
+      "targetId": "node_2",
+      "type": "MADE_BY",
+      "description": "Scott manufactures the Addict RC 20."
+    },
+    {
+      "id": "rel_15",
+      "sourceId": "node_43",
+      "targetId": "node_2",
+      "type": "MADE_BY",
+      "description": "Scott manufactures the Foil RC 20."
+    },
+    {
+      "id": "rel_16",
+      "sourceId": "node_44",
+      "targetId": "node_1",
+      "type": "MADE_BY",
+      "description": "Specialized manufactures the Tarmac SL8 Expert Ultegra Di2."
+    },
+    {
+      "id": "rel_17",
+      "sourceId": "node_45",
+      "targetId": "node_5",
+      "type": "MADE_BY",
+      "description": "Cervélo manufactures the Soloist 105 Di2."
+    },
+    {
+      "id": "rel_18",
+      "sourceId": "node_46",
+      "targetId": "node_7",
+      "type": "MADE_BY",
+      "description": "Marin Bikes manufactures the Nicasio 2."
+    },
+    {
+      "id": "rel_19",
+      "sourceId": "node_47",
+      "targetId": "node_6",
+      "type": "MADE_BY",
+      "description": "Wilier manufactures the Filante SL."
+    },
+    {
+      "id": "rel_20",
+      "sourceId": "node_48",
+      "targetId": "node_4",
+      "type": "MADE_BY",
+      "description": "Factor manufactures the MONZA Force PM."
+    },
+    {
+      "id": "rel_21",
+      "sourceId": "node_49",
+      "targetId": "node_4",
+      "type": "MADE_BY",
+      "description": "Factor manufactures the MONZA Ultegra."
+    },
+    {
+      "id": "rel_22",
+      "sourceId": "node_50",
+      "targetId": "node_4",
+      "type": "MADE_BY",
+      "description": "Factor manufactures the Raiden."
+    },
+    {
+      "id": "rel_23",
+      "sourceId": "node_29",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Factor OSTRO V.A.M 2.0 is built from Carbon."
+    },
+    {
+      "id": "rel_24",
+      "sourceId": "node_30",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Specialized Tarmac SL8 Comp Di2 is built from Carbon."
+    },
+    {
+      "id": "rel_25",
+      "sourceId": "node_31",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Scott Foil RC 10 is built from Carbon."
+    },
+    {
+      "id": "rel_26",
+      "sourceId": "node_32",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Scott Addict 30 is built from Carbon."
+    },
+    {
+      "id": "rel_27",
+      "sourceId": "node_33",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Cervélo S5 Force AXS is built from Carbon."
+    },
+    {
+      "id": "rel_28",
+      "sourceId": "node_34",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Cervélo Caledonia-5 Rival AXS is built from Carbon."
+    },
+    {
+      "id": "rel_29",
+      "sourceId": "node_35",
+      "targetId": "node_9",
+      "type": "BUILT_FROM",
+      "description": "Cannondale CAAD14 3 is built from Aluminium."
+    },
+    {
+      "id": "rel_30",
+      "sourceId": "node_36",
+      "targetId": "node_9",
+      "type": "BUILT_FROM",
+      "description": "Cannondale CAAD14 1 is built from Aluminium."
+    },
+    {
+      "id": "rel_31",
+      "sourceId": "node_37",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Cannondale SuperSix Evo 3 is built from Carbon."
+    },
+    {
+      "id": "rel_32",
+      "sourceId": "node_38",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Specialized Roubaix SL8 Comp Di2 is built from Carbon."
+    },
+    {
+      "id": "rel_33",
+      "sourceId": "node_39",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Specialized Tarmac SL8 Pro Force AXS is built from Carbon."
+    },
+    {
+      "id": "rel_34",
+      "sourceId": "node_40",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Specialized Roubaix SL8 Sport Shimano 105 is built from Carbon."
+    },
+    {
+      "id": "rel_35",
+      "sourceId": "node_41",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Scott Foil RC 30 is built from Carbon."
+    },
+    {
+      "id": "rel_36",
+      "sourceId": "node_42",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Scott Addict RC 20 is built from Carbon."
+    },
+    {
+      "id": "rel_37",
+      "sourceId": "node_43",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Scott Foil RC 20 is built from Carbon."
+    },
+    {
+      "id": "rel_38",
+      "sourceId": "node_44",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Specialized Tarmac SL8 Expert Ultegra Di2 is built from Carbon."
+    },
+    {
+      "id": "rel_39",
+      "sourceId": "node_45",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Cervélo Soloist 105 Di2 is built from Carbon."
+    },
+    {
+      "id": "rel_40",
+      "sourceId": "node_46",
+      "targetId": "node_10",
+      "type": "BUILT_FROM",
+      "description": "Marin Bikes Nicasio 2 is built from Steel."
+    },
+    {
+      "id": "rel_41",
+      "sourceId": "node_47",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Wilier Filante SL is built from Carbon."
+    },
+    {
+      "id": "rel_42",
+      "sourceId": "node_48",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Factor MONZA Force PM is built from Carbon."
+    },
+    {
+      "id": "rel_43",
+      "sourceId": "node_49",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Factor MONZA Ultegra is built from Carbon."
+    },
+    {
+      "id": "rel_44",
+      "sourceId": "node_50",
+      "targetId": "node_8",
+      "type": "BUILT_FROM",
+      "description": "Factor Raiden is built from Carbon."
+    },
+    {
+      "id": "rel_45",
+      "sourceId": "node_29",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Factor OSTRO V.A.M 2.0 is designed for Race/Aero."
+    },
+    {
+      "id": "rel_46",
+      "sourceId": "node_30",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Specialized Tarmac SL8 Comp Di2 is designed for Race/Aero."
+    },
+    {
+      "id": "rel_47",
+      "sourceId": "node_31",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Scott Foil RC 10 is designed for Race/Aero."
+    },
+    {
+      "id": "rel_48",
+      "sourceId": "node_31",
+      "targetId": "node_15",
+      "type": "DESIGNED_FOR",
+      "description": "Scott Foil RC 10 is designed for Triathlon & Time Trial."
+    },
+    {
+      "id": "rel_49",
+      "sourceId": "node_32",
+      "targetId": "node_11",
+      "type": "DESIGNED_FOR",
+      "description": "Scott Addict 30 is designed for Road."
+    },
+    {
+      "id": "rel_50",
+      "sourceId": "node_33",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Cervélo S5 Force AXS is designed for Race/Aero."
+    },
+    {
+      "id": "rel_51",
+      "sourceId": "node_34",
+      "targetId": "node_13",
+      "type": "DESIGNED_FOR",
+      "description": "Cervélo Caledonia-5 Rival AXS is designed for Endurance/Gran Fondo."
+    },
+    {
+      "id": "rel_52",
+      "sourceId": "node_35",
+      "targetId": "node_11",
+      "type": "DESIGNED_FOR",
+      "description": "Cannondale CAAD14 3 is designed for Road."
+    },
+    {
+      "id": "rel_53",
+      "sourceId": "node_36",
+      "targetId": "node_11",
+      "type": "DESIGNED_FOR",
+      "description": "Cannondale CAAD14 1 is designed for Road."
+    },
+    {
+      "id": "rel_54",
+      "sourceId": "node_37",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Cannondale SuperSix Evo 3 is designed for Race/Aero."
+    },
+    {
+      "id": "rel_55",
+      "sourceId": "node_38",
+      "targetId": "node_13",
+      "type": "DESIGNED_FOR",
+      "description": "Specialized Roubaix SL8 Comp Di2 is designed for Endurance/Gran Fondo."
+    },
+    {
+      "id": "rel_56",
+      "sourceId": "node_39",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Specialized Tarmac SL8 Pro Force AXS is designed for Race/Aero."
+    },
+    {
+      "id": "rel_57",
+      "sourceId": "node_40",
+      "targetId": "node_13",
+      "type": "DESIGNED_FOR",
+      "description": "Specialized Roubaix SL8 Sport Shimano 105 is designed for Endurance/Gran Fondo."
+    },
+    {
+      "id": "rel_58",
+      "sourceId": "node_40",
+      "targetId": "node_14",
+      "type": "DESIGNED_FOR",
+      "description": "Specialized Roubaix SL8 Sport Shimano 105 is designed for Gravel."
+    },
+    {
+      "id": "rel_59",
+      "sourceId": "node_41",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Scott Foil RC 30 is designed for Race/Aero."
+    },
+    {
+      "id": "rel_60",
+      "sourceId": "node_41",
+      "targetId": "node_15",
+      "type": "DESIGNED_FOR",
+      "description": "Scott Foil RC 30 is designed for Triathlon & Time Trial."
+    },
+    {
+      "id": "rel_61",
+      "sourceId": "node_42",
+      "targetId": "node_11",
+      "type": "DESIGNED_FOR",
+      "description": "Scott Addict RC 20 is designed for Road."
+    },
+    {
+      "id": "rel_62",
+      "sourceId": "node_43",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Scott Foil RC 20 is designed for Race/Aero."
+    },
+    {
+      "id": "rel_63",
+      "sourceId": "node_44",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Specialized Tarmac SL8 Expert Ultegra Di2 is designed for Race/Aero."
+    },
+    {
+      "id": "rel_64",
+      "sourceId": "node_45",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Cervélo Soloist 105 Di2 is designed for Race/Aero."
+    },
+    {
+      "id": "rel_65",
+      "sourceId": "node_46",
+      "targetId": "node_14",
+      "type": "DESIGNED_FOR",
+      "description": "Marin Bikes Nicasio 2 is designed for Gravel."
+    },
+    {
+      "id": "rel_66",
+      "sourceId": "node_47",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Wilier Filante SL is designed for Race/Aero."
+    },
+    {
+      "id": "rel_67",
+      "sourceId": "node_48",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Factor MONZA Force PM is designed for Race/Aero."
+    },
+    {
+      "id": "rel_68",
+      "sourceId": "node_49",
+      "targetId": "node_12",
+      "type": "DESIGNED_FOR",
+      "description": "Factor MONZA Ultegra is designed for Race/Aero."
+    },
+    {
+      "id": "rel_69",
+      "sourceId": "node_50",
+      "targetId": "node_16",
+      "type": "DESIGNED_FOR",
+      "description": "Factor Raiden is designed for Track/Fixed."
+    },
+    {
+      "id": "rel_70",
+      "sourceId": "node_30",
+      "targetId": "node_21",
+      "type": "USES_GROUPSET",
+      "description": "Specialized Tarmac SL8 Comp Di2 uses Shimano 105 Di2."
+    },
+    {
+      "id": "rel_71",
+      "sourceId": "node_33",
+      "targetId": "node_24",
+      "type": "USES_GROUPSET",
+      "description": "Cervélo S5 Force AXS uses SRAM Force AXS."
+    },
+    {
+      "id": "rel_72",
+      "sourceId": "node_34",
+      "targetId": "node_26",
+      "type": "USES_GROUPSET",
+      "description": "Cervélo Caledonia-5 Rival AXS uses SRAM Rival AXS."
+    },
+    {
+      "id": "rel_73",
+      "sourceId": "node_36",
+      "targetId": "node_25",
+      "type": "USES_GROUPSET",
+      "description": "Cannondale CAAD14 1 uses SRAM Force AXS 1x."
+    },
+    {
+      "id": "rel_74",
+      "sourceId": "node_38",
+      "targetId": "node_21",
+      "type": "USES_GROUPSET",
+      "description": "Specialized Roubaix SL8 Comp Di2 uses Shimano 105 Di2."
+    },
+    {
+      "id": "rel_75",
+      "sourceId": "node_39",
+      "targetId": "node_24",
+      "type": "USES_GROUPSET",
+      "description": "Specialized Tarmac SL8 Pro Force AXS uses SRAM Force AXS."
+    },
+    {
+      "id": "rel_76",
+      "sourceId": "node_40",
+      "targetId": "node_23",
+      "type": "USES_GROUPSET",
+      "description": "Specialized Roubaix SL8 Sport Shimano 105 uses Shimano 105."
+    },
+    {
+      "id": "rel_77",
+      "sourceId": "node_42",
+      "targetId": "node_22",
+      "type": "USES_GROUPSET",
+      "description": "Scott Addict RC 20 uses Shimano Ultegra Di2."
+    },
+    {
+      "id": "rel_78",
+      "sourceId": "node_43",
+      "targetId": "node_21",
+      "type": "USES_GROUPSET",
+      "description": "Scott Foil RC 20 uses Shimano 105 Di2."
+    },
+    {
+      "id": "rel_79",
+      "sourceId": "node_44",
+      "targetId": "node_22",
+      "type": "USES_GROUPSET",
+      "description": "Specialized Tarmac SL8 Expert Ultegra Di2 uses Shimano Ultegra Di2."
+    },
+    {
+      "id": "rel_80",
+      "sourceId": "node_45",
+      "targetId": "node_21",
+      "type": "USES_GROUPSET",
+      "description": "Cervélo Soloist 105 Di2 uses Shimano 105 Di2."
+    },
+    {
+      "id": "rel_81",
+      "sourceId": "node_46",
+      "targetId": "node_27",
+      "type": "USES_GROUPSET",
+      "description": "Marin Bikes Nicasio 2 uses Shimano GRX RX400."
+    },
+    {
+      "id": "rel_82",
+      "sourceId": "node_47",
+      "targetId": "node_21",
+      "type": "USES_GROUPSET",
+      "description": "Wilier Filante SL uses Shimano 105 Di2."
+    },
+    {
+      "id": "rel_83",
+      "sourceId": "node_48",
+      "targetId": "node_24",
+      "type": "USES_GROUPSET",
+      "description": "Factor MONZA Force PM uses SRAM Force AXS."
+    },
+    {
+      "id": "rel_84",
+      "sourceId": "node_49",
+      "targetId": "node_22",
+      "type": "USES_GROUPSET",
+      "description": "Factor MONZA Ultegra uses Shimano Ultegra Di2."
+    },
+    {
+      "id": "rel_85",
+      "sourceId": "node_50",
+      "targetId": "node_28",
+      "type": "USES_GROUPSET",
+      "description": "Factor Raiden uses a Track Drivetrain."
+    },
+    {
+      "id": "rel_86",
+      "sourceId": "node_29",
+      "targetId": "node_20",
+      "type": "PRICED_AS",
+      "description": "Factor OSTRO V.A.M 2.0 is priced as High-End."
+    },
+    {
+      "id": "rel_87",
+      "sourceId": "node_30",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Specialized Tarmac SL8 Comp Di2 is priced as Premium."
+    },
+    {
+      "id": "rel_88",
+      "sourceId": "node_31",
+      "targetId": "node_20",
+      "type": "PRICED_AS",
+      "description": "Scott Foil RC 10 is priced as High-End."
+    },
+    {
+      "id": "rel_89",
+      "sourceId": "node_32",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Scott Addict 30 is priced as Premium."
+    },
+    {
+      "id": "rel_90",
+      "sourceId": "node_33",
+      "targetId": "node_20",
+      "type": "PRICED_AS",
+      "description": "Cervélo S5 Force AXS is priced as High-End."
+    },
+    {
+      "id": "rel_91",
+      "sourceId": "node_34",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Cervélo Caledonia-5 Rival AXS is priced as Premium."
+    },
+    {
+      "id": "rel_92",
+      "sourceId": "node_35",
+      "targetId": "node_18",
+      "type": "PRICED_AS",
+      "description": "Cannondale CAAD14 3 is priced as Mid-Range."
+    },
+    {
+      "id": "rel_93",
+      "sourceId": "node_36",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Cannondale CAAD14 1 is priced as Premium."
+    },
+    {
+      "id": "rel_94",
+      "sourceId": "node_37",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Cannondale SuperSix Evo 3 is priced as Premium."
+    },
+    {
+      "id": "rel_95",
+      "sourceId": "node_38",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Specialized Roubaix SL8 Comp Di2 is priced as Premium."
+    },
+    {
+      "id": "rel_96",
+      "sourceId": "node_39",
+      "targetId": "node_20",
+      "type": "PRICED_AS",
+      "description": "Specialized Tarmac SL8 Pro Force AXS is priced as High-End."
+    },
+    {
+      "id": "rel_97",
+      "sourceId": "node_40",
+      "targetId": "node_18",
+      "type": "PRICED_AS",
+      "description": "Specialized Roubaix SL8 Sport Shimano 105 is priced as Mid-Range."
+    },
+    {
+      "id": "rel_98",
+      "sourceId": "node_41",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Scott Foil RC 30 is priced as Premium."
+    },
+    {
+      "id": "rel_99",
+      "sourceId": "node_42",
+      "targetId": "node_20",
+      "type": "PRICED_AS",
+      "description": "Scott Addict RC 20 is priced as High-End."
+    },
+    {
+      "id": "rel_100",
+      "sourceId": "node_43",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Scott Foil RC 20 is priced as Premium."
+    },
+    {
+      "id": "rel_101",
+      "sourceId": "node_44",
+      "targetId": "node_20",
+      "type": "PRICED_AS",
+      "description": "Specialized Tarmac SL8 Expert Ultegra Di2 is priced as High-End."
+    },
+    {
+      "id": "rel_102",
+      "sourceId": "node_45",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Cervélo Soloist 105 Di2 is priced as Premium."
+    },
+    {
+      "id": "rel_103",
+      "sourceId": "node_46",
+      "targetId": "node_17",
+      "type": "PRICED_AS",
+      "description": "Marin Bikes Nicasio 2 is priced as Entry."
+    },
+    {
+      "id": "rel_104",
+      "sourceId": "node_47",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Wilier Filante SL is priced as Premium."
+    },
+    {
+      "id": "rel_105",
+      "sourceId": "node_48",
+      "targetId": "node_20",
+      "type": "PRICED_AS",
+      "description": "Factor MONZA Force PM is priced as High-End."
+    },
+    {
+      "id": "rel_106",
+      "sourceId": "node_49",
+      "targetId": "node_20",
+      "type": "PRICED_AS",
+      "description": "Factor MONZA Ultegra is priced as High-End."
+    },
+    {
+      "id": "rel_107",
+      "sourceId": "node_50",
+      "targetId": "node_19",
+      "type": "PRICED_AS",
+      "description": "Factor Raiden is priced as Premium."
+    },
+    {
+      "id": "rel_108",
+      "sourceId": "node_21",
+      "targetId": "node_22",
+      "type": "COMPATIBLE_WITH",
+      "description": "Shimano 105 Di2 is compatible with Shimano Ultegra Di2."
+    },
+    {
+      "id": "rel_109",
+      "sourceId": "node_22",
+      "targetId": "node_21",
+      "type": "COMPATIBLE_WITH",
+      "description": "Shimano Ultegra Di2 is compatible with Shimano 105 Di2."
+    },
+    {
+      "id": "rel_110",
+      "sourceId": "node_24",
+      "targetId": "node_26",
+      "type": "COMPATIBLE_WITH",
+      "description": "SRAM Force AXS is compatible with SRAM Rival AXS."
+    },
+    {
+      "id": "rel_111",
+      "sourceId": "node_26",
+      "targetId": "node_24",
+      "type": "COMPATIBLE_WITH",
+      "description": "SRAM Rival AXS is compatible with SRAM Force AXS."
+    },
+    {
+      "id": "rel_112",
+      "sourceId": "node_24",
+      "targetId": "node_25",
+      "type": "COMPATIBLE_WITH",
+      "description": "SRAM Force AXS (2x) is compatible with SRAM Force AXS 1x for drivetrain conversion."
+    },
+    {
+      "id": "rel_113",
+      "sourceId": "node_25",
+      "targetId": "node_24",
+      "type": "COMPATIBLE_WITH",
+      "description": "SRAM Force AXS 1x is compatible with SRAM Force AXS (2x) for drivetrain conversion."
+    }
+  ],
+  "tensions": [],
+  "evaluativeSignals": [],
+  "entityTypes": [
+    {
+      "id": "brand",
+      "label": "Brand",
+      "color": "#8b5cf6"
+    },
+    {
+      "id": "bike",
+      "label": "Bike",
+      "color": "#3b82f6"
+    },
+    {
+      "id": "groupset",
+      "label": "Groupset",
+      "color": "#10b981"
+    },
+    {
+      "id": "frame_material",
+      "label": "Frame Material",
+      "color": "#f59e0b"
+    },
+    {
+      "id": "riding_style",
+      "label": "Riding Style",
+      "color": "#ef4444"
+    },
+    {
+      "id": "price_tier",
+      "label": "Price Tier",
+      "color": "#6b7280"
+    }
+  ]
+}

@@ -1,0 +1,244 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import type { GraphState, GraphNode, Relationship, EntityTypeConfig } from "@/types";
+
+interface InspectorProps {
+  graphState: GraphState;
+  selectedNodeId: string | null;
+  selectedEdgeId: string | null;
+  onUpdateNode: (id: string, updates: Partial<Pick<GraphNode, "label" | "description" | "type">>) => void;
+  onUpdateRelationship: (id: string, updates: Partial<Pick<Relationship, "type" | "description">>) => void;
+  onClose: () => void;
+}
+
+export default function Inspector({
+  graphState,
+  selectedNodeId,
+  selectedEdgeId,
+  onUpdateNode,
+  onUpdateRelationship,
+  onClose,
+}: InspectorProps) {
+  const selectedNode = selectedNodeId
+    ? graphState.nodes.find((n) => n.id === selectedNodeId)
+    : null;
+  const selectedEdge = selectedEdgeId
+    ? graphState.relationships.find((r) => r.id === selectedEdgeId)
+    : null;
+
+  const [editLabel, setEditLabel] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editType, setEditType] = useState("");
+
+  useEffect(() => {
+    if (selectedNode) {
+      setEditLabel(selectedNode.label);
+      setEditDescription(selectedNode.description);
+      setEditType(selectedNode.type);
+    } else if (selectedEdge) {
+      setEditLabel(selectedEdge.type);
+      setEditDescription(selectedEdge.description || "");
+    }
+  }, [selectedNode, selectedEdge]);
+
+  const handleSaveNode = () => {
+    if (!selectedNode) return;
+    onUpdateNode(selectedNode.id, {
+      label: editLabel,
+      description: editDescription,
+      type: editType,
+    });
+  };
+
+  const handleSaveEdge = () => {
+    if (!selectedEdge) return;
+    onUpdateRelationship(selectedEdge.id, {
+      type: editLabel,
+      description: editDescription || undefined,
+    });
+  };
+
+  // Nothing selected → show overview
+  if (!selectedNode && !selectedEdge) {
+    return (
+      <div className="h-full flex flex-col bg-white border-l border-stone-200">
+        <div className="px-4 py-3 border-b border-stone-200">
+          <h3 className="text-sm font-semibold text-stone-800">Inspector</h3>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div className="text-xs text-stone-400">
+            <p className="mb-3">Click a node or edge to inspect and edit it.</p>
+
+            <div className="space-y-3">
+              <div>
+                <h4 className="font-medium text-stone-600 mb-1">Graph Summary</h4>
+                <p>{graphState.nodes.length} entities · {graphState.relationships.length} relationships</p>
+                {graphState.tensions.filter((t) => t.status === "unresolved").length > 0 && (
+                  <p className="text-red-500 mt-1">
+                    {graphState.tensions.filter((t) => t.status === "unresolved").length} unresolved tensions
+                  </p>
+                )}
+              </div>
+
+              {graphState.evaluativeSignals.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-stone-600 mb-1">Evaluative Signals</h4>
+                  {graphState.evaluativeSignals.map((s) => (
+                    <div key={s.id} className="flex items-center gap-1.5 mt-0.5">
+                      <span>
+                        {s.direction === "toward" ? "→" : s.direction === "away_from" ? "←" : "◆"}
+                      </span>
+                      <span className="font-medium text-stone-600">{s.label}</span>
+                      <span className="text-stone-300">
+                        {"●".repeat(s.strength)}{"○".repeat(5 - s.strength)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Node selected
+  if (selectedNode) {
+    const connections = graphState.relationships.filter(
+      (r) => r.sourceId === selectedNode.id || r.targetId === selectedNode.id
+    );
+    const tensions = graphState.tensions.filter((t) =>
+      t.relatedNodeIds.includes(selectedNode.id)
+    );
+
+    return (
+      <div className="h-full flex flex-col bg-white border-l border-stone-200">
+        <div className="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-stone-800">Node</h3>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-xs">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          <div>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Label</label>
+            <input
+              value={editLabel}
+              onChange={(e) => setEditLabel(e.target.value)}
+              onBlur={handleSaveNode}
+              className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1.5 text-sm text-stone-800 focus:border-stone-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Type</label>
+            <select
+              value={editType}
+              onChange={(e) => {
+                setEditType(e.target.value);
+                onUpdateNode(selectedNode.id, { type: e.target.value });
+              }}
+              className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1.5 text-xs text-stone-600 focus:outline-none"
+            >
+              {graphState.entityTypes.map((t) => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Description</label>
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              onBlur={handleSaveNode}
+              rows={3}
+              className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1.5 text-xs text-stone-600 resize-none focus:border-stone-400 focus:outline-none"
+            />
+          </div>
+
+          {connections.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Connections</h4>
+              <div className="mt-1 space-y-1">
+                {connections.map((rel) => {
+                  const isSource = rel.sourceId === selectedNode.id;
+                  const other = graphState.nodes.find(
+                    (n) => n.id === (isSource ? rel.targetId : rel.sourceId)
+                  );
+                  return (
+                    <div key={rel.id} className="text-xs text-stone-600">
+                      {isSource ? "→" : "←"}{" "}
+                      <span className="font-medium">{rel.type}</span>{" "}
+                      {other?.label || "unknown"}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {tensions.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-medium text-red-500 uppercase tracking-wide">Tensions</h4>
+              {tensions.map((t) => (
+                <div key={t.id} className="text-xs text-red-600 mt-0.5">
+                  {t.status === "unresolved" ? "!" : "~"} {t.description}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="text-[10px] text-stone-400 font-mono pt-2 border-t border-stone-100">
+            ID: {selectedNode.id}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Edge selected
+  if (selectedEdge) {
+    const source = graphState.nodes.find((n) => n.id === selectedEdge.sourceId);
+    const target = graphState.nodes.find((n) => n.id === selectedEdge.targetId);
+
+    return (
+      <div className="h-full flex flex-col bg-white border-l border-stone-200">
+        <div className="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-stone-800">Relationship</h3>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-xs">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          <div className="text-xs text-stone-600">
+            <span className="font-medium">{source?.label}</span>
+            {" → "}
+            <span className="font-medium">{target?.label}</span>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Type</label>
+            <input
+              value={editLabel}
+              onChange={(e) => setEditLabel(e.target.value)}
+              onBlur={handleSaveEdge}
+              className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1.5 text-sm text-stone-800 focus:border-stone-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Description</label>
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              onBlur={handleSaveEdge}
+              rows={2}
+              className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1.5 text-xs text-stone-600 resize-none focus:border-stone-400 focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}

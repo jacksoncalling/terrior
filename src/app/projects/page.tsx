@@ -1,0 +1,346 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import type { Project, ProjectPhase } from '@/types';
+import { getProjects, createProject } from '@/lib/supabase';
+import { useProject } from '@/lib/project-context';
+
+// ── Phase badge ──────────────────────────────────────────────────────────────
+
+const PHASE_STYLES: Record<ProjectPhase, string> = {
+  preparation: 'bg-stone-100 text-stone-500',
+  workshop:    'bg-amber-100 text-amber-700',
+  synthesis:   'bg-violet-100 text-violet-700',
+  validation:  'bg-blue-100 text-blue-700',
+  live:        'bg-emerald-100 text-emerald-700',
+};
+
+function PhaseBadge({ phase }: { phase: ProjectPhase }) {
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${PHASE_STYLES[phase]}`}>
+      {phase}
+    </span>
+  );
+}
+
+// ── New project modal ────────────────────────────────────────────────────────
+
+const EMBEDDING_MODELS = [
+  { value: 'paraphrase-multilingual-MiniLM-L12-v2', label: 'Multilingual MiniLM L12 (recommended)' },
+  { value: 'all-MiniLM-L6-v2', label: 'MiniLM L6 (English only)' },
+];
+
+interface NewProjectModalProps {
+  onClose: () => void;
+  onCreated: (project: Project) => void;
+}
+
+function NewProjectModal({ onClose, onCreated }: NewProjectModalProps) {
+  const [name, setName] = useState('');
+  const [sector, setSector] = useState('');
+  const [description, setDescription] = useState('');
+  const [embeddingModel, setEmbeddingModel] = useState(EMBEDDING_MODELS[0].value);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const project = await createProject({
+        name: name.trim(),
+        sector: sector.trim() || undefined,
+        description: description.trim() || undefined,
+        embedding_model: embeddingModel,
+        phase: 'preparation',
+      });
+      onCreated(project);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create project');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-semibold text-stone-800">New Project</h2>
+          <button
+            onClick={onClose}
+            className="text-stone-400 hover:text-stone-600 text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1">
+              Project name <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Babor Beauty Group"
+              className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-300 bg-stone-50"
+              autoFocus
+            />
+          </div>
+
+          {/* Sector */}
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1">
+              Sector <span className="text-stone-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+              placeholder="e.g. Skincare / E-Commerce"
+              className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-300 bg-stone-50"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1">
+              Description <span className="text-stone-400">(optional)</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What is this project about?"
+              rows={2}
+              className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-300 bg-stone-50 resize-none"
+            />
+          </div>
+
+          {/* Embedding model */}
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1">
+              Embedding model
+            </label>
+            <select
+              value={embeddingModel}
+              onChange={(e) => setEmbeddingModel(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-300 bg-stone-50"
+            >
+              {EMBEDDING_MODELS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-stone-400 mt-1">
+              Must match the model used when ingesting documents. Cannot be changed later.
+            </p>
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-stone-500 hover:text-stone-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!name.trim() || saving}
+              className="px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? 'Creating…' : 'Create project'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Project card ─────────────────────────────────────────────────────────────
+
+interface ProjectCardProps {
+  project: Project;
+  onSelect: (project: Project) => void;
+}
+
+function ProjectCard({ project, onSelect }: ProjectCardProps) {
+  const updatedAt = new Date(project.updated_at);
+  const relativeTime = formatRelativeTime(updatedAt);
+
+  return (
+    <button
+      onClick={() => onSelect(project)}
+      className="w-full text-left bg-white border border-stone-200 rounded-xl p-5 hover:border-stone-400 hover:shadow-sm transition-all group"
+    >
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <h3 className="text-sm font-semibold text-stone-800 group-hover:text-stone-900 leading-tight">
+          {project.name}
+        </h3>
+        <PhaseBadge phase={project.phase} />
+      </div>
+
+      {project.sector && (
+        <p className="text-[11px] text-stone-400 mb-2">{project.sector}</p>
+      )}
+
+      {project.description && (
+        <p className="text-xs text-stone-500 mb-3 line-clamp-2">{project.description}</p>
+      )}
+
+      <div className="flex items-center gap-3 text-[10px] text-stone-400">
+        <span>Updated {relativeTime}</span>
+        <span className="text-stone-200">·</span>
+        <span className="font-mono">{project.embedding_model.split('-').slice(0, 2).join('-')}</span>
+      </div>
+    </button>
+  );
+}
+
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+export default function ProjectsPage() {
+  const router = useRouter();
+  const { setProjectId } = useProject();
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getProjects();
+      setProjects(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleSelect = useCallback(
+    (project: Project) => {
+      setProjectId(project.id);
+      router.push('/');
+    },
+    [setProjectId, router]
+  );
+
+  const handleCreated = useCallback(
+    (project: Project) => {
+      setShowModal(false);
+      setProjectId(project.id);
+      router.push('/');
+    },
+    [setProjectId, router]
+  );
+
+  return (
+    <div className="min-h-screen bg-stone-50">
+      {/* Header */}
+      <header className="border-b border-stone-200 bg-white px-6 py-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-base font-semibold text-stone-800 tracking-tight">TERROIR</h1>
+            <p className="text-[11px] text-stone-400 mt-0.5">Organisational Listening</p>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
+          >
+            + New Project
+          </button>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="max-w-4xl mx-auto px-6 py-8">
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <p className="text-sm text-stone-400">Loading projects…</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-red-600">{error}</p>
+            <button
+              onClick={load}
+              className="text-xs text-red-500 underline mt-1"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && projects.length === 0 && (
+          <div className="text-center py-20">
+            <p className="text-stone-500 mb-2 text-sm">No projects yet</p>
+            <p className="text-stone-400 text-xs mb-6">
+              Create your first project to get started.
+            </p>
+            <button
+              onClick={() => setShowModal(true)}
+              className="px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
+            >
+              + New Project
+            </button>
+          </div>
+        )}
+
+        {!loading && projects.length > 0 && (
+          <>
+            <p className="text-xs text-stone-400 mb-4">
+              {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {projects.map((project) => (
+                <ProjectCard key={project.id} project={project} onSelect={handleSelect} />
+              ))}
+            </div>
+          </>
+        )}
+      </main>
+
+      {showModal && (
+        <NewProjectModal
+          onClose={() => setShowModal(false)}
+          onCreated={handleCreated}
+        />
+      )}
+    </div>
+  );
+}

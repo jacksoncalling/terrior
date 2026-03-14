@@ -1,0 +1,1335 @@
+{
+  "nodes": [
+    {
+      "id": "node_1",
+      "label": "Ampoule Concentrates",
+      "type": "product_line",
+      "description": "A line of highly concentrated active ingredient ampoules for various skin concerns, known for their immediate effects.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_2",
+      "label": "DOCTOR BABOR",
+      "type": "product_line",
+      "description": "A high-performance skincare line with extremely high active potential, designed for targeted treatment of specific skin problems.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_3",
+      "label": "Cleansing",
+      "type": "product_line",
+      "description": "A product line focused on effective and gentle skin cleansing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_4",
+      "label": "Microbiomic",
+      "type": "product_line",
+      "description": "A product line that strengthens the skin's protective barrier and promotes a healthy glow.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_5",
+      "label": "Skinovage",
+      "type": "product_line",
+      "description": "A system care line tailored to specific skin types and needs, offering intensive moisture and anti-aging benefits.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_6",
+      "label": "HSR Lifting",
+      "type": "product_line",
+      "description": "A luxurious anti-wrinkle series designed to reduce signs of aging and prevent new lines and wrinkles.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_7",
+      "label": "HY-ÖL",
+      "type": "product_line",
+      "description": "Babor's foundational cleansing product, using hydrophilic oils for deep cleansing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_8",
+      "label": "Dehydration",
+      "type": "skin_concern",
+      "description": "Skin lacking moisture, often appearing tight or with fine lines.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_9",
+      "label": "Sensitivity",
+      "type": "skin_concern",
+      "description": "Skin prone to irritation, redness, itching, or tightness.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_10",
+      "label": "Redness",
+      "type": "skin_concern",
+      "description": "Visible flushing or persistent red areas on the skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_11",
+      "label": "Weakened Skin Barrier",
+      "type": "skin_concern",
+      "description": "Skin with compromised protective function, leading to increased sensitivity and moisture loss.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_12",
+      "label": "Dullness",
+      "type": "skin_concern",
+      "description": "Skin lacking radiance and appearing tired or uneven.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_13",
+      "label": "Wrinkles",
+      "type": "skin_concern",
+      "description": "Lines and folds in the skin, often associated with aging.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_14",
+      "label": "Loss of Firmness",
+      "type": "skin_concern",
+      "description": "Reduced skin elasticity and sagging.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_15",
+      "label": "Hyperpigmentation",
+      "type": "skin_concern",
+      "description": "Dark spots or uneven skin tone caused by excess melanin production.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_16",
+      "label": "Blemishes/Acne",
+      "type": "skin_concern",
+      "description": "Skin impurities, pimples, and breakouts.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_17",
+      "label": "Dry Skin",
+      "type": "skin_type",
+      "description": "Skin type characterized by a lack of natural oils (lipids), often feeling rough, flaky, or tight.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_18",
+      "label": "Sensitive Skin",
+      "type": "skin_type",
+      "description": "Skin type that reacts easily to external stimuli, prone to redness and irritation.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_19",
+      "label": "Demanding Skin",
+      "type": "skin_type",
+      "description": "Skin that requires specialized care due to specific needs or conditions.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_20",
+      "label": "Mature Skin",
+      "type": "skin_type",
+      "description": "Skin type showing signs of aging, such as wrinkles and loss of elasticity.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_21",
+      "label": "All Skin Types",
+      "type": "skin_type",
+      "description": "Suitable for any skin type.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_22",
+      "label": "Cleansing",
+      "type": "routine_step",
+      "description": "The first step in a skincare routine, removing impurities and makeup.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_23",
+      "label": "Serum/Treatment",
+      "type": "routine_step",
+      "description": "Concentrated formulas targeting specific skin concerns.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_24",
+      "label": "Moisturizing",
+      "type": "routine_step",
+      "description": "Applying creams or lotions to hydrate and protect the skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_25",
+      "label": "Masking",
+      "type": "routine_step",
+      "description": "Applying a mask for intensive care or specific benefits.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_26",
+      "label": "Toning",
+      "type": "routine_step",
+      "description": "Balancing the skin's pH and preparing it for subsequent products.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_27",
+      "label": "Eye Care",
+      "type": "routine_step",
+      "description": "Specific products for the delicate skin around the eyes.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_28",
+      "label": "Sun Protection",
+      "type": "routine_step",
+      "description": "Applying products with SPF to shield skin from UV radiation.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_29",
+      "label": "3D Hyaluron",
+      "type": "ingredient",
+      "description": "Triple-molecular-weight hyaluronic acid that hydrates at three different skin depths simultaneously.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_30",
+      "label": "Peptides",
+      "type": "ingredient",
+      "description": "Amino acid chains that support skin's natural collagen production and improve elasticity.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_31",
+      "label": "THD Ascorbic Acid",
+      "type": "ingredient",
+      "description": "A stable, oil-soluble form of Vitamin C known for its brightening and antioxidant properties.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_32",
+      "label": "Retinol",
+      "type": "ingredient",
+      "description": "A form of Vitamin A that promotes skin renewal, reduces wrinkles, and improves skin texture.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_33",
+      "label": "Vitamin C",
+      "type": "ingredient",
+      "description": "A powerful antioxidant that brightens skin, evens tone, and supports collagen synthesis.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_34",
+      "label": "Astaxanthin",
+      "type": "ingredient",
+      "description": "A potent antioxidant that protects skin from oxidative stress and enhances radiance.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_35",
+      "label": "Probiotics",
+      "type": "ingredient",
+      "description": "Beneficial microorganisms that help balance the skin's microbiome and strengthen its barrier.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_36",
+      "label": "Postbiotics",
+      "type": "ingredient",
+      "description": "Metabolic byproducts of probiotics that support skin health and barrier function.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_37",
+      "label": "Mushroom Extracts",
+      "type": "ingredient",
+      "description": "Plant-based extracts with soothing and stress-combating properties for the skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_38",
+      "label": "Hydrophilic Oils",
+      "type": "ingredient",
+      "description": "Water-friendly oils used in cleansing to effectively remove oil-soluble impurities.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_39",
+      "label": "Ampoule Concentrates Hydra Plus",
+      "type": "product",
+      "description": "Active concentrate for dehydrated, dry skin, providing intensive moisture.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_40",
+      "label": "Doctor Babor Instant Soothing Ampoule Serum Concentrate",
+      "type": "product",
+      "description": "A 7-day intensive treatment for immediately soothed and strengthened skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_41",
+      "label": "Cleansing Hyaluronic Cleansing Balm",
+      "type": "product",
+      "description": "A smoothing cleansing balm with 3D Hyaluron for demanding skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_42",
+      "label": "Microbiomic Moisture Glow Cream",
+      "type": "product",
+      "description": "A 72h hydrating face cream for an immediate, healthy-looking glow.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_43",
+      "label": "Doctor Babor Cryo Plumping Mask",
+      "type": "product",
+      "description": "A bio-cellulose mask with an immediate moisture boost for smoother skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_44",
+      "label": "Cleansing Soothing Rose Toner",
+      "type": "product",
+      "description": "A balancing facial toner without alcohol, suitable for all skin types.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_45",
+      "label": "Skinovage Moist + Lipid Cream",
+      "type": "product",
+      "description": "A rich face care cream for dry and lipid-deficient skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_46",
+      "label": "Skinovage Moisturizing Foam Mask",
+      "type": "product",
+      "description": "An experience foam mask for dry skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_47",
+      "label": "Doctor Babor Protecting Balm SPF 50",
+      "type": "product",
+      "description": "A light Protecting Balm SPF 50 that absorbs quickly without stickiness, offering advanced UVA/UVB, blue light, and infrared protection.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_48",
+      "label": "HSR Lifting Anti-Wrinkle Cream",
+      "type": "product",
+      "description": "A luxurious anti-wrinkle cream that reduces the traces of time on the skin and effectively prevents new lines and wrinkles.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_49",
+      "label": "Ampoule Concentrates Nutri Restore",
+      "type": "product",
+      "description": "An active concentrate for dull, weakened skin, providing essential nutrients.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_50",
+      "label": "Doctor Babor Collagen-Peptide Booster Cream",
+      "type": "product",
+      "description": "A modern peptide-performance cream for a sensual care ritual, targeting elasticity and wrinkles.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_51",
+      "label": "Doctor Babor Radiant Complexion Cream",
+      "type": "product",
+      "description": "A cream with 10% THD (Vitamin C) for a more radiant and even complexion.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_52",
+      "label": "Doctor Babor The Cure Cream",
+      "type": "product",
+      "description": "An intensive skin regeneration cream with strong anti-inflammatory and antioxidant properties.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_53",
+      "label": "Ampoule Concentrates Collagen Booster",
+      "type": "product",
+      "description": "An active concentrate for more elasticity and fewer wrinkles.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_54",
+      "label": "Ampoule Concentrates Multi Vitamin",
+      "type": "product",
+      "description": "An active concentrate for weakened, protected, tired-looking skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_55",
+      "label": "Skinovage Instant Fresh Smooth Eye Serum + Patches",
+      "type": "product",
+      "description": "A duo for intensive moisture and an immediately more awake, fresh, and smooth eye area.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_56",
+      "label": "Refining Cleansing Oil Balm",
+      "type": "product",
+      "description": "A cleansing balm for a more radiant and smoother complexion.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_57",
+      "label": "Rebalancing Toner",
+      "type": "product",
+      "description": "A toner for a balanced and relaxed complexion.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_58",
+      "label": "Derma Filler Serum",
+      "type": "product",
+      "description": "A daily booster serum for immediately smoother and plumper-looking skin.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_59",
+      "label": "Stress Defense Mushroom Cream",
+      "type": "product",
+      "description": "A cream that combats stress with its herbal superpower, promoting skin resilience.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_60",
+      "label": "Doctor Babor Broad Spectrum Hydration Serum SPF 50+",
+      "type": "product",
+      "description": "An advanced serum offering UVA/UVB, blue light, and infrared protection with intensive hydration.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_61",
+      "label": "Doctor Babor Broad Spectrum Hydration Lotion SPF 30",
+      "type": "product",
+      "description": "An advanced lotion offering UVA/UVB, blue light, and infrared protection with intensive hydration.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_62",
+      "label": "Doctor Babor After Sun Hydration Recovery Lotion",
+      "type": "product",
+      "description": "An intensively hydrating and fast-absorbing after-sun lotion for face and body.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "node_63",
+      "label": "HY-ÖL Cleanser",
+      "type": "product",
+      "description": "The original hydrophilic cleansing oil, a bestseller for deep cleansing.",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel_1",
+      "sourceId": "node_39",
+      "targetId": "node_1",
+      "type": "BELONGS_TO",
+      "description": "Part of the Ampoule Concentrates line."
+    },
+    {
+      "id": "rel_2",
+      "sourceId": "node_39",
+      "targetId": "node_8",
+      "type": "TARGETS",
+      "description": "Specifically formulated for dehydrated skin."
+    },
+    {
+      "id": "rel_3",
+      "sourceId": "node_39",
+      "targetId": "node_17",
+      "type": "SUITABLE_FOR",
+      "description": "Recommended for dry skin type."
+    },
+    {
+      "id": "rel_4",
+      "sourceId": "node_39",
+      "targetId": "node_23",
+      "type": "USED_IN",
+      "description": "Used as a serum/treatment step."
+    },
+    {
+      "id": "rel_5",
+      "sourceId": "node_40",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_6",
+      "sourceId": "node_40",
+      "targetId": "node_9",
+      "type": "TARGETS",
+      "description": "Provides immediate soothing for sensitive skin."
+    },
+    {
+      "id": "rel_7",
+      "sourceId": "node_40",
+      "targetId": "node_11",
+      "type": "TARGETS",
+      "description": "Strengthens weakened skin."
+    },
+    {
+      "id": "rel_8",
+      "sourceId": "node_40",
+      "targetId": "node_23",
+      "type": "USED_IN",
+      "description": "Used as a serum/treatment step."
+    },
+    {
+      "id": "rel_9",
+      "sourceId": "node_41",
+      "targetId": "node_3",
+      "type": "BELONGS_TO",
+      "description": "Part of the Cleansing line."
+    },
+    {
+      "id": "rel_10",
+      "sourceId": "node_41",
+      "targetId": "node_29",
+      "type": "CONTAINS",
+      "description": "Contains 3D Hyaluron for hydration."
+    },
+    {
+      "id": "rel_11",
+      "sourceId": "node_41",
+      "targetId": "node_19",
+      "type": "SUITABLE_FOR",
+      "description": "Recommended for demanding skin."
+    },
+    {
+      "id": "rel_12",
+      "sourceId": "node_41",
+      "targetId": "node_22",
+      "type": "USED_IN",
+      "description": "Used as a cleansing step."
+    },
+    {
+      "id": "rel_13",
+      "sourceId": "node_42",
+      "targetId": "node_4",
+      "type": "BELONGS_TO",
+      "description": "Part of the Microbiomic line."
+    },
+    {
+      "id": "rel_14",
+      "sourceId": "node_42",
+      "targetId": "node_8",
+      "type": "TARGETS",
+      "description": "Provides 72h hydration for dehydrated skin."
+    },
+    {
+      "id": "rel_15",
+      "sourceId": "node_42",
+      "targetId": "node_24",
+      "type": "USED_IN",
+      "description": "Used as a moisturizing step."
+    },
+    {
+      "id": "rel_16",
+      "sourceId": "node_43",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_17",
+      "sourceId": "node_43",
+      "targetId": "node_8",
+      "type": "TARGETS",
+      "description": "Provides an immediate moisture boost."
+    },
+    {
+      "id": "rel_18",
+      "sourceId": "node_43",
+      "targetId": "node_25",
+      "type": "USED_IN",
+      "description": "Used as a masking step."
+    },
+    {
+      "id": "rel_19",
+      "sourceId": "node_44",
+      "targetId": "node_3",
+      "type": "BELONGS_TO",
+      "description": "Part of the Cleansing line."
+    },
+    {
+      "id": "rel_20",
+      "sourceId": "node_44",
+      "targetId": "node_21",
+      "type": "SUITABLE_FOR",
+      "description": "Suitable for all skin types."
+    },
+    {
+      "id": "rel_21",
+      "sourceId": "node_44",
+      "targetId": "node_26",
+      "type": "USED_IN",
+      "description": "Used as a toning step."
+    },
+    {
+      "id": "rel_22",
+      "sourceId": "node_45",
+      "targetId": "node_5",
+      "type": "BELONGS_TO",
+      "description": "Part of the Skinovage line."
+    },
+    {
+      "id": "rel_23",
+      "sourceId": "node_45",
+      "targetId": "node_17",
+      "type": "SUITABLE_FOR",
+      "description": "Recommended for dry skin type."
+    },
+    {
+      "id": "rel_24",
+      "sourceId": "node_45",
+      "targetId": "node_24",
+      "type": "USED_IN",
+      "description": "Used as a moisturizing step."
+    },
+    {
+      "id": "rel_25",
+      "sourceId": "node_46",
+      "targetId": "node_5",
+      "type": "BELONGS_TO",
+      "description": "Part of the Skinovage line."
+    },
+    {
+      "id": "rel_26",
+      "sourceId": "node_46",
+      "targetId": "node_17",
+      "type": "SUITABLE_FOR",
+      "description": "Recommended for dry skin type."
+    },
+    {
+      "id": "rel_27",
+      "sourceId": "node_46",
+      "targetId": "node_25",
+      "type": "USED_IN",
+      "description": "Used as a masking step."
+    },
+    {
+      "id": "rel_28",
+      "sourceId": "node_47",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_29",
+      "sourceId": "node_47",
+      "targetId": "node_28",
+      "type": "USED_IN",
+      "description": "Used as a sun protection step."
+    },
+    {
+      "id": "rel_30",
+      "sourceId": "node_48",
+      "targetId": "node_6",
+      "type": "BELONGS_TO",
+      "description": "Part of the HSR Lifting line."
+    },
+    {
+      "id": "rel_31",
+      "sourceId": "node_48",
+      "targetId": "node_13",
+      "type": "TARGETS",
+      "description": "Reduces and prevents wrinkles."
+    },
+    {
+      "id": "rel_32",
+      "sourceId": "node_48",
+      "targetId": "node_24",
+      "type": "USED_IN",
+      "description": "Used as a moisturizing step."
+    },
+    {
+      "id": "rel_33",
+      "sourceId": "node_49",
+      "targetId": "node_1",
+      "type": "BELONGS_TO",
+      "description": "Part of the Ampoule Concentrates line."
+    },
+    {
+      "id": "rel_34",
+      "sourceId": "node_49",
+      "targetId": "node_12",
+      "type": "TARGETS",
+      "description": "Addresses dull and weakened skin."
+    },
+    {
+      "id": "rel_35",
+      "sourceId": "node_49",
+      "targetId": "node_11",
+      "type": "TARGETS",
+      "description": "Provides essential nutrients for weakened skin."
+    },
+    {
+      "id": "rel_36",
+      "sourceId": "node_49",
+      "targetId": "node_23",
+      "type": "USED_IN",
+      "description": "Used as a serum/treatment step."
+    },
+    {
+      "id": "rel_37",
+      "sourceId": "node_50",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_38",
+      "sourceId": "node_50",
+      "targetId": "node_30",
+      "type": "CONTAINS",
+      "description": "Contains peptides for performance."
+    },
+    {
+      "id": "rel_39",
+      "sourceId": "node_50",
+      "targetId": "node_13",
+      "type": "TARGETS",
+      "description": "Targets wrinkles and promotes elasticity."
+    },
+    {
+      "id": "rel_40",
+      "sourceId": "node_50",
+      "targetId": "node_14",
+      "type": "TARGETS",
+      "description": "Improves skin firmness."
+    },
+    {
+      "id": "rel_41",
+      "sourceId": "node_50",
+      "targetId": "node_24",
+      "type": "USED_IN",
+      "description": "Used as a moisturizing step."
+    },
+    {
+      "id": "rel_42",
+      "sourceId": "node_51",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_43",
+      "sourceId": "node_51",
+      "targetId": "node_31",
+      "type": "CONTAINS",
+      "description": "Contains 10% THD Ascorbic Acid."
+    },
+    {
+      "id": "rel_44",
+      "sourceId": "node_51",
+      "targetId": "node_12",
+      "type": "TARGETS",
+      "description": "Promotes a more radiant complexion."
+    },
+    {
+      "id": "rel_45",
+      "sourceId": "node_51",
+      "targetId": "node_15",
+      "type": "TARGETS",
+      "description": "Aids in achieving an even skin tone."
+    },
+    {
+      "id": "rel_46",
+      "sourceId": "node_51",
+      "targetId": "node_24",
+      "type": "USED_IN",
+      "description": "Used as a moisturizing step."
+    },
+    {
+      "id": "rel_47",
+      "sourceId": "node_52",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_48",
+      "sourceId": "node_52",
+      "targetId": "node_11",
+      "type": "TARGETS",
+      "description": "Supports intensive skin regeneration."
+    },
+    {
+      "id": "rel_49",
+      "sourceId": "node_52",
+      "targetId": "node_24",
+      "type": "USED_IN",
+      "description": "Used as a moisturizing step."
+    },
+    {
+      "id": "rel_50",
+      "sourceId": "node_53",
+      "targetId": "node_1",
+      "type": "BELONGS_TO",
+      "description": "Part of the Ampoule Concentrates line."
+    },
+    {
+      "id": "rel_51",
+      "sourceId": "node_53",
+      "targetId": "node_13",
+      "type": "TARGETS",
+      "description": "Reduces wrinkles."
+    },
+    {
+      "id": "rel_52",
+      "sourceId": "node_53",
+      "targetId": "node_14",
+      "type": "TARGETS",
+      "description": "Enhances skin elasticity."
+    },
+    {
+      "id": "rel_53",
+      "sourceId": "node_53",
+      "targetId": "node_23",
+      "type": "USED_IN",
+      "description": "Used as a serum/treatment step."
+    },
+    {
+      "id": "rel_54",
+      "sourceId": "node_54",
+      "targetId": "node_1",
+      "type": "BELONGS_TO",
+      "description": "Part of the Ampoule Concentrates line."
+    },
+    {
+      "id": "rel_55",
+      "sourceId": "node_54",
+      "targetId": "node_11",
+      "type": "TARGETS",
+      "description": "Supports weakened and protected skin."
+    },
+    {
+      "id": "rel_56",
+      "sourceId": "node_54",
+      "targetId": "node_12",
+      "type": "TARGETS",
+      "description": "Addresses tired-looking skin."
+    },
+    {
+      "id": "rel_57",
+      "sourceId": "node_54",
+      "targetId": "node_23",
+      "type": "USED_IN",
+      "description": "Used as a serum/treatment step."
+    },
+    {
+      "id": "rel_58",
+      "sourceId": "node_55",
+      "targetId": "node_5",
+      "type": "BELONGS_TO",
+      "description": "Part of the Skinovage line."
+    },
+    {
+      "id": "rel_59",
+      "sourceId": "node_55",
+      "targetId": "node_8",
+      "type": "TARGETS",
+      "description": "Provides intensive moisture for the eye area."
+    },
+    {
+      "id": "rel_60",
+      "sourceId": "node_55",
+      "targetId": "node_27",
+      "type": "USED_IN",
+      "description": "Used as an eye care step."
+    },
+    {
+      "id": "rel_61",
+      "sourceId": "node_56",
+      "targetId": "node_3",
+      "type": "BELONGS_TO",
+      "description": "Part of the Cleansing line."
+    },
+    {
+      "id": "rel_62",
+      "sourceId": "node_56",
+      "targetId": "node_22",
+      "type": "USED_IN",
+      "description": "Used as a cleansing step."
+    },
+    {
+      "id": "rel_63",
+      "sourceId": "node_57",
+      "targetId": "node_3",
+      "type": "BELONGS_TO",
+      "description": "Part of the Cleansing line."
+    },
+    {
+      "id": "rel_64",
+      "sourceId": "node_57",
+      "targetId": "node_26",
+      "type": "USED_IN",
+      "description": "Used as a toning step."
+    },
+    {
+      "id": "rel_65",
+      "sourceId": "node_58",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_66",
+      "sourceId": "node_58",
+      "targetId": "node_8",
+      "type": "TARGETS",
+      "description": "Plumps skin, addressing dehydration-related lines."
+    },
+    {
+      "id": "rel_67",
+      "sourceId": "node_58",
+      "targetId": "node_23",
+      "type": "USED_IN",
+      "description": "Used as a serum/treatment step."
+    },
+    {
+      "id": "rel_68",
+      "sourceId": "node_59",
+      "targetId": "node_37",
+      "type": "CONTAINS",
+      "description": "Contains mushroom extracts."
+    },
+    {
+      "id": "rel_69",
+      "sourceId": "node_59",
+      "targetId": "node_9",
+      "type": "TARGETS",
+      "description": "Combats stress, implying soothing for sensitive skin."
+    },
+    {
+      "id": "rel_70",
+      "sourceId": "node_59",
+      "targetId": "node_24",
+      "type": "USED_IN",
+      "description": "Used as a moisturizing step."
+    },
+    {
+      "id": "rel_71",
+      "sourceId": "node_60",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_72",
+      "sourceId": "node_60",
+      "targetId": "node_8",
+      "type": "TARGETS",
+      "description": "Provides intensive hydration."
+    },
+    {
+      "id": "rel_73",
+      "sourceId": "node_60",
+      "targetId": "node_28",
+      "type": "USED_IN",
+      "description": "Used as a sun protection step."
+    },
+    {
+      "id": "rel_74",
+      "sourceId": "node_61",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_75",
+      "sourceId": "node_61",
+      "targetId": "node_8",
+      "type": "TARGETS",
+      "description": "Provides intensive hydration."
+    },
+    {
+      "id": "rel_76",
+      "sourceId": "node_61",
+      "targetId": "node_28",
+      "type": "USED_IN",
+      "description": "Used as a sun protection step."
+    },
+    {
+      "id": "rel_77",
+      "sourceId": "node_62",
+      "targetId": "node_2",
+      "type": "BELONGS_TO",
+      "description": "Part of the DOCTOR BABOR line."
+    },
+    {
+      "id": "rel_78",
+      "sourceId": "node_62",
+      "targetId": "node_8",
+      "type": "TARGETS",
+      "description": "Provides intensive hydration after sun exposure."
+    },
+    {
+      "id": "rel_79",
+      "sourceId": "node_62",
+      "targetId": "node_24",
+      "type": "USED_IN",
+      "description": "Used as a moisturizing step."
+    },
+    {
+      "id": "rel_80",
+      "sourceId": "node_63",
+      "targetId": "node_7",
+      "type": "BELONGS_TO",
+      "description": "The original HY-ÖL cleanser."
+    },
+    {
+      "id": "rel_81",
+      "sourceId": "node_63",
+      "targetId": "node_38",
+      "type": "CONTAINS",
+      "description": "Contains hydrophilic oils."
+    },
+    {
+      "id": "rel_82",
+      "sourceId": "node_63",
+      "targetId": "node_22",
+      "type": "USED_IN",
+      "description": "Used as a cleansing step."
+    },
+    {
+      "id": "rel_83",
+      "sourceId": "node_29",
+      "targetId": "node_8",
+      "type": "ADDRESSES",
+      "description": "Hydrates at three different skin depths."
+    },
+    {
+      "id": "rel_84",
+      "sourceId": "node_30",
+      "targetId": "node_13",
+      "type": "ADDRESSES",
+      "description": "Supports skin's natural collagen production to reduce wrinkles."
+    },
+    {
+      "id": "rel_85",
+      "sourceId": "node_30",
+      "targetId": "node_14",
+      "type": "ADDRESSES",
+      "description": "Improves skin elasticity and firmness."
+    },
+    {
+      "id": "rel_86",
+      "sourceId": "node_31",
+      "targetId": "node_12",
+      "type": "ADDRESSES",
+      "description": "Brightens skin and promotes an even complexion."
+    },
+    {
+      "id": "rel_87",
+      "sourceId": "node_31",
+      "targetId": "node_15",
+      "type": "ADDRESSES",
+      "description": "Reduces hyperpigmentation."
+    },
+    {
+      "id": "rel_88",
+      "sourceId": "node_32",
+      "targetId": "node_13",
+      "type": "ADDRESSES",
+      "description": "Promotes skin renewal to reduce wrinkles."
+    },
+    {
+      "id": "rel_89",
+      "sourceId": "node_33",
+      "targetId": "node_12",
+      "type": "ADDRESSES",
+      "description": "Brightens skin and evens tone."
+    },
+    {
+      "id": "rel_90",
+      "sourceId": "node_33",
+      "targetId": "node_15",
+      "type": "ADDRESSES",
+      "description": "Reduces hyperpigmentation."
+    },
+    {
+      "id": "rel_91",
+      "sourceId": "node_34",
+      "targetId": "node_12",
+      "type": "ADDRESSES",
+      "description": "Protects from oxidative stress and enhances radiance."
+    },
+    {
+      "id": "rel_92",
+      "sourceId": "node_35",
+      "targetId": "node_11",
+      "type": "ADDRESSES",
+      "description": "Helps balance the skin's microbiome and strengthen its barrier."
+    },
+    {
+      "id": "rel_93",
+      "sourceId": "node_36",
+      "targetId": "node_11",
+      "type": "ADDRESSES",
+      "description": "Supports skin health and barrier function."
+    },
+    {
+      "id": "rel_94",
+      "sourceId": "node_37",
+      "targetId": "node_9",
+      "type": "ADDRESSES",
+      "description": "Provides soothing and stress-combating properties."
+    },
+    {
+      "id": "rel_95",
+      "sourceId": "node_38",
+      "targetId": "node_22",
+      "type": "USED_IN",
+      "description": "Key for effective cleansing."
+    }
+  ],
+  "tensions": [],
+  "evaluativeSignals": [],
+  "entityTypes": [
+    {
+      "id": "product_line",
+      "label": "Product Line",
+      "color": "#8b5cf6"
+    },
+    {
+      "id": "product",
+      "label": "Product",
+      "color": "#3b82f6"
+    },
+    {
+      "id": "ingredient",
+      "label": "Ingredient",
+      "color": "#10b981"
+    },
+    {
+      "id": "skin_concern",
+      "label": "Skin Concern",
+      "color": "#f59e0b"
+    },
+    {
+      "id": "skin_type",
+      "label": "Skin Type",
+      "color": "#ef4444"
+    },
+    {
+      "id": "routine_step",
+      "label": "Routine Step",
+      "color": "#6b7280"
+    }
+  ]
+}

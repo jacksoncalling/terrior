@@ -1,0 +1,364 @@
+import { createClient } from '@supabase/supabase-js';
+import type {
+  Project,
+  ProjectPhase,
+  GraphState,
+  GraphNode,
+  Relationship,
+  TensionMarker,
+  EvaluativeSignal,
+  EntityTypeConfig,
+} from '@/types';
+
+// NEXT_PUBLIC_ prefix makes these available in both server and client bundles.
+// Fallback to unprefixed versions for scripts/API routes that set them directly.
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '';
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL environment variables');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// ── Legacy types (Phase 1 compatibility) ────────────────────────────────────
+
+export type Document = {
+  id: string;
+  url: string;
+  title: string;
+  section: string;
+  content: string;
+  project_id: string | null;
+  created_at: string;
+};
+
+export type DocumentChunk = {
+  id: string;
+  document_id: string;
+  content: string;
+  chunk_index: number;
+  embedding: number[];
+  project_id: string | null;
+};
+
+// ── Search result type ───────────────────────────────────────────────────────
+
+export type SearchResult = {
+  id: string;
+  document_id: string;
+  content: string;
+  chunk_index: number;
+  similarity: number;
+  doc_url: string;
+  doc_title: string;
+  doc_section: string;
+};
+
+// ── Project CRUD ─────────────────────────────────────────────────────────────
+
+export async function getProjects(): Promise<Project[]> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(`getProjects: ${error.message}`);
+  return data ?? [];
+}
+
+export async function getProject(id: string): Promise<Project | null> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // not found
+    throw new Error(`getProject: ${error.message}`);
+  }
+  return data;
+}
+
+export async function createProject(input: {
+  name: string;
+  sector?: string;
+  description?: string;
+  embedding_model?: string;
+  phase?: ProjectPhase;
+  metadata?: Record<string, unknown>;
+}): Promise<Project> {
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({
+      name: input.name,
+      sector: input.sector ?? null,
+      description: input.description ?? null,
+      embedding_model: input.embedding_model ?? 'paraphrase-multilingual-MiniLM-L12-v2',
+      phase: input.phase ?? 'preparation',
+      metadata: input.metadata ?? {},
+    })
+    .select('*')
+    .single();
+
+  if (error) throw new Error(`createProject: ${error.message}`);
+  return data;
+}
+
+export async function updateProjectPhase(id: string, phase: ProjectPhase): Promise<void> {
+  const { error } = await supabase
+    .from('projects')
+    .update({ phase, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) throw new Error(`updateProjectPhase: ${error.message}`);
+}
+
+// ── Ontology load / save ─────────────────────────────────────────────────────
+//
+// loadOntology: fetches all 5 ontology tables for a project in parallel and
+//               maps DB rows → TypeScript interfaces (GraphState).
+//
+// saveOntology: upserts the full GraphState, then deletes any rows that are no
+//               longer present in the state (by comparing IDs).
+
+export async function loadOntology(projectId: string): Promise<GraphState> {
+  const [nodesRes, relsRes, tensionsRes, signalsRes, entityTypesRes] = await Promise.all([
+    supabase.from('ontology_nodes').select('*').eq('project_id', projectId),
+    supabase.from('ontology_relationships').select('*').eq('project_id', projectId),
+    supabase.from('tension_markers').select('*').eq('project_id', projectId),
+    supabase.from('evaluative_signals').select('*').eq('project_id', projectId),
+    supabase.from('entity_type_configs').select('*').eq('project_id', projectId),
+  ]);
+
+  if (nodesRes.error) throw new Error(`loadOntology nodes: ${nodesRes.error.message}`);
+  if (relsRes.error) throw new Error(`loadOntology rels: ${relsRes.error.message}`);
+  if (tensionsRes.error) throw new Error(`loadOntology tensions: ${tensionsRes.error.message}`);
+  if (signalsRes.error) throw new Error(`loadOntology signals: ${signalsRes.error.message}`);
+  if (entityTypesRes.error) throw new Error(`loadOntology entityTypes: ${entityTypesRes.error.message}`);
+
+  const nodes: GraphNode[] = (nodesRes.data ?? []).map((row) => ({
+    id: row.id,
+    label: row.label,
+    type: row.type,
+    description: row.description ?? '',
+    position: row.position ?? { x: 0, y: 0 },
+    properties: row.properties ?? {},
+  }));
+
+  const relationships: Relationship[] = (relsRes.data ?? []).map((row) => ({
+    id: row.id,
+    sourceId: row.source_node_id,
+    targetId: row.target_node_id,
+    type: row.type,
+    description: row.description ?? undefined,
+  }));
+
+  const tensions: TensionMarker[] = (tensionsRes.data ?? []).map((row) => ({
+    id: row.id,
+    description: row.description,
+    relatedNodeIds: row.related_node_ids ?? [],
+    status: row.status,
+  }));
+
+  const evaluativeSignals: EvaluativeSignal[] = (signalsRes.data ?? []).map((row) => ({
+    id: row.id,
+    label: row.label,
+    direction: row.direction,
+    strength: row.strength,
+    sourceDescription: row.source_description ?? '',
+  }));
+
+  const entityTypes: EntityTypeConfig[] = (entityTypesRes.data ?? []).map((row) => ({
+    id: row.type_id,   // type_id is the slug ("organisation"); id is the auto-generated UUID PK
+    label: row.label,
+    color: row.color,
+  }));
+
+  return { nodes, relationships, tensions, evaluativeSignals, entityTypes };
+}
+
+export async function saveOntology(projectId: string, state: GraphState): Promise<void> {
+  // ── Upsert nodes ──────────────────────────────────────────────────────────
+  if (state.nodes.length > 0) {
+    const { error } = await supabase.from('ontology_nodes').upsert(
+      state.nodes.map((n) => ({
+        id: n.id,
+        project_id: projectId,
+        label: n.label,
+        type: n.type,
+        description: n.description,
+        position: n.position,
+        properties: n.properties ?? {},
+        // preserve source_type if already set — don't override on upsert
+      })),
+      { onConflict: 'id', ignoreDuplicates: false }
+    );
+    if (error) throw new Error(`saveOntology nodes: ${error.message}`);
+  }
+
+  // ── Upsert relationships ──────────────────────────────────────────────────
+  if (state.relationships.length > 0) {
+    const { error } = await supabase.from('ontology_relationships').upsert(
+      state.relationships.map((r) => ({
+        id: r.id,
+        project_id: projectId,
+        source_node_id: r.sourceId,
+        target_node_id: r.targetId,
+        type: r.type,
+        description: r.description ?? null,
+      })),
+      { onConflict: 'id', ignoreDuplicates: false }
+    );
+    if (error) throw new Error(`saveOntology rels: ${error.message}`);
+  }
+
+  // ── Upsert tension markers ────────────────────────────────────────────────
+  if (state.tensions.length > 0) {
+    const { error } = await supabase.from('tension_markers').upsert(
+      state.tensions.map((t) => ({
+        id: t.id,
+        project_id: projectId,
+        description: t.description,
+        related_node_ids: t.relatedNodeIds,
+        status: t.status,
+      })),
+      { onConflict: 'id', ignoreDuplicates: false }
+    );
+    if (error) throw new Error(`saveOntology tensions: ${error.message}`);
+  }
+
+  // ── Upsert evaluative signals ─────────────────────────────────────────────
+  if (state.evaluativeSignals.length > 0) {
+    const { error } = await supabase.from('evaluative_signals').upsert(
+      state.evaluativeSignals.map((s) => ({
+        id: s.id,
+        project_id: projectId,
+        label: s.label,
+        direction: s.direction,
+        strength: s.strength,
+        source_description: s.sourceDescription,
+      })),
+      { onConflict: 'id', ignoreDuplicates: false }
+    );
+    if (error) throw new Error(`saveOntology signals: ${error.message}`);
+  }
+
+  // ── Upsert entity type configs ────────────────────────────────────────────
+  if (state.entityTypes.length > 0) {
+    const { error } = await supabase.from('entity_type_configs').upsert(
+      state.entityTypes.map((et) => ({
+        type_id: et.id,   // et.id is the slug; type_id is the text column; id PK is auto-generated
+        project_id: projectId,
+        label: et.label,
+        color: et.color,
+      })),
+      { onConflict: 'project_id,type_id', ignoreDuplicates: false }
+    );
+    if (error) throw new Error(`saveOntology entityTypes: ${error.message}`);
+  }
+
+  // ── Delete rows removed from state ────────────────────────────────────────
+  // Only delete if we have IDs to check against (otherwise skip to avoid nuking everything)
+  const nodeIds = state.nodes.map((n) => n.id);
+  const relIds = state.relationships.map((r) => r.id);
+  const tensionIds = state.tensions.map((t) => t.id);
+  const signalIds = state.evaluativeSignals.map((s) => s.id);
+  const entityTypeIds = state.entityTypes.map((et) => et.id);
+
+  if (nodeIds.length > 0) {
+    await supabase.from('ontology_nodes')
+      .delete()
+      .eq('project_id', projectId)
+      .not('id', 'in', `(${nodeIds.map((id) => `'${id}'`).join(',')})`);
+  }
+  if (relIds.length > 0) {
+    await supabase.from('ontology_relationships')
+      .delete()
+      .eq('project_id', projectId)
+      .not('id', 'in', `(${relIds.map((id) => `'${id}'`).join(',')})`);
+  }
+  if (tensionIds.length > 0) {
+    await supabase.from('tension_markers')
+      .delete()
+      .eq('project_id', projectId)
+      .not('id', 'in', `(${tensionIds.map((id) => `'${id}'`).join(',')})`);
+  }
+  if (signalIds.length > 0) {
+    await supabase.from('evaluative_signals')
+      .delete()
+      .eq('project_id', projectId)
+      .not('id', 'in', `(${signalIds.map((id) => `'${id}'`).join(',')})`);
+  }
+  if (entityTypeIds.length > 0) {
+    await supabase.from('entity_type_configs')
+      .delete()
+      .eq('project_id', projectId)
+      .not('type_id', 'in', `(${entityTypeIds.map((id) => `'${id}'`).join(',')})`);
+  }
+}
+
+// ── Session logging ──────────────────────────────────────────────────────────
+
+export type SessionType = 'inquiry' | 'extraction' | 'synthesis' | 'manual';
+export type SessionAgent = 'haiku' | 'sonnet' | 'gemini' | 'manual';
+
+export async function logSession(input: {
+  project_id: string;
+  type: SessionType;
+  agent: SessionAgent;
+  summary: string;
+  raw_output?: unknown;
+}): Promise<string> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert({
+      project_id: input.project_id,
+      type: input.type,
+      agent: input.agent,
+      summary: input.summary,
+      raw_output: input.raw_output ?? null,
+    })
+    .select('id')
+    .single();
+
+  if (error) throw new Error(`logSession: ${error.message}`);
+  return data.id;
+}
+
+export async function getSessions(projectId: string): Promise<{
+  id: string;
+  type: SessionType;
+  agent: SessionAgent;
+  summary: string;
+  created_at: string;
+}[]> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('id, type, agent, summary, created_at')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(`getSessions: ${error.message}`);
+  return data ?? [];
+}
+
+// ── Project-scoped vector search ─────────────────────────────────────────────
+
+export async function searchChunks(
+  projectId: string,
+  queryEmbedding: number[],
+  matchCount = 5
+): Promise<SearchResult[]> {
+  const { data, error } = await supabase.rpc('search_chunks_v2', {
+    p_project_id: projectId,
+    query_embedding: queryEmbedding,
+    match_count: matchCount,
+  });
+
+  if (error) throw new Error(`searchChunks: ${error.message}`);
+  return data ?? [];
+}
