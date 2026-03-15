@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
       documentId,
       chunkCount: chunks.length,
       title:      parsed.title,
+      content:    parsed.content,
     });
   } catch (err) {
     console.error("Ingest route error:", err);

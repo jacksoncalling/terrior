@@ -367,6 +367,30 @@ export default function Home() {
     importFileRef.current?.click();
   }, []);
 
+  // ── Sources graph-update handler ─────────────────────────────────────────
+
+  const handleGraphUpdate = useCallback(
+    (updatedGraph: GraphState, updates: GraphUpdate[]) => {
+      setGraphState(updatedGraph);
+
+      const entityCount = updates.filter((u) => u.type === "node_created").length;
+      const relCount    = updates.filter((u) => u.type === "relationship_created").length;
+
+      const msg: ChatMessage = {
+        id: uuidv4(),
+        role: "assistant",
+        content: `Document extracted: ${entityCount} ${entityCount === 1 ? "entity" : "entities"} and ${relCount} ${relCount === 1 ? "relationship" : "relationships"} added to the canvas.`,
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, msg]);
+
+      if (updates.length > 0) {
+        setGraphUpdatesMap((prev) => ({ ...prev, [msg.id]: updates }));
+      }
+    },
+    []
+  );
+
   const handleReset = useCallback(() => {
     clearLocalStorage(projectId ?? undefined);
     setGraphState(emptyGraphState());
@@ -424,6 +448,9 @@ export default function Home() {
           onExtract={handleExtract}
           isLoading={isLoading}
           graphUpdatesMap={graphUpdatesMap}
+          projectId={projectId ?? null}
+          graphState={graphState}
+          onGraphUpdate={handleGraphUpdate}
         />
         {/* Bottom actions */}
         <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-3">

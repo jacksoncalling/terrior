@@ -67,7 +67,7 @@ All tables scoped by `project_id`.
 ### Remaining (Sessions 4–5)
 - [x] **Bonus fix (Mar 15):** Deduplication prompt — `create_node` tool description + system prompt guidelines now instruct Claude to check for existing nodes before creating. Prevents duplicate nodes in chat sessions.
 - [x] **Session 4 (Mar 15):** Entity type UUID bug fixed (supabase.ts) · `src/lib/gemini.ts` (Gemini 2.5 Flash client) · `src/lib/document-parser.ts` (PDF/DOCX/TXT/MD/JSON) · `/api/ingest` route · `/api/extract-gemini` route · `scripts/ingest.mjs --project` flag · `next.config.ts` 20MB body limit
-- [ ] **Session 5:** Sources tab UI (`src/components/Sources.tsx`) + wire into `page.tsx` + end-to-end verification
+- [x] **Session 5 (Mar 15):** Sources tab UI (`src/components/Sources.tsx`) · wired into `Chat.tsx` (Chat/Extract/Sources tabs) · `handleGraphUpdate` callback in `page.tsx` · end-to-end verification
 
 ### Known Bug
 - Entity type IDs use strings (`"organisation"`, `"platform"`) instead of UUIDs → `entity_type_configs` Supabase upsert returns 400. Non-fatal (caught silently), but entity types don't persist to Supabase. Fix: generate UUID on creation in `src/lib/entity-types.ts`.

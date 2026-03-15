@@ -25,7 +25,7 @@ export async function embedText(text: string): Promise<number[]> {
   const extractor = await getEmbedder();
   // output.data is a flat Float32Array of length 384 for a single text
   const output = await extractor(text, { pooling: 'mean', normalize: true });
-  return Array.from(output.data as Float32Array);
+  return Array.from(output.data as unknown as Float32Array);
 }
 
 /**
@@ -42,7 +42,7 @@ export async function embedBatch(texts: string[]): Promise<number[][]> {
     const batch = texts.slice(i, i + BATCH_SIZE);
     // output.data is a flat Float32Array of length batch.length * DIMS
     const output = await extractor(batch, { pooling: 'mean', normalize: true });
-    const flat = output.data as Float32Array;
+    const flat = output.data as unknown as Float32Array;
     for (let j = 0; j < batch.length; j++) {
       results.push(Array.from(flat.slice(j * DIMS, (j + 1) * DIMS)));
     }

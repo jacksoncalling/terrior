@@ -15,8 +15,10 @@ export interface ParsedDocument {
 // ── PDF ──────────────────────────────────────────────────────────────────────
 
 async function parsePdf(buffer: Buffer, filename: string): Promise<ParsedDocument> {
-  // Dynamic import — pdf-parse is CJS, avoid top-level import issues in Next.js
-  const pdfParse = (await import("pdf-parse")).default;
+  // Dynamic import — pdf-parse is CJS; .default may or may not be present depending on bundler
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod = await import("pdf-parse") as any;
+  const pdfParse = (mod.default ?? mod) as (buf: Buffer) => Promise<{ text: string }>;
 
   try {
     const result = await pdfParse(buffer);
