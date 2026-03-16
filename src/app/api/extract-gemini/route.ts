@@ -7,14 +7,20 @@
  * Counterpart to /api/extract (Claude Sonnet) — same input/output shape,
  * so the Sources UI can call either depending on document size/preference.
  *
- * Body: { text: string, graphState: GraphState, projectId: string }
+ * Body: {
+ *   text: string,
+ *   graphState: GraphState,
+ *   projectId?: string,
+ *   abstractionLayer?: AbstractionLayer,   // Phase 2: extraction lens
+ *   projectBrief?: ProjectBrief,           // Phase 2: brief context
+ * }
  * Returns: { updatedGraph: GraphState, graphUpdates: GraphUpdate[] }
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { extractOntologyWithGemini } from "@/lib/gemini";
 import { logSession } from "@/lib/supabase";
-import type { GraphState } from "@/types";
+import type { GraphState, AbstractionLayer, ProjectBrief } from "@/types";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,9 +28,11 @@ export async function POST(req: NextRequest) {
       text: string;
       graphState: GraphState;
       projectId?: string;
+      abstractionLayer?: AbstractionLayer;
+      projectBrief?: ProjectBrief;
     };
 
-    const { text, graphState, projectId } = body;
+    const { text, graphState, projectId, abstractionLayer, projectBrief } = body;
 
     if (!text?.trim()) {
       return NextResponse.json({ error: "No text provided" }, { status: 400 });
@@ -35,15 +43,26 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Run Gemini extraction ─────────────────────────────────────────────────
-    const { updatedGraph, graphUpdates } = await extractOntologyWithGemini(text, graphState);
+    // Pass abstraction layer and brief when provided (Phase 2 path).
+    // Falls back to original "extract comprehensively" behaviour when omitted.
+    const { updatedGraph, graphUpdates } = await extractOntologyWithGemini(
+      text,
+      graphState,
+      abstractionLayer,
+      projectBrief
+    );
 
     // ── Log session (fire and forget) ─────────────────────────────────────────
     if (projectId) {
+      const nodeCount = graphUpdates.filter((u) => u.type === "node_created").length;
+      const relCount  = graphUpdates.filter((u) => u.type === "relationship_created").length;
+      const layerNote = abstractionLayer ? ` [lens: ${abstractionLayer}]` : "";
+
       logSession({
         project_id: projectId,
         type:       "extraction",
         agent:      "gemini",
-        summary:    `Extracted ${graphUpdates.filter(u => u.type === "node_created").length} entities, ${graphUpdates.filter(u => u.type === "relationship_created").length} relationships`,
+        summary:    `Extracted ${nodeCount} entities, ${relCount} relationships${layerNote}`,
       }).catch((err) => console.warn("Session log failed (non-fatal):", err));
     }
 

@@ -84,3 +84,82 @@ export interface GraphUpdate {
   type: GraphUpdateType;
   label: string;
 }
+
+// ── Phase 2: Abstraction Layer ────────────────────────────────────────────────
+//
+// Project-level setting that tells Gemini which "lens" to use when extracting
+// entities from documents. Three presets map to the three abstraction levels
+// surfaced in Terroir's design:
+//
+//   domain_objects       — nouns: systems, teams, tools, documents, roles
+//   interaction_patterns — verbs: workflows, handoffs, communication paths
+//   concerns_themes      — adjectives: values, tensions, strategic priorities
+
+export type AbstractionLayer =
+  | "domain_objects"
+  | "interaction_patterns"
+  | "concerns_themes";
+
+// ── Phase 2: Project Brief ────────────────────────────────────────────────────
+//
+// Produced by the Haiku scoping dialogue. Stored in projects.metadata.brief
+// (jsonb column — no migration needed). Feeds into Gemini extraction and
+// Haiku synthesis as the "stable context" layer.
+
+export interface ProjectBrief {
+  orgSize?: string;                    // e.g. "startup", "50-200 people", "enterprise"
+  sector?: string;                     // e.g. "aviation", "healthcare", "fintech"
+  discoveryGoal?: string;              // what the consultant most wants to understand
+  abstractionLayer: AbstractionLayer;  // extraction lens — required once set
+  keyThemes?: string[];                // top themes surfaced during scoping
+  summary?: string;                    // Haiku-generated prose summary of the brief
+  rawAnswers?: Record<string, string>; // raw Q&A pairs from the scoping dialogue
+  generatedAt?: string;                // ISO timestamp of last generation
+}
+
+// ── Phase 2: Synthesis Result ─────────────────────────────────────────────────
+//
+// Produced by the Haiku synthesis reader after reading across all ingested
+// documents. Not persisted to DB — cached in localStorage per project.
+
+/** The same concept called different names across different sources */
+export interface TermCollision {
+  variants: string[];             // e.g. ["updates", "sync", "alignment", "comms"]
+  sources: string[];              // document titles where each variant appears
+  suggestedCanonical: string;     // Haiku's recommended unified term
+  context: string;                // why these terms refer to the same concept
+}
+
+/** A recurring theme or structural pattern that spans multiple sources */
+export interface ConnectingThread {
+  theme: string;
+  description: string;
+  relatedSources: string[];
+  relatedNodeIds?: string[];      // optional: maps to existing graph nodes
+}
+
+/** Agreement or disagreement on an evaluative dimension across sources */
+export interface SignalConvergence {
+  signal: string;                 // what multiple sources converge on
+  convergenceType: "agreement" | "disagreement" | "partial";
+  sources: string[];
+  description: string;
+}
+
+/** A concept present in transcripts but absent/underrepresented in the graph */
+export interface GraphGap {
+  description: string;
+  suggestedQuestion: string;      // pre-filled prompt for the consultant to follow up
+  relatedNodeIds?: string[];
+}
+
+/** Full output from the Haiku cross-source synthesis pass */
+export interface SynthesisResult {
+  narrativeSummary: string;       // 2-3 paragraph prose overview of findings
+  termCollisions: TermCollision[];
+  connectingThreads: ConnectingThread[];
+  signalConvergence: SignalConvergence[];
+  graphGaps: GraphGap[];
+  documentCount: number;          // number of documents read
+  generatedAt: string;            // ISO timestamp
+}

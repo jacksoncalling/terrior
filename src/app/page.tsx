@@ -7,7 +7,16 @@ import Chat from "@/components/Chat";
 import Canvas from "@/components/Canvas";
 import Inspector from "@/components/Inspector";
 import TypePalette from "@/components/TypePalette";
-import type { ChatMessage, GraphState, GraphUpdate, GraphNode, Relationship } from "@/types";
+import ScopingModal, { type ScopingMessage } from "@/components/ScopingModal";
+import type {
+  ChatMessage,
+  GraphState,
+  GraphUpdate,
+  GraphNode,
+  Relationship,
+  ProjectBrief,
+  SynthesisResult,
+} from "@/types";
 import {
   emptyGraphState,
   saveToLocalStorage,
@@ -25,7 +34,12 @@ import {
 } from "@/lib/graph-state";
 import { autoLayout } from "@/lib/layout";
 import { addEntityType, updateEntityType } from "@/lib/entity-types";
-import { loadOntology, saveOntology } from "@/lib/supabase";
+import {
+  loadOntology,
+  saveOntology,
+  updateProjectMetadata,
+  countProjectDocuments,
+} from "@/lib/supabase";
 import { useProject } from "@/lib/project-context";
 
 // Debounce delay for Supabase saves (ms)
@@ -44,6 +58,19 @@ export default function Home() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const importFileRef = useRef<HTMLInputElement>(null);
+
+  // ── Phase 2: brief + scoping + reprocess state ───────────────────────────
+  const [projectBrief, setProjectBrief] = useState<ProjectBrief | null>(null);
+  const [scopingMessages, setScopingMessages] = useState<ScopingMessage[]>([]);
+  const [scopingOpen, setScopingOpen] = useState(false);
+  const [isScopingLoading, setIsScopingLoading] = useState(false);
+  const [pendingBrief, setPendingBrief] = useState<ProjectBrief | undefined>();
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const [documentCount, setDocumentCount] = useState(0);
+
+  // ── Phase 2: synthesis state ───────────────────────────────────────────────
+  const [synthesisResult, setSynthesisResult] = useState<SynthesisResult | null>(null);
+  const [isSynthesisLoading, setIsSynthesisLoading] = useState(false);
 
   // Debounce ref for Supabase saves
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,7 +117,59 @@ export default function Home() {
     const savedMessages = loadMessagesFromLocalStorage(projectId);
     if (savedMessages) setMessages(savedMessages);
     else setMessages([]); // clear messages from previous project
+
+    // ── Phase 2: load brief, document count, scoping messages ─────────────
+
+    // Reset Phase 2 state immediately on project switch
+    setProjectBrief(null);
+    setScopingOpen(false);
+    setPendingBrief(undefined);
+    setIsReprocessing(false);
+    setSynthesisResult(null);
+    setIsSynthesisLoading(false);
+
+    // Load scoping messages from localStorage (keyed per project)
+    const scopingKey = `terroir_scoping_${projectId}`;
+    try {
+      const saved = localStorage.getItem(scopingKey);
+      setScopingMessages(saved ? JSON.parse(saved) : []);
+    } catch {
+      setScopingMessages([]);
+    }
+
+    // Load cached synthesis result from localStorage (keyed per project)
+    const synthesisKey = `terroir_synthesis_${projectId}`;
+    try {
+      const cached = localStorage.getItem(synthesisKey);
+      setSynthesisResult(cached ? JSON.parse(cached) : null);
+    } catch {
+      setSynthesisResult(null);
+    }
+
+    // Load document count (lightweight HEAD request)
+    countProjectDocuments(projectId)
+      .then(setDocumentCount)
+      .catch((err) => console.warn('countProjectDocuments failed (non-fatal):', err));
   }, [projectId]);
+
+  // ── Sync project brief from project.metadata whenever project record changes
+  useEffect(() => {
+    if (project) {
+      const brief = project.metadata?.brief as ProjectBrief | undefined;
+      setProjectBrief(brief ?? null);
+    }
+  }, [project]);
+
+  // ── Persist scoping messages to localStorage when they change ─────────────
+  useEffect(() => {
+    if (!projectId) return;
+    const scopingKey = `terroir_scoping_${projectId}`;
+    try {
+      localStorage.setItem(scopingKey, JSON.stringify(scopingMessages));
+    } catch {
+      // localStorage write failures are non-fatal
+    }
+  }, [scopingMessages, projectId]);
 
   // ── Save to localStorage (immediate, for resilience — project-scoped) ───────
 
@@ -372,6 +451,8 @@ export default function Home() {
   const handleGraphUpdate = useCallback(
     (updatedGraph: GraphState, updates: GraphUpdate[]) => {
       setGraphState(updatedGraph);
+      // Keep documentCount in sync — each successful Sources upload = +1 doc
+      setDocumentCount((prev) => prev + 1);
 
       const entityCount = updates.filter((u) => u.type === "node_created").length;
       const relCount    = updates.filter((u) => u.type === "relationship_created").length;
@@ -390,6 +471,222 @@ export default function Home() {
     },
     []
   );
+
+  // ── Phase 2: Synthesis handler ────────────────────────────────────────────
+
+  /**
+   * Calls /api/synthesis with the current graph state. Caches the result in
+   * localStorage so it survives page refreshes within the same project.
+   */
+  const handleRunSynthesis = useCallback(async () => {
+    if (!projectId) return;
+    setIsSynthesisLoading(true);
+
+    try {
+      const response = await fetch("/api/synthesis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, graphState }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Synthesis failed");
+      }
+
+      const result: SynthesisResult = await response.json();
+      setSynthesisResult(result);
+
+      // Cache in localStorage so the result survives a page refresh
+      try {
+        localStorage.setItem(
+          `terroir_synthesis_${projectId}`,
+          JSON.stringify(result)
+        );
+      } catch {
+        // localStorage write failures are non-fatal
+      }
+    } catch (err) {
+      alert(
+        `Synthesis failed: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    } finally {
+      setIsSynthesisLoading(false);
+    }
+  }, [projectId, graphState]);
+
+  // ── Phase 2: Scoping handlers ─────────────────────────────────────────────
+
+  /**
+   * Sends a message in the scoping dialogue. Strips the <brief> block from
+   * the displayed response text and captures the parsed brief separately.
+   */
+  const handleScopingSend = useCallback(
+    async (content: string) => {
+      const userMsg: ScopingMessage = {
+        id: uuidv4(),
+        role: "user",
+        content,
+      };
+      const updatedMessages = [...scopingMessages, userMsg];
+      setScopingMessages(updatedMessages);
+      setIsScopingLoading(true);
+
+      try {
+        const response = await fetch("/api/scoping", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: updatedMessages.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            projectId,
+            projectContext: project
+              ? { name: project.name, sector: project.sector }
+              : undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || "Scoping request failed");
+        }
+
+        const result: { response: string; brief?: ProjectBrief } =
+          await response.json();
+
+        // Strip the <brief>...</brief> block from the visible message
+        const cleanedText = result.response
+          .replace(/<brief>[\s\S]*?<\/brief>/g, "")
+          .trim();
+
+        const assistantMsg: ScopingMessage = {
+          id: uuidv4(),
+          role: "assistant",
+          content: cleanedText || "Brief generated. See the preview below.",
+        };
+        setScopingMessages((prev) => [...prev, assistantMsg]);
+
+        // Surface the pending brief for the consultant to review + save
+        if (result.brief) {
+          setPendingBrief(result.brief);
+        }
+      } catch (err) {
+        const errMsg: ScopingMessage = {
+          id: uuidv4(),
+          role: "assistant",
+          content: `Error: ${err instanceof Error ? err.message : "Something went wrong"}`,
+        };
+        setScopingMessages((prev) => [...prev, errMsg]);
+      } finally {
+        setIsScopingLoading(false);
+      }
+    },
+    [scopingMessages, projectId, project]
+  );
+
+  /**
+   * Saves the pending brief to the project's metadata in Supabase and
+   * updates local state. Closes the scoping modal.
+   */
+  const handleSaveBrief = useCallback(
+    async (brief: ProjectBrief) => {
+      if (!projectId) return;
+      try {
+        await updateProjectMetadata(projectId, { brief });
+        setProjectBrief(brief);
+        setPendingBrief(undefined);
+        setScopingOpen(false);
+      } catch (err) {
+        console.error("Failed to save brief:", err);
+        alert("Failed to save brief. Please try again.");
+      }
+    },
+    [projectId]
+  );
+
+  /**
+   * Saves an inline edit to one or more brief fields.
+   * Called from Inspector → ProjectBrief on blur or radio selection.
+   */
+  const handleBriefUpdate = useCallback(
+    async (updates: Partial<ProjectBrief>) => {
+      if (!projectId || !projectBrief) return;
+      const merged: ProjectBrief = { ...projectBrief, ...updates };
+      setProjectBrief(merged); // optimistic update
+      try {
+        await updateProjectMetadata(projectId, { brief: merged });
+      } catch (err) {
+        console.error("Failed to update brief (non-fatal):", err);
+        // Revert on failure
+        setProjectBrief(projectBrief);
+      }
+    },
+    [projectId, projectBrief]
+  );
+
+  /**
+   * Re-processes all project documents with the current abstraction layer.
+   * Downloads a snapshot of the current graph first, then calls /api/reprocess
+   * and replaces the graph state with the rebuilt result.
+   */
+  const handleReprocess = useCallback(async () => {
+    if (!projectId || !projectBrief) return;
+    setIsReprocessing(true);
+
+    // Step 1: download current graph as a snapshot before rebuilding
+    const snapshotDate = new Date().toISOString().split("T")[0];
+    const snapshotJson = JSON.stringify(graphState, null, 2);
+    const blob = new Blob([snapshotJson], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `snapshot-${snapshotDate}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Step 2: rebuild the graph with the new abstraction layer
+    try {
+      const response = await fetch("/api/reprocess", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          abstractionLayer: projectBrief.abstractionLayer,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Reprocess failed");
+      }
+
+      const result: {
+        updatedGraph: GraphState;
+        documentCount: number;
+        totalUpdates: number;
+      } = await response.json();
+
+      setGraphState(result.updatedGraph);
+      setDocumentCount(result.documentCount);
+
+      // Add a system message in chat so the consultant knows the graph changed
+      const msg: ChatMessage = {
+        id: uuidv4(),
+        role: "assistant",
+        content: `Graph rebuilt using the "${projectBrief.abstractionLayer.replace(/_/g, " ")}" lens across ${result.documentCount} document${result.documentCount === 1 ? "" : "s"}. ${result.updatedGraph.nodes.length} entities extracted.`,
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, msg]);
+    } catch (err) {
+      alert(
+        `Reprocess failed: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    } finally {
+      setIsReprocessing(false);
+    }
+  }, [projectId, projectBrief, graphState]);
 
   const handleReset = useCallback(() => {
     clearLocalStorage(projectId ?? undefined);
@@ -440,6 +737,20 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-stone-50">
+      {/* ── Phase 2: Scoping modal (renders above everything) ─────────────── */}
+      <ScopingModal
+        isOpen={scopingOpen}
+        messages={scopingMessages}
+        isLoading={isScopingLoading}
+        pendingBrief={pendingBrief}
+        onSend={handleScopingSend}
+        onSaveBrief={handleSaveBrief}
+        onClose={() => {
+          setScopingOpen(false);
+          setPendingBrief(undefined);
+        }}
+      />
+
       {/* Chat panel */}
       <div className="w-[360px] shrink-0 border-r border-stone-200 bg-white flex flex-col">
         <Chat
@@ -451,6 +762,12 @@ export default function Home() {
           projectId={projectId ?? null}
           graphState={graphState}
           onGraphUpdate={handleGraphUpdate}
+          // ── Phase 2: Synthesis ───────────────────────────────────────────
+          synthesisResult={synthesisResult}
+          onRunSynthesis={handleRunSynthesis}
+          isSynthesisLoading={isSynthesisLoading}
+          documentCount={documentCount}
+          projectBrief={projectBrief}
         />
         {/* Bottom actions */}
         <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-3">
@@ -553,6 +870,13 @@ export default function Home() {
               setSelectedNodeId(null);
               setSelectedEdgeId(null);
             }}
+            // ── Phase 2 ────────────────────────────────────────────────────
+            brief={projectBrief}
+            documentCount={documentCount}
+            isReprocessing={isReprocessing}
+            onBriefUpdate={handleBriefUpdate}
+            onStartScoping={() => setScopingOpen(true)}
+            onReprocess={handleReprocess}
           />
         </div>
       )}

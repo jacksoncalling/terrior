@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { GraphState, GraphNode, Relationship, EntityTypeConfig } from "@/types";
+import type { GraphState, GraphNode, Relationship, ProjectBrief } from "@/types";
+import ProjectBriefPanel from "./ProjectBrief";
 
 interface InspectorProps {
   graphState: GraphState;
@@ -10,6 +11,13 @@ interface InspectorProps {
   onUpdateNode: (id: string, updates: Partial<Pick<GraphNode, "label" | "description" | "type">>) => void;
   onUpdateRelationship: (id: string, updates: Partial<Pick<Relationship, "type" | "description">>) => void;
   onClose: () => void;
+  // ── Phase 2 additions (all optional so existing call-sites don't break) ──
+  brief?: ProjectBrief | null;
+  documentCount?: number;
+  isReprocessing?: boolean;
+  onBriefUpdate?: (updates: Partial<ProjectBrief>) => void;
+  onStartScoping?: () => void;
+  onReprocess?: () => void;
 }
 
 export default function Inspector({
@@ -19,6 +27,12 @@ export default function Inspector({
   onUpdateNode,
   onUpdateRelationship,
   onClose,
+  brief,
+  documentCount = 0,
+  isReprocessing = false,
+  onBriefUpdate,
+  onStartScoping,
+  onReprocess,
 }: InspectorProps) {
   const selectedNode = selectedNodeId
     ? graphState.nodes.find((n) => n.id === selectedNodeId)
@@ -59,45 +73,88 @@ export default function Inspector({
     });
   };
 
-  // Nothing selected → show overview
+  // ── Nothing selected → show brief (or CTA) + graph summary ─────────────────
   if (!selectedNode && !selectedEdge) {
+    const unresolvedCount = graphState.tensions.filter(
+      (t) => t.status === "unresolved"
+    ).length;
+
     return (
       <div className="h-full flex flex-col bg-white border-l border-stone-200">
         <div className="px-4 py-3 border-b border-stone-200">
           <h3 className="text-sm font-semibold text-stone-800">Inspector</h3>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-3">
-          <div className="text-xs text-stone-400">
-            <p className="mb-3">Click a node or edge to inspect and edit it.</p>
 
-            <div className="space-y-3">
-              <div>
-                <h4 className="font-medium text-stone-600 mb-1">Graph Summary</h4>
-                <p>{graphState.nodes.length} entities · {graphState.relationships.length} relationships</p>
-                {graphState.tensions.filter((t) => t.status === "unresolved").length > 0 && (
-                  <p className="text-red-500 mt-1">
-                    {graphState.tensions.filter((t) => t.status === "unresolved").length} unresolved tensions
-                  </p>
-                )}
-              </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
 
-              {graphState.evaluativeSignals.length > 0 && (
-                <div>
-                  <h4 className="font-medium text-stone-600 mb-1">Evaluative Signals</h4>
-                  {graphState.evaluativeSignals.map((s) => (
-                    <div key={s.id} className="flex items-center gap-1.5 mt-0.5">
-                      <span>
-                        {s.direction === "toward" ? "→" : s.direction === "away_from" ? "←" : "◆"}
-                      </span>
-                      <span className="font-medium text-stone-600">{s.label}</span>
-                      <span className="text-stone-300">
-                        {"●".repeat(s.strength)}{"○".repeat(5 - s.strength)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+          {/* ── Project Brief section ────────────────────────────────────── */}
+          {brief ? (
+            // Brief exists — show inline-editable panel
+            <ProjectBriefPanel
+              brief={brief}
+              documentCount={documentCount}
+              isReprocessing={isReprocessing}
+              onBriefUpdate={onBriefUpdate ?? (() => {})}
+              onStartScoping={onStartScoping ?? (() => {})}
+              onReprocess={onReprocess ?? (() => {})}
+            />
+          ) : (
+            // No brief yet — CTA
+            <div className="space-y-2.5">
+              <p className="text-xs text-stone-400 leading-relaxed">
+                Set up your project to guide AI extraction and enable
+                cross-source synthesis.
+              </p>
+              {onStartScoping && (
+                <button
+                  onClick={onStartScoping}
+                  className="w-full rounded-xl bg-stone-800 py-2 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
+                >
+                  Set up project
+                </button>
               )}
             </div>
+          )}
+
+          {/* ── Graph Summary (always visible below brief) ───────────────── */}
+          <div className="pt-3 border-t border-stone-100 text-xs text-stone-400 space-y-3">
+            <div>
+              <h4 className="font-medium text-stone-600 mb-1">Graph Summary</h4>
+              <p>
+                {graphState.nodes.length} entities ·{" "}
+                {graphState.relationships.length} relationships
+              </p>
+              {unresolvedCount > 0 && (
+                <p className="text-red-500 mt-1">
+                  {unresolvedCount} unresolved{" "}
+                  {unresolvedCount === 1 ? "tension" : "tensions"}
+                </p>
+              )}
+            </div>
+
+            {graphState.evaluativeSignals.length > 0 && (
+              <div>
+                <h4 className="font-medium text-stone-600 mb-1">
+                  Evaluative Signals
+                </h4>
+                {graphState.evaluativeSignals.map((s) => (
+                  <div key={s.id} className="flex items-center gap-1.5 mt-0.5">
+                    <span>
+                      {s.direction === "toward"
+                        ? "→"
+                        : s.direction === "away_from"
+                        ? "←"
+                        : "◆"}
+                    </span>
+                    <span className="font-medium text-stone-600">{s.label}</span>
+                    <span className="text-stone-300">
+                      {"●".repeat(s.strength)}
+                      {"○".repeat(5 - s.strength)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -11,7 +11,14 @@
  * Claude Sonnet stays for the interactive chat loop (tools + conversation).
  */
 
-import type { GraphState, GraphNode, Relationship, TensionMarker } from "@/types";
+import type {
+  GraphState,
+  GraphNode,
+  Relationship,
+  TensionMarker,
+  AbstractionLayer,
+  ProjectBrief,
+} from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { ensureTypeExists } from "./entity-types";
 
@@ -25,26 +32,109 @@ export interface GeminiExtractionResult {
 }
 
 // ── Extraction prompt ────────────────────────────────────────────────────────
-// Generic version of the Babor script prompt — no hardcoded domain types.
-// Entity types emerge from the document content, same as Claude extraction.
+//
+// Builds an extraction prompt tuned to the project's abstraction layer.
+// Three layers correspond to three different "lenses" on the same document:
+//
+//   domain_objects       — focus on NOUNS: what exists in this org
+//   interaction_patterns — focus on VERBS: how work actually moves
+//   concerns_themes      — focus on ADJECTIVES: what matters and why
+//
+// Backwards compatible: no layer = original "extract comprehensively" behaviour.
 
-function buildExtractionPrompt(text: string, graphState: GraphState): string {
-  const existingContext = graphState.nodes.length > 0
-    ? `\n\nExisting entities already in the graph (avoid duplicates, connect to these where relevant):\n${graphState.nodes.map((n) => `- "${n.label}" (${n.type}) [id: ${n.id}]`).join("\n")}\n\nExisting entity types: ${graphState.entityTypes.map((t) => t.id).join(", ")}`
-    : "";
+function buildExtractionPrompt(
+  text: string,
+  graphState: GraphState,
+  abstractionLayer?: AbstractionLayer,
+  projectBrief?: ProjectBrief
+): string {
+  // Build the existing-graph context block (dedup guard)
+  const existingContext =
+    graphState.nodes.length > 0
+      ? `\n\nExisting entities already in the graph (avoid duplicates, connect to these where relevant):\n${graphState.nodes
+          .map((n) => `- "${n.label}" (${n.type}) [id: ${n.id}]`)
+          .join(
+            "\n"
+          )}\n\nExisting entity types: ${graphState.entityTypes.map((t) => t.id).join(", ")}`
+      : "";
 
-  return `You are TERROIR's extraction engine. Extract a structured knowledge graph from the document below.
+  // Build the project context block (when a brief is available)
+  const projectContext =
+    projectBrief
+      ? `\n\nPROJECT CONTEXT (use this to calibrate extraction focus):
+- Sector: ${projectBrief.sector ?? "not specified"}
+- Org size: ${projectBrief.orgSize ?? "not specified"}
+- Discovery goal: ${projectBrief.discoveryGoal ?? "not specified"}
+- Key themes to watch for: ${(projectBrief.keyThemes ?? []).join(", ") || "none"}`
+      : "";
 
-Your task:
+  // ── Abstraction-layer-specific extraction instructions ──────────────────────
+
+  let focusInstructions: string;
+
+  switch (abstractionLayer) {
+    case "domain_objects":
+      focusInstructions = `ABSTRACTION LAYER: Domain Objects (nouns)
+Your focus is on WHAT EXISTS in this organisation.
+
+Extract:
+1. ENTITIES — systems, tools, platforms, teams, roles, documents, products, processes, standards. Prioritise concrete things over abstract concepts.
+2. OWNERSHIP / MEMBERSHIP — who owns, uses, or is responsible for what.
+3. DEPENDENCIES — what needs what to function.
+4. TENSIONS — conflicting ownership, duplicate tools, unclear accountability.
+5. EVALUATIVE SIGNALS — what the org values or fears losing.
+
+Entity types should be noun-oriented: system, team, role, document, platform, product, standard, etc.`;
+      break;
+
+    case "interaction_patterns":
+      focusInstructions = `ABSTRACTION LAYER: Interaction Patterns (verbs)
+Your focus is on HOW WORK ACTUALLY MOVES in this organisation.
+
+Extract:
+1. WORKFLOWS — named processes, recurring flows, sequences of steps.
+2. HANDOFFS — who passes what to whom, and under what conditions.
+3. COMMUNICATION PATHS — how information travels, sync vs async, channels used.
+4. DEPENDENCIES — what blocks what, what gates what, who needs what from whom.
+5. TENSIONS — bottlenecks, broken handoffs, unclear ownership of transitions.
+6. EVALUATIVE SIGNALS — what people value or fear about how work moves.
+
+Entity types should be verb-oriented: workflow, handoff, communication, dependency, gate, blocker, channel, etc.`;
+      break;
+
+    case "concerns_themes":
+      focusInstructions = `ABSTRACTION LAYER: Concerns and Themes (adjectives / values)
+Your focus is on WHAT MATTERS AND WHY in this organisation.
+
+Extract:
+1. VALUES — what the organisation or individuals explicitly care about protecting or achieving.
+2. TENSIONS — competing values, strategic contradictions, cultural friction.
+3. THEMES — recurring concerns, shared anxieties, strategic priorities.
+4. SIGNALS — things people are moving toward or away from.
+5. STAKES — what people believe is at risk, what they're trying to preserve.
+
+Entity types should be value/theme-oriented: value, concern, tension, theme, priority, risk, aspiration, etc.
+Focus on the evaluative layer — what things mean to people, not just what they are.`;
+      break;
+
+    default:
+      // Original behaviour — extract comprehensively across all layers
+      focusInstructions = `Your task:
 1. FIND all meaningful entities (concepts, organisations, platforms, processes, roles, documents, goals, values, products, etc.)
 2. CLASSIFY each with an appropriate type. Types are emergent — use what fits the domain. Reuse existing types where appropriate.
 3. RELATE entities to each other with descriptive relationship types.
 4. FLAG tensions or conflicts between entities.
 5. NOTE evaluative signals — what the organisation values, fears, or is moving toward.
 
+Extract COMPREHENSIVELY — capture every meaningful entity and relationship.`;
+  }
+
+  return `You are TERROIR's extraction engine. Extract a structured knowledge graph from the document below.
+
+${focusInstructions}
+
 CRITICAL: Do NOT create duplicate entities. Check the existing graph context below.
-Extract COMPREHENSIVELY — capture every meaningful entity and relationship.
-${existingContext}
+${existingContext}${projectContext}
 
 Respond with valid JSON ONLY — no markdown, no code blocks:
 {
@@ -213,11 +303,24 @@ function assembleGraph(
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
+/**
+ * Extracts an ontology from document text using Gemini 2.5 Flash.
+ *
+ * @param text            Raw document text to extract from
+ * @param graphState      Current graph state (for dedup context)
+ * @param abstractionLayer Optional lens: domain_objects | interaction_patterns | concerns_themes
+ * @param projectBrief    Optional project brief for calibrating extraction focus
+ *
+ * Backwards compatible: omit abstractionLayer to use the original
+ * "extract comprehensively" behaviour.
+ */
 export async function extractOntologyWithGemini(
   text: string,
-  graphState: GraphState
+  graphState: GraphState,
+  abstractionLayer?: AbstractionLayer,
+  projectBrief?: ProjectBrief
 ): Promise<GeminiExtractionResult> {
-  const prompt  = buildExtractionPrompt(text, graphState);
+  const prompt  = buildExtractionPrompt(text, graphState, abstractionLayer, projectBrief);
   const rawJson = await callGemini(prompt);
 
   let extracted;

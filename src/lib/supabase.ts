@@ -117,6 +117,96 @@ export async function updateProjectPhase(id: string, phase: ProjectPhase): Promi
   if (error) throw new Error(`updateProjectPhase: ${error.message}`);
 }
 
+/**
+ * Deep-merges a metadata patch into the project's existing metadata jsonb.
+ * Used to store the ProjectBrief under projects.metadata.brief without
+ * overwriting other metadata keys.
+ *
+ * Read → merge → write (two round trips, but keeps all existing fields safe).
+ */
+export async function updateProjectMetadata(
+  id: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  // Read current metadata first so we can merge rather than replace
+  const { data: current, error: readError } = await supabase
+    .from('projects')
+    .select('metadata')
+    .eq('id', id)
+    .single();
+
+  if (readError) throw new Error(`updateProjectMetadata (read): ${readError.message}`);
+
+  const merged = { ...(current?.metadata ?? {}), ...patch };
+
+  const { error } = await supabase
+    .from('projects')
+    .update({ metadata: merged, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) throw new Error(`updateProjectMetadata (write): ${error.message}`);
+}
+
+/**
+ * Returns the number of documents for a project without fetching content.
+ * Used by the Inspector to decide whether "Re-process sources" is available.
+ */
+export async function countProjectDocuments(projectId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('documents')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', projectId);
+
+  if (error) throw new Error(`countProjectDocuments: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Fetches all documents for a project, ordered by creation date.
+ * Used by the synthesis route to load full document content into Haiku's
+ * context window and by the reprocess route to rebuild the graph.
+ */
+export async function getProjectDocuments(
+  projectId: string
+): Promise<{ id: string; title: string; content: string }[]> {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('id, title, content')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw new Error(`getProjectDocuments: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title ?? 'Untitled',
+    content: row.content ?? '',
+  }));
+}
+
+/**
+ * Deletes all ontology data for a project across all five tables.
+ * Used by the reprocess route before rebuilding the graph from scratch.
+ */
+export async function clearOntology(projectId: string): Promise<void> {
+  const tables = [
+    'ontology_nodes',
+    'ontology_relationships',
+    'tension_markers',
+    'evaluative_signals',
+    'entity_type_configs',
+  ] as const;
+
+  for (const table of tables) {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq('project_id', projectId);
+
+    if (error) throw new Error(`clearOntology (${table}): ${error.message}`);
+  }
+}
+
 // ── Ontology load / save ─────────────────────────────────────────────────────
 //
 // loadOntology: fetches all 5 ontology tables for a project in parallel and

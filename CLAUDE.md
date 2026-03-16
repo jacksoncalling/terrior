@@ -18,7 +18,7 @@ Full brief: `../TERROIR_brief_v2.md`
 
 - **Framework:** Next.js (app router, TypeScript)
 - **UI:** ReactFlow (graph canvas) + Tailwind
-- **AI:** Claude Sonnet (chat + graph tool use), Gemini (batch ontology extraction)
+- **AI:** Claude Sonnet (chat + graph tool use), Gemini 2.5 Flash (batch ontology extraction), Claude Haiku (scoping dialogue + cross-source synthesis)
 - **DB:** Supabase (projects, ontology nodes/relationships, documents, embeddings, sessions)
 - **Embeddings:** Transformers.js local (paraphrase-multilingual-MiniLM-L12-v2)
 - **Layout:** Dagre (hierarchical auto-layout)
@@ -28,15 +28,16 @@ Full brief: `../TERROIR_brief_v2.md`
 ## Architecture: 3-Panel Editor
 
 ```
-[Chat / Extract] | [Canvas — ReactFlow graph] | [Inspector]
+[Chat / Extract / Sources / Synthesis] | [Canvas — ReactFlow graph] | [Inspector + Project Brief]
 ```
 
-- **Chat panel** — dual mode: conversational (Claude with 9 graph tools) + narrative extraction
+- **Chat panel** — four modes: Chat (Claude Sonnet + 9 graph tools), Extract (narrative → graph), Sources (file upload → Gemini extraction), Synthesis (Haiku cross-source analysis)
 - **Canvas** — interactive graph, drag/click/auto-layout, type-filtered
-- **Inspector** — node/edge property editor
+- **Inspector** — node/edge property editor + Project Brief panel (when nothing selected)
 - **TypePalette** — emergent entity types, color-coded
 - **Projects page** (`/projects`) — multi-project management
 - **Compare page** (`/compare`) — side-by-side vector vs. ontology search
+- **Scoping Modal** — full-screen overlay, Haiku dialogue → ProjectBrief
 
 ---
 
@@ -46,11 +47,13 @@ Tables: `projects`, `ontology_nodes`, `ontology_relationships`, `tension_markers
 
 All tables scoped by `project_id`.
 
+Project brief stored in `projects.metadata.brief` (jsonb — no schema migration needed).
+
 ---
 
-## Phase 1 Status — NEARLY COMPLETE
+## Phase 1 Status — COMPLETE ✅
 
-### Completed (Sessions 1–3, Mar 9–13)
+### Completed (Sessions 1–5, Mar 9–15)
 - [x] Next.js scaffold + Supabase schema
 - [x] ReactFlow canvas with custom nodes/edges, Dagre auto-layout
 - [x] Chat panel with Claude Sonnet tool use (9 graph manipulation tools)
@@ -59,29 +62,38 @@ All tables scoped by `project_id`.
 - [x] Project-scoped localStorage (messages + graph state keyed by `projectId`)
 - [x] Supabase load/save with 800ms debounce
 - [x] `↑ Migrate v1` button for recovering legacy unscoped localStorage data
-- [x] Compare page fully project-scoped (removes hardcoded corpus selector, loads graph from Supabase, generates preset chips from ontology nodes)
-- [x] Navigation bug fix: localStorage saves immediately on change; Supabase is durable backup. Fallback on load = localStorage if Supabase empty (prevents empty canvas on mid-flight nav)
-- [x] Two demo projects in Supabase: Bike Components — Rennrad, Babor Beauty Group
-- [x] Pre-built ontology JSONs: `data/bc-ontology-gemini.json`, `data/babor-ontology-gemini.json`
-
-### Remaining (Sessions 4–5)
-- [x] **Bonus fix (Mar 15):** Deduplication prompt — `create_node` tool description + system prompt guidelines now instruct Claude to check for existing nodes before creating. Prevents duplicate nodes in chat sessions.
-- [x] **Session 4 (Mar 15):** Entity type UUID bug fixed (supabase.ts) · `src/lib/gemini.ts` (Gemini 2.5 Flash client) · `src/lib/document-parser.ts` (PDF/DOCX/TXT/MD/JSON) · `/api/ingest` route · `/api/extract-gemini` route · `scripts/ingest.mjs --project` flag · `next.config.ts` 20MB body limit
-- [x] **Session 5 (Mar 15):** Sources tab UI (`src/components/Sources.tsx`) · wired into `Chat.tsx` (Chat/Extract/Sources tabs) · `handleGraphUpdate` callback in `page.tsx` · end-to-end verification
+- [x] Compare page fully project-scoped
+- [x] Two demo projects: Bike Components — Rennrad, Babor Beauty Group
+- [x] Gemini 2.5 Flash extraction client + `/api/extract-gemini`
+- [x] Document ingest pipeline (`/api/ingest`, `scripts/ingest.mjs`)
+- [x] Sources tab UI with drag-and-drop file upload
 
 ### Known Bug
 - Entity type IDs use strings (`"organisation"`, `"platform"`) instead of UUIDs → `entity_type_configs` Supabase upsert returns 400. Non-fatal (caught silently), but entity types don't persist to Supabase. Fix: generate UUID on creation in `src/lib/entity-types.ts`.
 
 ---
 
-## Phase 2 — Planned (not yet started)
+## Phase 2 Status — COMPLETE ✅
 
-**Milestone 2: Haiku Inquiry Agent**
-- Structured inquiry mode (vs. open conversation) — a new interaction pattern
-- Haiku as the listening instrument: asks questions, extracts, updates graph
-- Needs Opus planning session before implementation
+**Haiku Synthesis Agent** — completed Mar 16, 2026 (Sessions 6–9)
 
-**Milestone 3+:** TBD — see full brief
+### What was built
+- [x] **Project Brief** — scoping dialogue with Haiku → editable brief stored in `projects.metadata.brief`
+- [x] **Abstraction layers** — three extraction lenses (domain objects / interaction patterns / concerns & themes) fed to Gemini
+- [x] **Sources integration** — new uploads use the project's abstraction layer automatically
+- [x] **Cross-source synthesis** — Haiku reads all documents + graph, returns term collisions, connecting threads, signal convergence, graph gaps
+- [x] **Synthesis tab** — 4th tab in Chat panel with full results display
+- [x] **Re-process escape valve** — change abstraction layer → snapshot download → full graph rebuild
+- [x] **LocalStorage caching** — synthesis results + scoping messages cached per project
+- [x] **Session logging** — all Haiku + Gemini interactions logged to `sessions` table
+
+### Architecture decisions
+- **Haiku has NO graph tools.** Reads and recommends only. Consultant acts on suggestions.
+- **Synthesis before interview.** Cross-source reading is higher value than structured Q&A.
+- **Brief in `projects.metadata`** — no migration, jsonb patch via read-modify-write.
+- **Re-process = full replace + snapshot.** No merge. Consultant retains snapshot for rollback.
+- **`<brief>` tag protocol** — Haiku signals completion by embedding JSON in `<brief>...</brief>`. Stripped from display.
+- **Context window guard** — 600k chars (~150k tokens). Docs pre-summarised with Haiku if exceeded.
 
 ---
 
@@ -89,17 +101,30 @@ All tables scoped by `project_id`.
 
 | File | Purpose |
 |------|---------|
-| `src/app/page.tsx` | Main 3-panel editor |
+| `src/app/page.tsx` | Main 3-panel editor + all Phase 2 state/handlers |
 | `src/app/projects/page.tsx` | Project management |
 | `src/app/compare/page.tsx` | Search comparison |
-| `src/app/api/chat/route.ts` | Claude conversation loop |
-| `src/app/api/extract/route.ts` | Narrative extraction |
+| `src/app/api/chat/route.ts` | Claude Sonnet conversation loop |
+| `src/app/api/extract/route.ts` | Narrative extraction (Sonnet) |
+| `src/app/api/extract-gemini/route.ts` | Bulk extraction (Gemini + abstraction layer) |
+| `src/app/api/scoping/route.ts` | Haiku scoping dialogue |
+| `src/app/api/synthesis/route.ts` | Haiku cross-source synthesis |
+| `src/app/api/reprocess/route.ts` | Re-extract all docs with new lens |
 | `src/lib/claude.ts` | Claude Sonnet + tool use loop |
+| `src/lib/haiku.ts` | Haiku client: scoping + synthesis |
+| `src/lib/gemini.ts` | Gemini extraction with abstraction layer variants |
 | `src/lib/tools.ts` | 9 graph tool definitions |
-| `src/lib/supabase.ts` | DB client + CRUD |
+| `src/lib/supabase.ts` | DB client + CRUD (incl. updateProjectMetadata, getProjectDocuments, clearOntology) |
 | `src/lib/graph-state.ts` | Graph state mutations |
 | `src/lib/entity-types.ts` | Entity type management (has UUID bug) |
 | `src/lib/system-prompt.ts` | Dynamic system prompt builder |
+| `src/types/index.ts` | All types incl. ProjectBrief, SynthesisResult, AbstractionLayer |
+| `src/components/Chat.tsx` | 4-tab chat panel (Chat/Extract/Sources/Synthesis) |
+| `src/components/Sources.tsx` | Document upload + Gemini extraction (passes abstraction layer) |
+| `src/components/Inspector.tsx` | Node/edge editor + ProjectBrief panel |
+| `src/components/ProjectBrief.tsx` | Inline-editable brief + re-process button |
+| `src/components/ScopingModal.tsx` | Haiku scoping dialogue modal |
+| `src/components/SynthesisResults.tsx` | Cross-source synthesis results display |
 | `data/bc-ontology-gemini.json` | Bike Components pre-built ontology |
 | `data/babor-ontology-gemini.json` | Babor Beauty pre-built ontology |
 | `scripts/ingest.mjs` | Ingest ontologies into Supabase |
@@ -115,6 +140,18 @@ npm run dev
 ```
 
 Or use the launch.json config (`terroir-dev`).
+
+---
+
+## Patterns & Gotchas
+
+- **Three-agent cognitive division:** Gemini = extract (bulk, no conversation), Sonnet = converse + tools, Haiku = synthesise + recommend (NO graph tools). See `~/.claude/learnings/2026-03-15-three-agent-cognitive-division.md`
+- **Abstraction layer is explicit:** Three presets fed to Gemini — never default to "extract everything". See `~/.claude/learnings/2026-03-15-abstraction-layer-problem.md`
+- **Synthesis before interview:** Cross-source synthesis first, structured interviewing second. See `~/.claude/learnings/2026-03-15-synthesis-before-interview.md`
+- **Dynamic contexts framework:** Brief = stable context, Graph = dynamic context, Synthesis = inferred context. Maps to LineUp7's 9-layer model. See `~/.claude/learnings/2026-03-16-dynamic-contexts-framework.md`
+- **Edit-on-blur pattern:** ProjectBrief uses same UX as Inspector — local state mirrors fields, Supabase updated on blur.
+- **`saveOntology` ID interpolation:** NOT IN filter uses string-interpolated IDs — safe for UUIDs, watch if slug IDs ever contain special chars.
+- **Reprocess timeout risk:** Sequential Gemini calls in `/api/reprocess` — add `export const maxDuration = 300` for Vercel deployments with 5+ large documents.
 
 ---
 

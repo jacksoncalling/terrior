@@ -13,7 +13,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { GraphState, GraphUpdate } from "@/types";
+import type { GraphState, GraphUpdate, ProjectBrief } from "@/types";
 import { autoLayout } from "@/lib/layout";
 
 interface SourceFile {
@@ -31,11 +31,13 @@ interface SourcesProps {
   projectId: string | null;
   graphState: GraphState;
   onGraphUpdate: (updatedGraph: GraphState, updates: GraphUpdate[]) => void;
+  /** When set, new uploads use the project's abstraction layer for extraction */
+  projectBrief?: ProjectBrief | null;
 }
 
 const ACCEPTED_EXTS = ["pdf", "docx", "doc", "txt", "md", "json"];
 
-export default function Sources({ projectId, graphState, onGraphUpdate }: SourcesProps) {
+export default function Sources({ projectId, graphState, onGraphUpdate, projectBrief }: SourcesProps) {
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,6 +90,10 @@ export default function Sources({ projectId, graphState, onGraphUpdate }: Source
             text: content,
             graphState: latestGraphRef.current,
             projectId,
+            // Phase 2: pass extraction lens so Gemini uses the project's
+            // abstraction layer instead of the default "extract everything" mode
+            abstractionLayer: projectBrief?.abstractionLayer,
+            projectBrief: projectBrief ?? undefined,
           }),
         });
         if (!res.ok) {

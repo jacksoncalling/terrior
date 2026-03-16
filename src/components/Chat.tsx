@@ -3,7 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import ChatMessage from "./ChatMessage";
 import Sources from "./Sources";
-import type { ChatMessage as ChatMessageType, GraphState, GraphUpdate } from "@/types";
+import SynthesisResults from "./SynthesisResults";
+import type {
+  ChatMessage as ChatMessageType,
+  GraphState,
+  GraphUpdate,
+  SynthesisResult,
+  ProjectBrief,
+} from "@/types";
 
 interface ChatProps {
   messages: ChatMessageType[];
@@ -15,6 +22,13 @@ interface ChatProps {
   projectId: string | null;
   graphState: GraphState;
   onGraphUpdate: (updatedGraph: GraphState, updates: GraphUpdate[]) => void;
+  // ── Phase 2: Synthesis tab ────────────────────────────────────────────────
+  synthesisResult?: SynthesisResult | null;
+  onRunSynthesis?: () => void;
+  isSynthesisLoading?: boolean;
+  documentCount?: number;
+  /** Passed through to Sources so new uploads use the project's extraction lens */
+  projectBrief?: ProjectBrief | null;
 }
 
 export default function Chat({
@@ -26,9 +40,14 @@ export default function Chat({
   projectId,
   graphState,
   onGraphUpdate,
+  synthesisResult,
+  onRunSynthesis,
+  isSynthesisLoading = false,
+  documentCount = 0,
+  projectBrief,
 }: ChatProps) {
   const [input, setInput] = useState("");
-  const [mode, setMode] = useState<"chat" | "narrative" | "sources">("chat");
+  const [mode, setMode] = useState<"chat" | "narrative" | "sources" | "synthesis">("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,6 +84,15 @@ export default function Chat({
     }
   };
 
+  /**
+   * Called by SynthesisResults "Ask about this in Chat" buttons.
+   * Switches to the chat tab and pre-fills the input with the suggested question.
+   */
+  const handleAskInChat = (question: string) => {
+    setMode("chat");
+    setInput(question);
+  };
+
   const tabBtn = (label: string, value: typeof mode) => (
     <button
       onClick={() => setMode(value)}
@@ -87,9 +115,10 @@ export default function Chat({
           <p className="text-[10px] text-stone-500">Organisational listening</p>
         </div>
         <div className="flex gap-1">
-          {tabBtn("Chat",    "chat")}
-          {tabBtn("Extract", "narrative")}
-          {tabBtn("Sources", "sources")}
+          {tabBtn("Chat",      "chat")}
+          {tabBtn("Extract",   "narrative")}
+          {tabBtn("Sources",   "sources")}
+          {tabBtn("Synthesis", "synthesis")}
         </div>
       </div>
 
@@ -100,12 +129,26 @@ export default function Chat({
             projectId={projectId}
             graphState={graphState}
             onGraphUpdate={onGraphUpdate}
+            projectBrief={projectBrief}
+          />
+        </div>
+      )}
+
+      {/* Synthesis mode */}
+      {mode === "synthesis" && (
+        <div className="flex-1 overflow-hidden">
+          <SynthesisResults
+            result={synthesisResult ?? null}
+            documentCount={documentCount}
+            isLoading={isSynthesisLoading}
+            onRunSynthesis={onRunSynthesis ?? (() => {})}
+            onAskInChat={handleAskInChat}
           />
         </div>
       )}
 
       {/* Chat / Extract mode */}
-      {mode !== "sources" && (
+      {mode !== "sources" && mode !== "synthesis" && (
         <>
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 py-3">
