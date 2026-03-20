@@ -1,30 +1,34 @@
 "use client";
 
 /**
- * Sources — document upload & extraction panel.
+ * Sources — document upload, classification & extraction panel.
  *
- * Per-file flow:
- *   1. POST /api/ingest  (parse + chunk + embed + persist)  → { content, chunkCount, title }
- *   2. POST /api/extract-gemini (text + currentGraph)       → { updatedGraph, graphUpdates }
+ * New 4-phase flow (Phase 2.5):
+ *   1. INGEST — parallel POST /api/ingest for all files (parse + chunk + embed)
+ *   2. CLASSIFY — batch POST /api/classify (Gemini evaluates all docs in one call)
+ *   3. REVIEW — user sees EXTRACT/CAUTION/SKIP verdicts, can override
+ *   4. EXTRACT — sequential POST /api/extract-gemini for approved files only
  *
- * Files are processed sequentially so each extraction sees the latest graph
- * state for deduplication.
+ * Files are extracted sequentially so each extraction sees the latest graph
+ * state for deduplication. Ingest is parallelised (no dedup concern there).
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { GraphState, GraphUpdate, ProjectBrief } from "@/types";
+import type { GraphState, GraphUpdate, ProjectBrief, DocumentClassification, ClassificationVerdict } from "@/types";
 import { autoLayout } from "@/lib/layout";
 
 interface SourceFile {
   id: string;
   name: string;
   size: number;
-  status: "queued" | "uploading" | "extracting" | "done" | "error";
+  status: "queued" | "uploading" | "classifying" | "classified" | "extracting" | "done" | "skipped" | "error";
   chunkCount?: number;
   entityCount?: number;
   relCount?: number;
   error?: string;
+  content?: string;                          // parsed text from ingest (needed for classify + extract)
+  classification?: DocumentClassification;   // verdict from Gemini classification
 }
 
 interface SourcesProps {
@@ -40,6 +44,9 @@ const ACCEPTED_EXTS = ["pdf", "docx", "doc", "txt", "md", "json"];
 export default function Sources({ projectId, graphState, onGraphUpdate, projectBrief }: SourcesProps) {
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isClassifying, setIsClassifying] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [hasClassified, setHasClassified] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Keep a ref to the latest graph so sequential processing uses fresh state
@@ -52,13 +59,13 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
   }, []);
 
-  const processFile = useCallback(
-    async (meta: SourceFile, raw: File) => {
-      if (!projectId) return;
+  // ── Phase 1: Parallel ingest ──────────────────────────────────────────────
 
-      // ── Step 1: Ingest ────────────────────────────────────────────────────
+  const ingestFile = useCallback(
+    async (meta: SourceFile, raw: File): Promise<{ id: string; content: string; title: string } | null> => {
+      if (!projectId) return null;
+
       updateFile(meta.id, { status: "uploading" });
-      let content: string;
       try {
         const form = new FormData();
         form.append("file", raw);
@@ -70,55 +77,168 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
           throw new Error((err as { error?: string }).error || `Ingest failed (${res.status})`);
         }
         const data = await res.json() as { content: string; chunkCount: number; title: string };
-        content = data.content;
-        updateFile(meta.id, { chunkCount: data.chunkCount });
+        updateFile(meta.id, { chunkCount: data.chunkCount, content: data.content });
+        return { id: meta.id, content: data.content, title: data.title || meta.name };
       } catch (err) {
         updateFile(meta.id, {
           status: "error",
           error: err instanceof Error ? err.message : "Upload failed",
         });
-        return;
+        return null;
+      }
+    },
+    [projectId, updateFile]
+  );
+
+  // ── Phase 2: Batch classify ───────────────────────────────────────────────
+
+  const classifyFiles = useCallback(
+    async (ingested: { id: string; content: string; title: string }[]) => {
+      if (!projectId || ingested.length === 0) return;
+
+      setIsClassifying(true);
+
+      // Mark all ingested files as classifying
+      for (const doc of ingested) {
+        updateFile(doc.id, { status: "classifying" });
       }
 
-      // ── Step 2: Extract with Gemini ───────────────────────────────────────
-      updateFile(meta.id, { status: "extracting" });
+      try {
+        const res = await fetch("/api/classify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            documents: ingested.map((doc, i) => ({
+              index: i,
+              title: doc.title,
+              content: doc.content,
+            })),
+            projectId,
+            projectBrief: projectBrief ?? undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || `Classification failed (${res.status})`);
+        }
+
+        const data = await res.json() as { classifications: DocumentClassification[] };
+
+        // Map classifications back to files
+        for (let i = 0; i < data.classifications.length; i++) {
+          const classification = data.classifications[i];
+          const doc = ingested[classification.documentIndex ?? i];
+          if (doc) {
+            updateFile(doc.id, {
+              status: "classified",
+              classification,
+            });
+          }
+        }
+
+        setHasClassified(true);
+      } catch (err) {
+        console.error("[classify] Error:", err);
+        // Fallback: classify everything as EXTRACT
+        for (const doc of ingested) {
+          updateFile(doc.id, {
+            status: "classified",
+            classification: {
+              documentIndex: 0,
+              title: doc.title,
+              verdict: "EXTRACT",
+              genre: "unknown",
+              confidence: 0,
+              reason: "Classification failed — defaulting to extract",
+            },
+          });
+        }
+        setHasClassified(true);
+      } finally {
+        setIsClassifying(false);
+      }
+    },
+    [projectId, projectBrief, updateFile]
+  );
+
+  // ── Phase 3: Toggle verdict (user override) ───────────────────────────────
+
+  const toggleVerdict = useCallback((fileId: string) => {
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id !== fileId || !f.classification) return f;
+        const cycle: ClassificationVerdict[] = ["EXTRACT", "CAUTION", "SKIP"];
+        const currentIdx = cycle.indexOf(f.classification.verdict);
+        const nextVerdict = cycle[(currentIdx + 1) % cycle.length];
+        return {
+          ...f,
+          classification: { ...f.classification, verdict: nextVerdict },
+        };
+      })
+    );
+  }, []);
+
+  // ── Phase 4: Sequential extract (approved files only) ─────────────────────
+
+  const extractApproved = useCallback(async () => {
+    if (!projectId) return;
+
+    setIsExtracting(true);
+
+    const toExtract = files.filter(
+      (f) => f.classification && f.classification.verdict !== "SKIP" && f.content && f.status === "classified"
+    );
+
+    // Mark skipped files
+    setFiles((prev) =>
+      prev.map((f) =>
+        f.classification?.verdict === "SKIP" && f.status === "classified"
+          ? { ...f, status: "skipped" }
+          : f
+      )
+    );
+
+    for (const file of toExtract) {
+      updateFile(file.id, { status: "extracting" });
       try {
         const res = await fetch("/api/extract-gemini", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text: content,
+            text: file.content,
             graphState: latestGraphRef.current,
             projectId,
-            // Phase 2: pass extraction lens so Gemini uses the project's
-            // abstraction layer instead of the default "extract everything" mode
             abstractionLayer: projectBrief?.abstractionLayer,
             projectBrief: projectBrief ?? undefined,
           }),
         });
+
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error((err as { error?: string }).error || `Extraction failed (${res.status})`);
         }
+
         const data = await res.json() as { updatedGraph: GraphState; graphUpdates: GraphUpdate[] };
-
         const laidOut = autoLayout(data.updatedGraph);
-        latestGraphRef.current = laidOut; // feed into the next file
-
+        latestGraphRef.current = laidOut;
         onGraphUpdate(laidOut, data.graphUpdates);
 
         const entityCount = data.graphUpdates.filter((u) => u.type === "node_created").length;
-        const relCount    = data.graphUpdates.filter((u) => u.type === "relationship_created").length;
-        updateFile(meta.id, { status: "done", entityCount, relCount });
+        const relCount = data.graphUpdates.filter((u) => u.type === "relationship_created").length;
+        updateFile(file.id, { status: "done", entityCount, relCount });
       } catch (err) {
-        updateFile(meta.id, {
+        updateFile(file.id, {
           status: "error",
           error: err instanceof Error ? err.message : "Extraction failed",
         });
       }
-    },
-    [projectId, onGraphUpdate, updateFile]
-  );
+    }
+
+    setIsExtracting(false);
+  }, [files, projectId, projectBrief, onGraphUpdate, updateFile]);
+
+  // ── Enqueue: ingest → classify → wait for user ────────────────────────────
 
   const enqueueFiles = useCallback(
     (rawFiles: File[]) => {
@@ -136,15 +256,26 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
       }));
 
       setFiles((prev) => [...prev, ...metas]);
+      setHasClassified(false);
 
-      // Process sequentially (each file sees the graph after the previous one)
+      // Phase 1+2: Parallel ingest, then batch classify
       (async () => {
-        for (let i = 0; i < metas.length; i++) {
-          await processFile(metas[i], accepted[i]);
+        // Parallel ingest with Promise.allSettled
+        const results = await Promise.allSettled(
+          metas.map((meta, i) => ingestFile(meta, accepted[i]))
+        );
+
+        // Collect successful ingests
+        const ingested = results
+          .map((r) => (r.status === "fulfilled" ? r.value : null))
+          .filter((r): r is { id: string; content: string; title: string } => r !== null);
+
+        if (ingested.length > 0) {
+          await classifyFiles(ingested);
         }
       })();
     },
-    [processFile]
+    [ingestFile, classifyFiles]
   );
 
   const handleDrop = useCallback(
@@ -173,20 +304,53 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
   };
 
   const StatusIcon = ({ status }: { status: SourceFile["status"] }) => {
-    if (status === "queued")     return <span className="text-stone-300 text-base leading-none">·</span>;
-    if (status === "uploading")  return <span className="text-amber-400 animate-pulse text-sm leading-none">↑</span>;
-    if (status === "extracting") return <span className="text-blue-400 animate-spin inline-block text-sm leading-none">⟳</span>;
-    if (status === "done")       return <span className="text-emerald-500 text-sm leading-none">✓</span>;
-    return                              <span className="text-red-400 text-sm leading-none">✕</span>;
+    if (status === "queued")       return <span className="text-stone-300 text-base leading-none">·</span>;
+    if (status === "uploading")    return <span className="text-amber-400 animate-pulse text-sm leading-none">↑</span>;
+    if (status === "classifying")  return <span className="text-violet-400 animate-pulse text-sm leading-none">◎</span>;
+    if (status === "classified")   return <span className="text-stone-400 text-sm leading-none">◉</span>;
+    if (status === "extracting")   return <span className="text-blue-400 animate-spin inline-block text-sm leading-none">⟳</span>;
+    if (status === "done")         return <span className="text-emerald-500 text-sm leading-none">✓</span>;
+    if (status === "skipped")      return <span className="text-stone-300 text-sm leading-none">–</span>;
+    return                                <span className="text-red-400 text-sm leading-none">✕</span>;
+  };
+
+  const VerdictBadge = ({ file }: { file: SourceFile }) => {
+    if (!file.classification) return null;
+    const v = file.classification.verdict;
+    const colors = {
+      EXTRACT: "bg-emerald-50 text-emerald-600 border-emerald-200",
+      CAUTION: "bg-amber-50 text-amber-600 border-amber-200",
+      SKIP:    "bg-stone-50 text-stone-400 border-stone-200 line-through",
+    };
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleVerdict(file.id); }}
+        className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${colors[v]} hover:opacity-80 transition-opacity cursor-pointer`}
+        title={`${file.classification.reason} — click to change`}
+      >
+        {v}
+      </button>
+    );
   };
 
   const statusLabel = (f: SourceFile): string => {
-    if (f.status === "queued")     return "Queued";
-    if (f.status === "uploading")  return "Uploading…";
-    if (f.status === "extracting") return "Extracting…";
-    if (f.status === "done")       return `${f.entityCount ?? 0} entities · ${f.relCount ?? 0} rels`;
+    if (f.status === "queued")       return "Queued";
+    if (f.status === "uploading")    return "Uploading…";
+    if (f.status === "classifying")  return "Classifying…";
+    if (f.status === "classified")   return f.classification?.genre ?? "Classified";
+    if (f.status === "extracting")   return "Extracting…";
+    if (f.status === "done")         return `${f.entityCount ?? 0} entities · ${f.relCount ?? 0} rels`;
+    if (f.status === "skipped")      return f.classification?.reason ?? "Skipped";
     return f.error ?? "Error";
   };
+
+  // ── Summary counts ────────────────────────────────────────────────────────
+
+  const classifiedFiles = files.filter((f) => f.classification);
+  const extractCount = classifiedFiles.filter((f) => f.classification?.verdict === "EXTRACT").length;
+  const cautionCount = classifiedFiles.filter((f) => f.classification?.verdict === "CAUTION").length;
+  const skipCount    = classifiedFiles.filter((f) => f.classification?.verdict === "SKIP").length;
+  const showSummary  = hasClassified && classifiedFiles.length > 0;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -229,15 +393,44 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
         />
       </div>
 
+      {/* Classification summary + Extract button */}
+      {showSummary && (
+        <div className="mx-4 mb-3 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2.5">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-stone-500">
+              <span className="text-emerald-600 font-medium">{extractCount} extract</span>
+              {cautionCount > 0 && <> · <span className="text-amber-600 font-medium">{cautionCount} caution</span></>}
+              {skipCount > 0 && <> · <span className="text-stone-400">{skipCount} skip</span></>}
+            </p>
+            {!isExtracting && files.some((f) => f.status === "classified") && (
+              <button
+                onClick={extractApproved}
+                className="text-[10px] font-medium text-white bg-stone-800 hover:bg-stone-700 px-3 py-1 rounded-md transition-colors"
+              >
+                Extract {extractCount + cautionCount} documents
+              </button>
+            )}
+            {isExtracting && (
+              <span className="text-[10px] text-blue-500 animate-pulse font-medium">
+                Extracting…
+              </span>
+            )}
+          </div>
+          <p className="text-[9px] text-stone-400 mt-1">
+            Click a verdict badge to override · SKIP docs won&apos;t be extracted
+          </p>
+        </div>
+      )}
+
       {/* File list */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         {files.length === 0 ? (
           <div className="flex flex-col items-center gap-2 mt-6 px-4">
             <p className="text-center text-[10px] text-stone-400 leading-relaxed">
-              Upload documents to extract entities and relationships directly onto the canvas.
+              Upload documents to extract entities and relationships onto the canvas.
             </p>
             <p className="text-center text-[10px] text-stone-300">
-              Each file is chunked, embedded, and passed to Gemini for extraction.
+              Files are classified first — legal boilerplate and noise are filtered out automatically.
             </p>
           </div>
         ) : (
@@ -250,6 +443,10 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                     ? "border-red-100 bg-red-50"
                     : f.status === "done"
                     ? "border-emerald-100 bg-white"
+                    : f.status === "skipped"
+                    ? "border-stone-100 bg-stone-50 opacity-60"
+                    : f.classification?.verdict === "SKIP"
+                    ? "border-stone-100 bg-stone-50 opacity-60"
                     : "border-stone-100 bg-white"
                 }`}
               >
@@ -258,14 +455,17 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                     <StatusIcon status={f.status} />
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium text-stone-700 truncate">{f.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[11px] font-medium text-stone-700 truncate flex-1">{f.name}</p>
+                      <VerdictBadge file={f} />
+                    </div>
                     <p
                       className={`text-[10px] mt-0.5 ${
                         f.status === "error" ? "text-red-400" : "text-stone-400"
                       }`}
                     >
                       {statusLabel(f)}
-                      {f.status !== "error" && (
+                      {f.status !== "error" && f.status !== "skipped" && (
                         <span className="text-stone-300"> · {formatSize(f.size)}</span>
                       )}
                     </p>

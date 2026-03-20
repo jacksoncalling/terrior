@@ -39,6 +39,8 @@ import {
   saveOntology,
   updateProjectMetadata,
   countProjectDocuments,
+  clearOntology,
+  clearDocuments,
 } from "@/lib/supabase";
 import { useProject } from "@/lib/project-context";
 
@@ -688,13 +690,33 @@ export default function Home() {
     }
   }, [projectId, projectBrief, graphState]);
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
+    if (!confirm("Reset all data for this project? This clears the graph, chat, and all uploaded documents. This cannot be undone.")) return;
+
+    // Clear local state
     clearLocalStorage(projectId ?? undefined);
     setGraphState(emptyGraphState());
     setMessages([]);
     setGraphUpdatesMap({});
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
+    setSynthesisResult(null);
+    setDocumentCount(0);
+
+    // Clear synthesis cache from localStorage
+    if (projectId) {
+      localStorage.removeItem(`terroir_synthesis_${projectId}`);
+    }
+
+    // Clear Supabase: ontology tables + documents + chunks
+    if (projectId) {
+      try {
+        await clearOntology(projectId);
+        await clearDocuments(projectId);
+      } catch (err) {
+        console.warn("Supabase clear failed (non-fatal):", err);
+      }
+    }
   }, [projectId]);
 
   // Phase 1 migration: import the legacy unscoped localStorage graph into this project
@@ -802,7 +824,7 @@ export default function Home() {
             href="/projects"
             className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
           >
-            ← Projects
+            ← All Projects
           </Link>
           <span className="text-stone-200 select-none">|</span>
           <Link

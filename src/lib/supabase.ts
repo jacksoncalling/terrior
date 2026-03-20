@@ -207,6 +207,27 @@ export async function clearOntology(projectId: string): Promise<void> {
   }
 }
 
+/**
+ * Deletes all documents and their chunks for a project.
+ * Used by the full reset flow to prevent duplicate documents on re-upload.
+ * Chunks deleted first (FK dependency on document_id).
+ */
+export async function clearDocuments(projectId: string): Promise<void> {
+  const { error: chunkError } = await supabase
+    .from('document_chunks')
+    .delete()
+    .eq('project_id', projectId);
+
+  if (chunkError) throw new Error(`clearDocuments (chunks): ${chunkError.message}`);
+
+  const { error: docError } = await supabase
+    .from('documents')
+    .delete()
+    .eq('project_id', projectId);
+
+  if (docError) throw new Error(`clearDocuments (documents): ${docError.message}`);
+}
+
 // ── Ontology load / save ─────────────────────────────────────────────────────
 //
 // loadOntology: fetches all 5 ontology tables for a project in parallel and

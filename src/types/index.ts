@@ -100,6 +100,26 @@ export type AbstractionLayer =
   | "interaction_patterns"
   | "concerns_themes";
 
+// ── Phase 2.5: Document Classification ──────────────────────────────────────
+//
+// Pre-classification step that filters documents before extraction.
+// Gemini classifies each document as EXTRACT, CAUTION, or SKIP based on
+// genre (legal, marketing, operational) to prevent noise from polluting
+// the knowledge graph.
+
+export type ClassificationVerdict = "EXTRACT" | "CAUTION" | "SKIP";
+
+export interface DocumentClassification {
+  documentIndex: number;           // index in the batch
+  title: string;
+  verdict: ClassificationVerdict;
+  genre: string;                   // e.g. "legal", "marketing", "operational", "interview"
+  confidence: number;              // 0-1
+  reason: string;                  // one-line explanation
+  isDuplicate?: boolean;           // true if this duplicates another doc
+  duplicateOf?: string;            // title of the doc it duplicates
+}
+
 // ── Phase 2: Project Brief ────────────────────────────────────────────────────
 //
 // Produced by the Haiku scoping dialogue. Stored in projects.metadata.brief
