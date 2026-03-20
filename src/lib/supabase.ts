@@ -414,7 +414,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
 
 // ── Session logging ──────────────────────────────────────────────────────────
 
-export type SessionType = 'inquiry' | 'extraction' | 'synthesis' | 'manual';
+export type SessionType = 'inquiry' | 'extraction' | 'synthesis' | 'classification' | 'manual';
 export type SessionAgent = 'haiku' | 'sonnet' | 'gemini' | 'manual';
 
 export async function logSession(input: {

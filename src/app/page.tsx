@@ -42,6 +42,7 @@ import {
   clearOntology,
   clearDocuments,
 } from "@/lib/supabase";
+import { buildProjectBundle, downloadProjectBundle } from "@/lib/export";
 import { useProject } from "@/lib/project-context";
 
 // Debounce delay for Supabase saves (ms)
@@ -421,6 +422,21 @@ export default function Home() {
     a.click();
     URL.revokeObjectURL(url);
   }, [graphState]);
+
+  /**
+   * Exports the full project bundle: graph + synthesis + brief + classifications.
+   * Designed for PoC handover — the JSON is machine-readable by RAG pipelines.
+   */
+  const handleExportBundle = useCallback(() => {
+    const bundle = buildProjectBundle({
+      projectName: project?.name ?? "untitled",
+      graphState,
+      projectBrief,
+      synthesisResult,
+      documentCount,
+    });
+    downloadProjectBundle(bundle);
+  }, [project, graphState, projectBrief, synthesisResult, documentCount]);
 
   const handleImportFile = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -811,6 +827,13 @@ export default function Home() {
             className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
           >
             Export
+          </button>
+          <button
+            onClick={handleExportBundle}
+            className="text-[10px] text-stone-500 hover:text-stone-700 font-medium transition-colors"
+            title="Export full project bundle (graph + synthesis + brief) as JSON"
+          >
+            Bundle ↓
           </button>
           <button
             onClick={handleMigrateLegacy}

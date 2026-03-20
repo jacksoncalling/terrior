@@ -3,14 +3,19 @@
 /**
  * Sources — document upload, classification & extraction panel.
  *
- * New 4-phase flow (Phase 2.5):
+ * 4-phase flow (Phase 2.5):
  *   1. INGEST — parallel POST /api/ingest for all files (parse + chunk + embed)
+ *              OR direct paste (skips ingest, goes straight to classify)
  *   2. CLASSIFY — batch POST /api/classify (Gemini evaluates all docs in one call)
  *   3. REVIEW — user sees EXTRACT/CAUTION/SKIP verdicts, can override
  *   4. EXTRACT — sequential POST /api/extract-gemini for approved files only
  *
  * Files are extracted sequentially so each extraction sees the latest graph
  * state for deduplication. Ingest is parallelised (no dedup concern there).
+ *
+ * Paste-text: for Confluence / wiki / copy-paste workflows. Pasted content
+ * skips the /api/ingest step (no file parsing needed) and joins the pipeline
+ * at the classify phase with the raw text.
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -29,6 +34,7 @@ interface SourceFile {
   error?: string;
   content?: string;                          // parsed text from ingest (needed for classify + extract)
   classification?: DocumentClassification;   // verdict from Gemini classification
+  isPasted?: boolean;                        // true for paste-text entries (no file upload)
 }
 
 interface SourcesProps {
@@ -48,6 +54,11 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
   const [isExtracting, setIsExtracting] = useState(false);
   const [hasClassified, setHasClassified] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Paste-text mode ───────────────────────────────────────────────────────
+  const [inputMode, setInputMode] = useState<"upload" | "paste">("upload");
+  const [pasteTitle, setPasteTitle] = useState("");
+  const [pasteContent, setPasteContent] = useState("");
 
   // Keep a ref to the latest graph so sequential processing uses fresh state
   const latestGraphRef = useRef<GraphState>(graphState);
@@ -278,6 +289,37 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
     [ingestFile, classifyFiles]
   );
 
+  // ── Paste-text: skip ingest, go straight to classify ──────────────────
+
+  const enqueuePastedText = useCallback(() => {
+    const trimmed = pasteContent.trim();
+    if (!trimmed || !projectId) return;
+
+    const title = pasteTitle.trim() || "Pasted document";
+    const meta: SourceFile = {
+      id: uuidv4(),
+      name: title,
+      size: new Blob([trimmed]).size,
+      status: "queued",
+      content: trimmed,
+      isPasted: true,
+    };
+
+    setFiles((prev) => [...prev, meta]);
+    setHasClassified(false);
+    setPasteTitle("");
+    setPasteContent("");
+
+    // Skip ingest (no file to parse) — go directly to classify
+    (async () => {
+      updateFile(meta.id, { status: "uploading" }); // brief visual feedback
+      // Small delay so user sees the file appear before classifying
+      updateFile(meta.id, { status: "classifying" });
+
+      await classifyFiles([{ id: meta.id, content: trimmed, title }]);
+    })();
+  }, [pasteContent, pasteTitle, projectId, classifyFiles, updateFile]);
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -352,46 +394,111 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
   const skipCount    = classifiedFiles.filter((f) => f.classification?.verdict === "SKIP").length;
   const showSummary  = hasClassified && classifiedFiles.length > 0;
 
+  // ── Guided checklist: visible when no files loaded ────────────────────────
+  const [checklistOpen, setChecklistOpen] = useState(true);
+  // Auto-collapse checklist once first file is added
+  useEffect(() => {
+    if (files.length > 0) setChecklistOpen(false);
+  }, [files.length]);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full">
-      {/* Drop zone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => projectId && fileInputRef.current?.click()}
-        className={`mx-4 mt-4 mb-3 rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center py-7 gap-1.5 ${
-          !projectId
-            ? "border-stone-100 cursor-not-allowed opacity-60"
-            : isDragging
-            ? "border-stone-400 bg-stone-50 cursor-copy"
-            : "border-stone-200 hover:border-stone-300 hover:bg-stone-50 cursor-pointer"
-        }`}
-      >
-        <svg
-          className={`w-6 h-6 ${isDragging ? "text-stone-500" : "text-stone-300"}`}
-          fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"
+      {/* ── Input mode toggle: Upload / Paste ─────────────────────────────── */}
+      <div className="flex items-center gap-1 mx-4 mt-3 mb-2">
+        <button
+          onClick={() => setInputMode("upload")}
+          className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-colors ${
+            inputMode === "upload"
+              ? "bg-stone-800 text-white"
+              : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+          }`}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-        </svg>
-        <p className="text-xs font-medium text-stone-500">
-          {isDragging ? "Drop to upload" : "Drop files or click to upload"}
-        </p>
-        <p className="text-[10px] text-stone-400">PDF · DOCX · TXT · MD · JSON</p>
-        {!projectId && (
-          <p className="text-[10px] text-red-400 mt-1">Select a project first</p>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.docx,.doc,.txt,.md,.json"
-          multiple
-          onChange={handleFileInput}
-          className="hidden"
-        />
+          Upload files
+        </button>
+        <button
+          onClick={() => setInputMode("paste")}
+          className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-colors ${
+            inputMode === "paste"
+              ? "bg-stone-800 text-white"
+              : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+          }`}
+        >
+          Paste text
+        </button>
       </div>
+
+      {/* ── Upload mode: file drop zone ───────────────────────────────────── */}
+      {inputMode === "upload" && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => projectId && fileInputRef.current?.click()}
+          className={`mx-4 mb-3 rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center py-7 gap-1.5 ${
+            !projectId
+              ? "border-stone-100 cursor-not-allowed opacity-60"
+              : isDragging
+              ? "border-stone-400 bg-stone-50 cursor-copy"
+              : "border-stone-200 hover:border-stone-300 hover:bg-stone-50 cursor-pointer"
+          }`}
+        >
+          <svg
+            className={`w-6 h-6 ${isDragging ? "text-stone-500" : "text-stone-300"}`}
+            fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          <p className="text-xs font-medium text-stone-500">
+            {isDragging ? "Drop to upload" : "Drop files or click to upload"}
+          </p>
+          <p className="text-[10px] text-stone-400">PDF · DOCX · TXT · MD · JSON</p>
+          {!projectId && (
+            <p className="text-[10px] text-red-400 mt-1">Select a project first</p>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.doc,.txt,.md,.json"
+            multiple
+            onChange={handleFileInput}
+            className="hidden"
+          />
+        </div>
+      )}
+
+      {/* ── Paste mode: title + textarea ──────────────────────────────────── */}
+      {inputMode === "paste" && (
+        <div className="mx-4 mb-3 flex flex-col gap-2">
+          <input
+            type="text"
+            value={pasteTitle}
+            onChange={(e) => setPasteTitle(e.target.value)}
+            placeholder="Document title (e.g. Confluence: Team Processes)"
+            disabled={!projectId}
+            className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[11px] text-stone-700 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none disabled:opacity-60"
+          />
+          <textarea
+            value={pasteContent}
+            onChange={(e) => setPasteContent(e.target.value)}
+            placeholder="Paste document content here — wiki pages, Confluence exports, meeting notes, interview transcripts..."
+            rows={5}
+            disabled={!projectId}
+            className="w-full resize-none rounded-lg border border-stone-200 bg-white px-3 py-2 text-[11px] text-stone-700 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none disabled:opacity-60"
+          />
+          <button
+            onClick={enqueuePastedText}
+            disabled={!projectId || !pasteContent.trim()}
+            className="w-full rounded-lg bg-stone-800 py-1.5 text-[10px] font-medium text-white hover:bg-stone-700 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
+          >
+            Add document
+          </button>
+          {!projectId && (
+            <p className="text-[10px] text-red-400">Select a project first</p>
+          )}
+        </div>
+      )}
 
       {/* Classification summary + Extract button */}
       {showSummary && (
@@ -425,13 +532,68 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
       {/* File list */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         {files.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 mt-6 px-4">
-            <p className="text-center text-[10px] text-stone-400 leading-relaxed">
-              Upload documents to extract entities and relationships onto the canvas.
-            </p>
-            <p className="text-center text-[10px] text-stone-300">
-              Files are classified first — legal boilerplate and noise are filtered out automatically.
-            </p>
+          <div className="flex flex-col gap-3 mt-3">
+            {/* ── Guided upload checklist (Step 3) ───────────────────────── */}
+            <div className="rounded-lg border border-stone-100 bg-stone-50 overflow-hidden">
+              <button
+                onClick={() => setChecklistOpen(!checklistOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-medium text-stone-600 hover:bg-stone-100 transition-colors"
+              >
+                <span>What to upload</span>
+                <span className={`text-stone-400 transition-transform ${checklistOpen ? "rotate-180" : ""}`}>▾</span>
+              </button>
+              {checklistOpen && (
+                <div className="px-3 pb-3 text-[10px] text-stone-500 leading-relaxed space-y-2.5">
+                  {/* Priority list */}
+                  <div>
+                    <p className="font-medium text-stone-600 mb-1">Start with these (highest value):</p>
+                    <ul className="space-y-0.5 ml-2">
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-px shrink-0">1.</span>
+                        <span><strong>Process docs</strong> — how work actually gets done, handoffs, workflows</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-px shrink-0">2.</span>
+                        <span><strong>Org charts & role descriptions</strong> — who does what, reporting lines</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-px shrink-0">3.</span>
+                        <span><strong>Meeting notes & transcripts</strong> — where real language lives</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-px shrink-0">4.</span>
+                        <span><strong>Strategy docs</strong> — goals, priorities, decision records</span>
+                      </li>
+                    </ul>
+                  </div>
+                  {/* Skip list */}
+                  <div>
+                    <p className="font-medium text-stone-600 mb-1">Skip these (auto-filtered anyway):</p>
+                    <p className="text-stone-400 ml-2">Legal boilerplate, cookie policies, T&C, marketing brochures, compliance templates</p>
+                  </div>
+                  {/* Source tips */}
+                  <div className="border-t border-stone-100 pt-2">
+                    <p className="font-medium text-stone-600 mb-1">Exporting from common sources:</p>
+                    <ul className="space-y-0.5 ml-2 text-stone-400">
+                      <li><strong className="text-stone-500">Confluence</strong> — Space settings → Export → HTML or PDF</li>
+                      <li><strong className="text-stone-500">SharePoint</strong> — Select files → Download (or use &quot;Paste text&quot;)</li>
+                      <li><strong className="text-stone-500">Google Drive</strong> — Right-click → Download as .docx</li>
+                      <li><strong className="text-stone-500">Notion</strong> — ··· menu → Export → Markdown & CSV</li>
+                      <li><strong className="text-stone-500">Wiki / other</strong> — Use the &quot;Paste text&quot; tab above</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Empty state text */}
+            <div className="flex flex-col items-center gap-2 px-4">
+              <p className="text-center text-[10px] text-stone-400 leading-relaxed">
+                Upload documents or paste text to extract entities and relationships onto the canvas.
+              </p>
+              <p className="text-center text-[10px] text-stone-300">
+                Files are classified first — legal boilerplate and noise are filtered out automatically.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">
@@ -456,6 +618,9 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
+                      {f.isPasted && (
+                        <span className="text-stone-300 text-[9px] shrink-0" title="Pasted text">✎</span>
+                      )}
                       <p className="text-[11px] font-medium text-stone-700 truncate flex-1">{f.name}</p>
                       <VerdictBadge file={f} />
                     </div>

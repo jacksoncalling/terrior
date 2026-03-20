@@ -18,7 +18,7 @@ Full brief: `../TERROIR_brief_v2.md`
 
 - **Framework:** Next.js (app router, TypeScript)
 - **UI:** ReactFlow (graph canvas) + Tailwind
-- **AI:** Claude Sonnet (chat + graph tool use), Gemini 2.5 Flash (batch ontology extraction), Claude Haiku (scoping dialogue + cross-source synthesis)
+- **AI:** Claude Sonnet (chat + graph tool use), Gemini 2.5 Flash (extraction + classification + synthesis), Claude Haiku (scoping dialogue only)
 - **DB:** Supabase (projects, ontology nodes/relationships, documents, embeddings, sessions)
 - **Embeddings:** Transformers.js local (paraphrase-multilingual-MiniLM-L12-v2)
 - **Layout:** Dagre (hierarchical auto-layout)
@@ -31,7 +31,7 @@ Full brief: `../TERROIR_brief_v2.md`
 [Chat / Extract / Sources / Synthesis] | [Canvas — ReactFlow graph] | [Inspector + Project Brief]
 ```
 
-- **Chat panel** — four modes: Chat (Claude Sonnet + 9 graph tools), Extract (narrative → graph), Sources (file upload → Gemini extraction), Synthesis (Haiku cross-source analysis)
+- **Chat panel** — four modes: Chat (Claude Sonnet + 9 graph tools), Extract (narrative → graph), Sources (file upload + paste-text → Gemini extraction), Synthesis (Gemini cross-source analysis)
 - **Canvas** — interactive graph, drag/click/auto-layout, type-filtered
 - **Inspector** — node/edge property editor + Project Brief panel (when nothing selected)
 - **TypePalette** — emergent entity types, color-coded
@@ -97,6 +97,36 @@ Project brief stored in `projects.metadata.brief` (jsonb — no schema migration
 
 ---
 
+## Phase 2.5 Status — IN PROGRESS 🟨
+
+**Bug Fixes + Ingestion Intelligence + PoC Readiness** — Mar 18–20, 2026
+
+### What was built (completed Mar 20)
+- [x] **Reset All fix** — now clears Supabase (ontology + documents + chunks), not just React state
+- [x] **Synthesis moved to Gemini** — replaced Haiku synthesis with Gemini (1M context, 32768 output tokens). Haiku now scoping-only.
+- [x] **Document pre-classification** — batch Gemini call classifies docs as EXTRACT/CAUTION/SKIP before extraction. Filters legal boilerplate, marketing, compliance noise.
+- [x] **4-phase Sources flow** — Ingest (parallel) → Classify (batch) → Review (user overrides verdicts) → Extract (sequential, approved only)
+- [x] **Paste-text input** — "Paste text" tab in Sources for Confluence/wiki/copy-paste workflows. Skips file ingest, enters pipeline at classify phase.
+- [x] **Combined export bundle** — `src/lib/export.ts` — one JSON file with graph + synthesis + brief + classifications + stats. Machine-readable for RAG pipelines. Schema-versioned.
+- [x] **Guided upload checklist** — collapsible "What to upload" panel in Sources empty state. Prioritised list + source-specific export tips (Confluence, SharePoint, Notion). Auto-collapses on first file.
+- [x] **Button rename** — "← Projects" → "← All Projects"
+- [x] **SessionType fix** — added `"classification"` to the SessionType union
+
+### What's left for PoC readiness
+- [ ] **Validation experiment** — run Babor data at 5/15/44 doc batch sizes, find the "aha" threshold where synthesis reveals non-obvious insights
+- [ ] **10-minute demo script** — timed walkthrough: scoping → upload → classify → extract → synthesis → export. Identify 3 "wow moments". Prepare backup project with pre-ingested data.
+
+### Architecture decisions (Phase 2.5)
+- **Gemini does all document work:** extraction + classification + synthesis. Haiku = scoping only. Three-agent division updated.
+- **Classification before extraction:** single Gemini call classifies all docs (first 2000 chars each). SKIP docs never extracted. Reduces noise + speeds up pipeline.
+- **Paste-text is a pipeline bypass:** pasted content skips `/api/ingest` and enters at classify phase. Same downstream flow as uploaded files.
+- **JSON export over PDF:** machine-readable format serves both humans and agents. `schema_version: "1.0"` for forward compatibility.
+
+### Plan document
+Full implementation plan at: `PLAN-poc-readiness.md` (Steps 1–3 complete, Steps 4–5 pending)
+
+---
+
 ## Key File Paths
 
 | File | Purpose |
@@ -108,19 +138,21 @@ Project brief stored in `projects.metadata.brief` (jsonb — no schema migration
 | `src/app/api/extract/route.ts` | Narrative extraction (Sonnet) |
 | `src/app/api/extract-gemini/route.ts` | Bulk extraction (Gemini + abstraction layer) |
 | `src/app/api/scoping/route.ts` | Haiku scoping dialogue |
-| `src/app/api/synthesis/route.ts` | Haiku cross-source synthesis |
+| `src/app/api/classify/route.ts` | Batch document classification (Gemini) |
+| `src/app/api/synthesis/route.ts` | Gemini cross-source synthesis |
 | `src/app/api/reprocess/route.ts` | Re-extract all docs with new lens |
 | `src/lib/claude.ts` | Claude Sonnet + tool use loop |
-| `src/lib/haiku.ts` | Haiku client: scoping + synthesis |
-| `src/lib/gemini.ts` | Gemini extraction with abstraction layer variants |
+| `src/lib/haiku.ts` | Haiku client: scoping dialogue only |
+| `src/lib/gemini.ts` | Gemini: extraction + classification + synthesis |
+| `src/lib/export.ts` | Project bundle export (graph + synthesis + brief as JSON) |
 | `src/lib/tools.ts` | 9 graph tool definitions |
-| `src/lib/supabase.ts` | DB client + CRUD (incl. updateProjectMetadata, getProjectDocuments, clearOntology) |
+| `src/lib/supabase.ts` | DB client + CRUD (incl. updateProjectMetadata, getProjectDocuments, clearOntology, clearDocuments) |
 | `src/lib/graph-state.ts` | Graph state mutations |
 | `src/lib/entity-types.ts` | Entity type management (has UUID bug) |
 | `src/lib/system-prompt.ts` | Dynamic system prompt builder |
 | `src/types/index.ts` | All types incl. ProjectBrief, SynthesisResult, AbstractionLayer |
 | `src/components/Chat.tsx` | 4-tab chat panel (Chat/Extract/Sources/Synthesis) |
-| `src/components/Sources.tsx` | Document upload + Gemini extraction (passes abstraction layer) |
+| `src/components/Sources.tsx` | 4-phase sources: upload/paste → classify → review → extract |
 | `src/components/Inspector.tsx` | Node/edge editor + ProjectBrief panel |
 | `src/components/ProjectBrief.tsx` | Inline-editable brief + re-process button |
 | `src/components/ScopingModal.tsx` | Haiku scoping dialogue modal |
@@ -145,13 +177,16 @@ Or use the launch.json config (`terroir-dev`).
 
 ## Patterns & Gotchas
 
-- **Three-agent cognitive division:** Gemini = extract (bulk, no conversation), Sonnet = converse + tools, Haiku = synthesise + recommend (NO graph tools). See `~/.claude/learnings/2026-03-15-three-agent-cognitive-division.md`
+- **Three-agent cognitive division (revised):** Gemini = extract + classify + synthesise (all document work), Sonnet = converse + tools, Haiku = scoping dialogue only. See `~/.claude/learnings/2026-03-15-three-agent-cognitive-division.md`
 - **Abstraction layer is explicit:** Three presets fed to Gemini — never default to "extract everything". See `~/.claude/learnings/2026-03-15-abstraction-layer-problem.md`
 - **Synthesis before interview:** Cross-source synthesis first, structured interviewing second. See `~/.claude/learnings/2026-03-15-synthesis-before-interview.md`
 - **Dynamic contexts framework:** Brief = stable context, Graph = dynamic context, Synthesis = inferred context. Maps to LineUp7's 9-layer model. See `~/.claude/learnings/2026-03-16-dynamic-contexts-framework.md`
 - **Edit-on-blur pattern:** ProjectBrief uses same UX as Inspector — local state mirrors fields, Supabase updated on blur.
 - **`saveOntology` ID interpolation:** NOT IN filter uses string-interpolated IDs — safe for UUIDs, watch if slug IDs ever contain special chars.
 - **Reprocess timeout risk:** Sequential Gemini calls in `/api/reprocess` — add `export const maxDuration = 300` for Vercel deployments with 5+ large documents.
+- **Classification filters noise at the gate:** Pre-classify all docs in one Gemini call (first 2000 chars each). 25 of 44 Babor docs were legal boilerplate — SKIP verdict prevents them from ever entering extraction.
+- **Paste-text bypasses ingest:** `enqueuePastedText()` skips `/api/ingest` entirely, enters pipeline at classify. Same downstream flow. See `~/.claude/learnings/2026-03-20-paste-text-ingest-bypass.md`
+- **Export bundles are agent context files:** The JSON bundle from `src/lib/export.ts` is designed to become the "CLAUDE.md for the organisation" — a structured preamble that travels with every agent call in a RAG pipeline.
 
 ---
 
