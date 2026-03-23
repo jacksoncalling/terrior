@@ -27,6 +27,9 @@
  * }
  */
 
+// Vercel: allow up to 5 minutes for sequential Gemini extraction across large corpora
+export const maxDuration = 300;
+
 import { NextRequest, NextResponse } from "next/server";
 import { extractOntologyWithGemini } from "@/lib/gemini";
 import {

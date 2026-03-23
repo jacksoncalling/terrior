@@ -35,6 +35,7 @@ import {
 import { autoLayout } from "@/lib/layout";
 import { addEntityType, updateEntityType } from "@/lib/entity-types";
 import {
+  supabase,
   loadOntology,
   saveOntology,
   updateProjectMetadata,
@@ -75,10 +76,16 @@ export default function Home() {
   const [synthesisResult, setSynthesisResult] = useState<SynthesisResult | null>(null);
   const [isSynthesisLoading, setIsSynthesisLoading] = useState(false);
 
+  // ── Share button state ────────────────────────────────────────────────────
+  const [shareCopied, setShareCopied] = useState(false);
+
   // Debounce ref for Supabase saves
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track the last project we loaded for (to reset on project switch)
   const loadedProjectRef = useRef<string | null>(null);
+  // Track when we last saved to Supabase so we can suppress realtime echo
+  // (our own saves trigger Realtime events — we don't want to re-load those)
+  const lastLocalSaveRef = useRef<number>(0);
 
   // ── Load ontology on mount / project switch ──────────────────────────────
 
@@ -191,6 +198,8 @@ export default function Home() {
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
+      // Stamp time before saving so the Realtime handler can ignore the echo
+      lastLocalSaveRef.current = Date.now();
       saveOntology(projectId, graphState).catch((err) =>
         console.warn('Supabase save failed (non-fatal):', err)
       );
@@ -200,6 +209,65 @@ export default function Home() {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [graphState, hydrated, projectId]);
+
+  // ── Supabase Realtime: live graph sync for collaborators ─────────────────
+  //
+  // Watches ontology_nodes for any remote change on this project.
+  // When a collaborator's save arrives, we re-load the full ontology so their
+  // graph changes appear on screen without a page refresh.
+  //
+  // Echo suppression: we stamp lastLocalSaveRef when we save. Any Realtime event
+  // within 5 seconds of our own save is treated as our echo and ignored, so we
+  // don't overwrite local state mid-drag or mid-edit.
+  //
+  // Prerequisite: run supabase/migrations/002_enable_realtime.sql in Supabase.
+  useEffect(() => {
+    if (!projectId || !hydrated) return;
+
+    const channel = supabase
+      .channel(`terroir-project-${projectId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ontology_nodes',
+          filter: `project_id=eq.${projectId}`,
+        },
+        () => {
+          // Ignore if we caused this change ourselves (within 5s of our last save)
+          if (Date.now() - lastLocalSaveRef.current < 5000) return;
+
+          loadOntology(projectId)
+            .then((remoteGraph) => {
+              if (remoteGraph.nodes.length > 0 || remoteGraph.relationships.length > 0) {
+                setGraphState(remoteGraph);
+              }
+            })
+            .catch((err) => console.warn('[realtime] Graph reload failed (non-fatal):', err));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, hydrated]);
+
+  // ── Share handler ─────────────────────────────────────────────────────────
+
+  /**
+   * Copies a shareable project URL to the clipboard.
+   * Anyone who opens /?p=<projectId> will be taken directly into this project.
+   */
+  const handleShare = useCallback(() => {
+    if (!projectId) return;
+    const url = `${window.location.origin}/?p=${projectId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    });
+  }, [projectId]);
 
   // ── Chat handler ─────────────────────────────────────────────────────────
 
@@ -874,6 +942,15 @@ export default function Home() {
             <span className="text-[11px] font-medium text-stone-600">{project.name}</span>
             <span className="text-stone-300 text-[10px]">·</span>
             <span className="text-[10px] text-stone-400">{project.phase}</span>
+            {/* Spacer pushes Share to the right */}
+            <span className="flex-1" />
+            <button
+              onClick={handleShare}
+              className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
+              title="Copy shareable link — anyone with this URL can open this project"
+            >
+              {shareCopied ? 'Copied!' : 'Share ↗'}
+            </button>
           </div>
         )}
         <TypePalette

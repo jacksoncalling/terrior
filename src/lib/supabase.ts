@@ -359,6 +359,12 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
   }
 
   // ── Upsert entity type configs ────────────────────────────────────────────
+  // Non-fatal: the onConflict clause requires a unique index on (project_id, type_id)
+  // in Supabase. If that index is missing the upsert returns 400. Entity types
+  // are rebuilt from graph nodes on every load (syncTypesFromGraph), so a failed
+  // persist here is acceptable — it just means colours won't survive a cold reload
+  // from Supabase alone. Run supabase/migrations/001_entity_type_unique_constraint.sql
+  // to fix this permanently.
   if (state.entityTypes.length > 0) {
     const { error } = await supabase.from('entity_type_configs').upsert(
       state.entityTypes.map((et) => ({
@@ -369,7 +375,11 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
       })),
       { onConflict: 'project_id,type_id', ignoreDuplicates: false }
     );
-    if (error) throw new Error(`saveOntology entityTypes: ${error.message}`);
+    if (error) {
+      // Log but don't throw — entity types are derived from nodes and can be
+      // reconstructed client-side, so this failure is non-blocking.
+      console.warn(`saveOntology entityTypes (non-fatal): ${error.message}`);
+    }
   }
 
   // ── Delete rows removed from state ────────────────────────────────────────

@@ -48,6 +48,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const [projectId, setProjectIdState] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
+      // URL param ?p=<id> takes precedence — enables shareable project links.
+      // When a collaborator opens /?p=<uuid>, they land directly in that project
+      // without needing to select it from the projects page.
+      const params = new URLSearchParams(window.location.search);
+      const shared = params.get('p');
+      if (shared) {
+        localStorage.setItem('terroir_project_id', shared); // persist for subsequent loads
+        return shared;
+      }
       return localStorage.getItem('terroir_project_id');
     }
     return null;
