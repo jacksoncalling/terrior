@@ -77,21 +77,30 @@ export async function POST(req: NextRequest) {
     await supabase.from("document_chunks").delete().eq("document_id", documentId);
 
     // ── Embed + save chunks ──────────────────────────────────────────────────
+    // Embeddings power the Compare/Search feature (vector similarity).
+    // If the ONNX runtime is unavailable (Vercel serverless), embedBatch returns
+    // empty arrays and we skip chunk storage. The document text is still saved
+    // above, so Gemini extraction (the main pipeline) is unaffected.
     const texts      = chunks.map((c) => c.content);
     const embeddings = await embedBatch(texts);
+    const embeddingsAvailable = embeddings.length > 0 && embeddings[0].length > 0;
 
-    const rows = chunks.map((chunk, i) => ({
-      document_id: documentId,
-      project_id:  projectId,
-      content:     chunk.content,
-      chunk_index: chunk.chunkIndex,
-      embedding:   embeddings[i],
-    }));
+    if (embeddingsAvailable) {
+      const rows = chunks.map((chunk, i) => ({
+        document_id: documentId,
+        project_id:  projectId,
+        content:     chunk.content,
+        chunk_index: chunk.chunkIndex,
+        embedding:   embeddings[i],
+      }));
 
-    const { error: chunkError } = await supabase.from("document_chunks").insert(rows);
-    if (chunkError) {
-      console.error("Chunk insert error:", chunkError);
-      return NextResponse.json({ error: chunkError.message }, { status: 500 });
+      const { error: chunkError } = await supabase.from("document_chunks").insert(rows);
+      if (chunkError) {
+        console.error("Chunk insert error:", chunkError);
+        return NextResponse.json({ error: chunkError.message }, { status: 500 });
+      }
+    } else {
+      console.warn("[ingest] Skipping chunk storage — embeddings unavailable (vector search disabled)");
     }
 
     return NextResponse.json({

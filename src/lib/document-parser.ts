@@ -5,6 +5,19 @@
  * Supported: PDF, DOCX, TXT, MD, JSON (GraphState or platform exports)
  */
 
+// pdf-parse uses pdfjs-dist internally, which expects browser DOM globals.
+// These are not available in Vercel's Node.js serverless runtime.
+// Stub the missing globals before any pdf-parse import so initialisation
+// doesn't throw. We only extract text — no rendering — so stubs are safe.
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  // @ts-expect-error — minimal stub for pdf-parse in Node.js serverless
+  globalThis.DOMMatrix = class DOMMatrix {
+    constructor(_init?: string | number[]) {}
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    is2D = true; isIdentity = true;
+  };
+}
+
 export interface ParsedDocument {
   title: string;
   content: string;
