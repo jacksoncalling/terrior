@@ -46,6 +46,7 @@ interface SourcesProps {
 }
 
 const ACCEPTED_EXTS = ["pdf", "docx", "doc", "txt", "md", "json"];
+const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB — Vercel serverless body limit
 
 export default function Sources({ projectId, graphState, onGraphUpdate, projectBrief }: SourcesProps) {
   const [files, setFiles] = useState<SourceFile[]>([]);
@@ -259,21 +260,37 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
       });
       if (!accepted.length) return;
 
-      const metas: SourceFile[] = accepted.map((f) => ({
+      const oversized: File[] = [];
+      const ok: File[] = [];
+      for (const f of accepted) {
+        (f.size > MAX_FILE_BYTES ? oversized : ok).push(f);
+      }
+
+      const oversizedMetas: SourceFile[] = oversized.map((f) => ({
+        id: uuidv4(),
+        name: f.name,
+        size: f.size,
+        status: "error",
+        error: `File too large (${(f.size / 1024 / 1024).toFixed(1)} MB) — max 4 MB. Split the PDF or use Paste Text.`,
+      }));
+
+      const metas: SourceFile[] = ok.map((f) => ({
         id: uuidv4(),
         name: f.name,
         size: f.size,
         status: "queued",
       }));
 
-      setFiles((prev) => [...prev, ...metas]);
+      setFiles((prev) => [...prev, ...oversizedMetas, ...metas]);
       setHasClassified(false);
+
+      if (!ok.length) return;
 
       // Phase 1+2: Parallel ingest, then batch classify
       (async () => {
         // Parallel ingest with Promise.allSettled
         const results = await Promise.allSettled(
-          metas.map((meta, i) => ingestFile(meta, accepted[i]))
+          metas.map((meta, i) => ingestFile(meta, ok[i]))
         );
 
         // Collect successful ingests
@@ -453,7 +470,7 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
           <p className="text-xs font-medium text-stone-500">
             {isDragging ? "Drop to upload" : "Drop files or click to upload"}
           </p>
-          <p className="text-[10px] text-stone-400">PDF · DOCX · TXT · MD · JSON</p>
+          <p className="text-[10px] text-stone-400">PDF · DOCX · TXT · MD · JSON · max 4 MB</p>
           {!projectId && (
             <p className="text-[10px] text-red-400 mt-1">Select a project first</p>
           )}
@@ -634,6 +651,14 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                         <span className="text-stone-300"> · {formatSize(f.size)}</span>
                       )}
                     </p>
+                    {f.status === "error" && (f.error?.includes("scanned") || f.error?.includes("usable text") || f.error?.includes("too large")) && (
+                      <button
+                        onClick={() => setInputMode("paste")}
+                        className="text-[9px] text-stone-400 underline underline-offset-2 hover:text-stone-600 mt-0.5"
+                      >
+                        Switch to Paste Text →
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

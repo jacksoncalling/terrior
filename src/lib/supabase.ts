@@ -256,7 +256,7 @@ export async function loadOntology(projectId: string): Promise<GraphState> {
     label: row.label,
     type: row.type,
     description: row.description ?? '',
-    position: row.position ?? { x: 0, y: 0 },
+    position: { x: row.position_x ?? 0, y: row.position_y ?? 0 },
     properties: row.properties ?? {},
   }));
 
@@ -302,7 +302,8 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
         label: n.label,
         type: n.type,
         description: n.description,
-        position: n.position,
+        position_x: n.position.x,
+        position_y: n.position.y,
         properties: n.properties ?? {},
         // preserve source_type if already set — don't override on upsert
       })),
