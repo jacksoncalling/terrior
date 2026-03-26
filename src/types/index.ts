@@ -51,8 +51,18 @@ export interface EvaluativeSignal {
   id: string;
   label: string;
   direction: "toward" | "away_from" | "protecting";
+  /** Extraction-time confidence/salience score (1–5), set by AI */
   strength: number;
   sourceDescription: string;
+  // ── Reflect tab scores — set by the user, nullable until rated ────────────
+  /** How relevant is this signal to the current work? (1–5, null = unrated) */
+  relevanceScore?: number | null;
+  /** How urgent / high-stakes does this signal feel right now? (1–5, null = unrated) */
+  intensityScore?: number | null;
+  /** ISO timestamp of the last reflection rating */
+  reflectedAt?: string | null;
+  /** Optional freetext note from the consultant */
+  userNote?: string | null;
 }
 
 export interface GraphState {

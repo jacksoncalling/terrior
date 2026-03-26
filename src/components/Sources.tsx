@@ -526,7 +526,7 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
               {cautionCount > 0 && <> · <span className="text-amber-600 font-medium">{cautionCount} caution</span></>}
               {skipCount > 0 && <> · <span className="text-stone-400">{skipCount} skip</span></>}
             </p>
-            {!isExtracting && files.some((f) => f.status === "classified") && (
+            {!isExtracting && (extractCount + cautionCount) > 0 && (
               <button
                 onClick={extractApproved}
                 className="text-[10px] font-medium text-white bg-stone-800 hover:bg-stone-700 px-3 py-1 rounded-md transition-colors"

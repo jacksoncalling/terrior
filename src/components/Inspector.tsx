@@ -132,29 +132,7 @@ export default function Inspector({
               )}
             </div>
 
-            {graphState.evaluativeSignals.length > 0 && (
-              <div>
-                <h4 className="font-medium text-stone-600 mb-1">
-                  Evaluative Signals
-                </h4>
-                {graphState.evaluativeSignals.map((s) => (
-                  <div key={s.id} className="flex items-center gap-1.5 mt-0.5">
-                    <span>
-                      {s.direction === "toward"
-                        ? "→"
-                        : s.direction === "away_from"
-                        ? "←"
-                        : "◆"}
-                    </span>
-                    <span className="font-medium text-stone-600">{s.label}</span>
-                    <span className="text-stone-300">
-                      {"●".repeat(s.strength)}
-                      {"○".repeat(5 - s.strength)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Evaluative signals live in the Reflect tab (Chat panel) */}
           </div>
         </div>
       </div>

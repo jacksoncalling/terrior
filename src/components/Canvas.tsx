@@ -314,27 +314,7 @@ export default function Canvas({
           </div>
         </Panel>
 
-        {/* Evaluative signals */}
-        {graphState.evaluativeSignals.length > 0 && (
-          <Panel position="bottom-right">
-            <div className="rounded-lg bg-white/90 px-3 py-2 shadow-sm backdrop-blur-sm border border-stone-100 max-w-[220px]">
-              <h4 className="text-[10px] font-medium text-stone-500 uppercase tracking-wide mb-1">
-                Evaluative Signals
-              </h4>
-              {graphState.evaluativeSignals.map((signal) => (
-                <div key={signal.id} className="flex items-center gap-1.5 text-[11px] text-stone-600">
-                  <span>
-                    {signal.direction === "toward" ? "→" : signal.direction === "away_from" ? "←" : "◆"}
-                  </span>
-                  <span className="font-medium truncate">{signal.label}</span>
-                  <span className="text-stone-400 shrink-0">
-                    {"●".repeat(signal.strength)}{"○".repeat(5 - signal.strength)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Panel>
-        )}
+        {/* Evaluative signals are displayed in the Reflect tab (Chat panel) — not on the canvas */}
       </ReactFlow>
 
       {/* New node dialog */}

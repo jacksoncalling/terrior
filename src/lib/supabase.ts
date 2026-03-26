@@ -281,6 +281,11 @@ export async function loadOntology(projectId: string): Promise<GraphState> {
     direction: row.direction,
     strength: row.strength,
     sourceDescription: row.source_description ?? '',
+    // Reflect tab scores — nullable until the user rates the signal
+    relevanceScore: row.relevance_score ?? null,
+    intensityScore: row.intensity_score ?? null,
+    reflectedAt: row.reflected_at ?? null,
+    userNote: row.user_note ?? null,
   }));
 
   const entityTypes: EntityTypeConfig[] = (entityTypesRes.data ?? []).map((row) => ({
@@ -353,6 +358,11 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
         direction: s.direction,
         strength: s.strength,
         source_description: s.sourceDescription,
+        // Preserve reflect scores — null means unrated, not "clear existing value"
+        relevance_score: s.relevanceScore ?? null,
+        intensity_score: s.intensityScore ?? null,
+        reflected_at: s.reflectedAt ?? null,
+        user_note: s.userNote ?? null,
       })),
       { onConflict: 'id', ignoreDuplicates: false }
     );

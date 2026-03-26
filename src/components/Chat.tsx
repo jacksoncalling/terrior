@@ -6,6 +6,7 @@ import Sources from "./Sources";
 import SynthesisResults from "./SynthesisResults";
 import type {
   ChatMessage as ChatMessageType,
+  EvaluativeSignal,
   GraphState,
   GraphUpdate,
   SynthesisResult,
@@ -18,18 +19,217 @@ interface ChatProps {
   onExtract: (text: string) => void;
   isLoading: boolean;
   graphUpdatesMap: Record<string, GraphUpdate[]>;
-  // Sources tab
+  // Sources panel
   projectId: string | null;
   graphState: GraphState;
   onGraphUpdate: (updatedGraph: GraphState, updates: GraphUpdate[]) => void;
-  // ── Phase 2: Synthesis tab ────────────────────────────────────────────────
+  // Synthesis tab
   synthesisResult?: SynthesisResult | null;
   onRunSynthesis?: () => void;
   isSynthesisLoading?: boolean;
   documentCount?: number;
   /** Passed through to Sources so new uploads use the project's extraction lens */
   projectBrief?: ProjectBrief | null;
+  /**
+   * Called optimistically when the user rates a signal in the Reflect tab.
+   * Keeps graphState (and saveOntology) in sync alongside the direct API write.
+   */
+  onSignalReflect?: (
+    signalId: string,
+    updates: Partial<Pick<EvaluativeSignal, "relevanceScore" | "intensityScore" | "reflectedAt" | "userNote">>
+  ) => void;
 }
+
+// ── Direction icon map ────────────────────────────────────────────────────────
+const DIRECTION_ICON: Record<string, string> = {
+  toward:    "→",
+  away_from: "←",
+  protecting: "◆",
+};
+
+// ── ScorePicker ───────────────────────────────────────────────────────────────
+// Renders a row of 5 clickable dots. Filled dots = selected score and below.
+// Hover preview: hovering dot N temporarily shows N filled dots.
+function ScorePicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | null | undefined;
+  onChange: (score: number) => void;
+}) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  // Display: use hover preview while hovering, otherwise show saved value
+  const display = hovered ?? value ?? 0;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] text-stone-400 w-16 shrink-0">{label}</span>
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            onClick={() => onChange(n)}
+            onMouseEnter={() => setHovered(n)}
+            onMouseLeave={() => setHovered(null)}
+            className="text-[11px] leading-none transition-colors"
+            style={{ color: n <= display ? "#78716c" : "#d6d3d1" }}
+            aria-label={`${label} ${n} of 5`}
+          >
+            {n <= display ? "●" : "○"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Relative timestamp formatter ──────────────────────────────────────────────
+function relativeTime(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins  = Math.floor(diff / 60_000);
+  const hours = Math.floor(diff / 3_600_000);
+  const days  = Math.floor(diff / 86_400_000);
+  if (mins < 1)   return "just now";
+  if (mins < 60)  return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
+}
+
+// ── SignalCard ────────────────────────────────────────────────────────────────
+// Interactive card for a single evaluative signal in the Reflect tab.
+// Auto-saves scores to /api/reflect on each change (fire-and-forget).
+function SignalCard({
+  signal,
+  projectId,
+  onReflect,
+}: {
+  signal: EvaluativeSignal;
+  projectId: string | null;
+  onReflect: (updates: Partial<Pick<EvaluativeSignal, "relevanceScore" | "intensityScore" | "reflectedAt" | "userNote">>) => void;
+}) {
+  const [noteOpen, setNoteOpen] = useState(!!signal.userNote);
+  const [noteValue, setNoteValue] = useState(signal.userNote ?? "");
+
+  // Keep local note in sync if the parent signal changes (e.g. on project load)
+  useEffect(() => {
+    setNoteValue(signal.userNote ?? "");
+    setNoteOpen(!!signal.userNote);
+  }, [signal.userNote]);
+
+  /** Persists a score change to Supabase and notifies the parent. */
+  const saveScore = async (
+    field: "relevanceScore" | "intensityScore",
+    score: number
+  ) => {
+    const reflectedAt = new Date().toISOString();
+    // Optimistic update to parent graphState first
+    onReflect({ [field]: score, reflectedAt });
+
+    // Fire-and-forget persist — server stamps its own reflected_at
+    if (projectId) {
+      fetch("/api/reflect", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signalId: signal.id, projectId, [field]: score }),
+      }).catch((err) => console.warn("[reflect] score save failed (non-fatal):", err));
+    }
+  };
+
+  /** Persists a note on blur. */
+  const saveNote = async () => {
+    const trimmed = noteValue.trim();
+    const reflectedAt = new Date().toISOString();
+    onReflect({ userNote: trimmed || null, reflectedAt });
+
+    if (projectId) {
+      fetch("/api/reflect", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signalId: signal.id,
+          projectId,
+          userNote: trimmed || null,
+        }),
+      }).catch((err) => console.warn("[reflect] note save failed (non-fatal):", err));
+    }
+  };
+
+  const isRated = signal.relevanceScore != null || signal.intensityScore != null;
+
+  return (
+    <div
+      className={`rounded-lg border px-3 py-2.5 space-y-2 transition-colors ${
+        isRated
+          ? "border-stone-200 bg-white"
+          : "border-stone-100 bg-stone-50"
+      }`}
+    >
+      {/* Header: direction icon + label + timestamp */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="shrink-0 text-sm text-stone-400"
+            title={signal.direction.replace("_", " ")}
+          >
+            {DIRECTION_ICON[signal.direction] ?? "→"}
+          </span>
+          <span
+            className={`text-xs font-medium leading-tight truncate ${
+              isRated ? "text-stone-700" : "text-stone-500"
+            }`}
+          >
+            {signal.label}
+          </span>
+        </div>
+        {signal.reflectedAt && (
+          <span className="shrink-0 text-[10px] text-stone-300">
+            {relativeTime(signal.reflectedAt)}
+          </span>
+        )}
+      </div>
+
+      {/* Score pickers */}
+      <div className="space-y-1 pl-5">
+        <ScorePicker
+          label="Relevance"
+          value={signal.relevanceScore}
+          onChange={(score) => saveScore("relevanceScore", score)}
+        />
+        <ScorePicker
+          label="Intensity"
+          value={signal.intensityScore}
+          onChange={(score) => saveScore("intensityScore", score)}
+        />
+      </div>
+
+      {/* Note — revealed on demand */}
+      <div className="pl-5">
+        {noteOpen ? (
+          <input
+            type="text"
+            value={noteValue}
+            onChange={(e) => setNoteValue(e.target.value)}
+            onBlur={saveNote}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            placeholder="Add a note..."
+            className="w-full rounded border border-stone-200 bg-white px-2 py-1 text-[11px] text-stone-600 placeholder:text-stone-300 focus:border-stone-400 focus:outline-none"
+          />
+        ) : (
+          <button
+            onClick={() => setNoteOpen(true)}
+            className="text-[10px] text-stone-300 hover:text-stone-500 transition-colors"
+          >
+            + note
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Chat component ────────────────────────────────────────────────────────────
 
 export default function Chat({
   messages,
@@ -45,96 +245,141 @@ export default function Chat({
   isSynthesisLoading = false,
   documentCount = 0,
   projectBrief,
+  onSignalReflect,
 }: ChatProps) {
+  // ── Panel mode ────────────────────────────────────────────────────────────
+  // "sources" mode is triggered by the + menu, not a tab, but lives in the
+  // mode union so Sources stays always-mounted for file-state preservation.
+  const [mode, setMode] = useState<"chat" | "sources" | "synthesis" | "reflect">("chat");
+  // Track which tab was active before entering sources, so we can return to it
+  const [preSourcesToab, setPreSourcesTab] = useState<"chat" | "synthesis" | "reflect">("chat");
+
+  // ── Chat input state ─────────────────────────────────────────────────────
   const [input, setInput] = useState("");
-  const [mode, setMode] = useState<"chat" | "narrative" | "sources" | "synthesis">("chat");
+
+  // ── Paste-text state (replaces the old "Extract" tab) ────────────────────
+  const [pasteMode, setPasteMode] = useState(false);
+  const [pasteInput, setPasteInput] = useState("");
+
+  // ── + menu state ──────────────────────────────────────────────────────────
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  // Auto-resize chat textarea
   useEffect(() => {
-    if (textareaRef.current && mode === "chat") {
+    if (textareaRef.current && mode === "chat" && !pasteMode) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
-  }, [input, mode]);
+  }, [input, mode, pasteMode]);
 
-  const handleSubmit = () => {
+  // Close + menu when clicking outside
+  useEffect(() => {
+    if (!showPlusMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target as Node)) {
+        setShowPlusMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showPlusMenu]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleChatSubmit = () => {
     const trimmed = input.trim();
     if (!trimmed || isLoading) return;
-
-    if (mode === "narrative") {
-      onExtract(trimmed);
-    } else {
-      onSend(trimmed);
-    }
+    onSend(trimmed);
     setInput("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+  };
+
+  const handlePasteExtract = () => {
+    const trimmed = pasteInput.trim();
+    if (!trimmed || isLoading) return;
+    onExtract(trimmed);
+    setPasteInput("");
+    setPasteMode(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && mode === "chat") {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      handleChatSubmit();
     }
   };
 
-  /**
-   * Called by SynthesisResults "Ask about this in Chat" buttons.
-   * Switches to the chat tab and pre-fills the input with the suggested question.
-   */
+  /** Called by SynthesisResults "Ask about this in Chat" buttons. */
   const handleAskInChat = (question: string) => {
     setMode("chat");
     setInput(question);
   };
 
-  const tabBtn = (label: string, value: typeof mode) => (
-    <button
-      onClick={() => setMode(value)}
-      className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
-        mode === value
-          ? "bg-stone-800 text-white"
-          : "bg-stone-100 text-stone-500 hover:bg-stone-200"
-      }`}
-    >
-      {label}
-    </button>
-  );
+  /** Opens the Sources panel, remembering which tab to return to. */
+  const handleOpenSources = () => {
+    setPreSourcesTab(mode as "chat" | "synthesis" | "reflect");
+    setMode("sources");
+    setShowPlusMenu(false);
+  };
+
+  // ── Tab button renderer ───────────────────────────────────────────────────
+  // When in sources mode, the pre-sources tab stays visually active so the
+  // user always knows where they came from and how to get back.
+  const tabBtn = (label: string, value: "chat" | "synthesis" | "reflect") => {
+    const isActive = mode === value || (mode === "sources" && preSourcesToab === value);
+    return (
+      <button
+        onClick={() => { setMode(value); setPasteMode(false); }}
+        className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
+          isActive
+            ? "bg-stone-800 text-white"
+            : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
         <div>
           <h2 className="text-sm font-semibold text-stone-800">TERROIR</h2>
           <p className="text-[10px] text-stone-500">Organisational listening</p>
         </div>
+        {/* Three tabs — Extract promoted to + menu in the input area */}
         <div className="flex gap-1">
           {tabBtn("Chat",      "chat")}
-          {tabBtn("Extract",   "narrative")}
-          {tabBtn("Sources",   "sources")}
           {tabBtn("Synthesis", "synthesis")}
+          {tabBtn("Reflect",   "reflect")}
         </div>
       </div>
 
-      {/* Sources mode */}
-      {mode === "sources" && (
-        <div className="flex-1 overflow-hidden">
-          <Sources
-            projectId={projectId}
-            graphState={graphState}
-            onGraphUpdate={onGraphUpdate}
-            projectBrief={projectBrief}
-          />
-        </div>
-      )}
+      {/* ── Sources panel — always mounted to preserve file state ─────────── */}
+      <div
+        className="flex-1 overflow-hidden"
+        style={{ display: mode === "sources" ? "flex" : "none", flexDirection: "column" }}
+      >
+        <Sources
+          projectId={projectId}
+          graphState={graphState}
+          onGraphUpdate={onGraphUpdate}
+          projectBrief={projectBrief}
+        />
+      </div>
 
-      {/* Synthesis mode */}
+      {/* ── Synthesis tab ─────────────────────────────────────────────────── */}
       {mode === "synthesis" && (
         <div className="flex-1 overflow-hidden">
           <SynthesisResults
@@ -147,16 +392,55 @@ export default function Chat({
         </div>
       )}
 
-      {/* Chat / Extract mode */}
-      {mode !== "sources" && mode !== "synthesis" && (
+      {/* ── Reflect tab ───────────────────────────────────────────────────── */}
+      {mode === "reflect" && (
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-3">
+            Evaluative Signals
+            {graphState.evaluativeSignals.length > 0 && (
+              <span className="ml-1.5 normal-case font-normal">
+                — {graphState.evaluativeSignals.filter(
+                  (s) => s.relevanceScore != null || s.intensityScore != null
+                ).length} of {graphState.evaluativeSignals.length} rated
+              </span>
+            )}
+          </p>
+
+          {graphState.evaluativeSignals.length === 0 ? (
+            <div className="flex items-start justify-center pt-8">
+              <p className="text-xs text-stone-400 text-center leading-relaxed max-w-[240px]">
+                No evaluative signals yet. Use the{" "}
+                <span className="font-medium">+</span> button to upload documents
+                or paste text, or describe the organisation in Chat to surface
+                what it values and fears.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {graphState.evaluativeSignals.map((s) => (
+                <SignalCard
+                  key={s.id}
+                  signal={s}
+                  projectId={projectId}
+                  onReflect={(updates) => onSignalReflect?.(s.id, updates)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Chat mode ─────────────────────────────────────────────────────── */}
+      {mode === "chat" && (
         <>
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 py-3">
-            {messages.length === 0 && mode === "chat" && (
+            {messages.length === 0 && (
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-[280px] text-center">
                   <p className="text-xs text-stone-500">
-                    Tell me about the organisation you&apos;re working with. Who are they, what do they do, and what are you trying to help them build?
+                    Tell me about the organisation you&apos;re working with. Who are
+                    they, what do they do, and what are you trying to help them build?
                   </p>
                 </div>
               </div>
@@ -183,28 +467,83 @@ export default function Chat({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
+          {/* ── Input area ──────────────────────────────────────────────── */}
           <div className="border-t border-stone-200 px-4 py-2.5">
-            {mode === "narrative" ? (
+            {pasteMode ? (
+              /* Paste-text mode: large textarea + extract button */
               <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] text-stone-400">Paste narrative or transcript</span>
+                  <button
+                    onClick={() => { setPasteMode(false); setPasteInput(""); }}
+                    className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
                 <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  autoFocus
+                  value={pasteInput}
+                  onChange={(e) => setPasteInput(e.target.value)}
                   placeholder="Paste a narrative, interview transcript, or meeting notes..."
                   rows={6}
                   className="w-full resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-800 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none"
                   disabled={isLoading}
                 />
                 <button
-                  onClick={handleSubmit}
-                  disabled={!input.trim() || isLoading}
+                  onClick={handlePasteExtract}
+                  disabled={!pasteInput.trim() || isLoading}
                   className="mt-2 w-full rounded-xl bg-stone-800 py-2 text-xs font-medium text-white hover:bg-stone-700 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
                 >
                   {isLoading ? "Extracting..." : "Extract entities & relationships"}
                 </button>
               </div>
             ) : (
+              /* Normal chat: + button + textarea + send */
               <div className="flex items-end gap-2">
+                {/* + button — opens upload/paste menu */}
+                <div className="relative shrink-0" ref={plusMenuRef}>
+                  <button
+                    onClick={() => setShowPlusMenu((prev) => !prev)}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-700"
+                    title="Add documents or paste text"
+                    aria-label="Add content"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5"  y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+
+                  {/* Dropdown */}
+                  {showPlusMenu && (
+                    <div className="absolute bottom-full left-0 mb-1.5 w-44 rounded-xl border border-stone-200 bg-white py-1 shadow-md">
+                      <button
+                        onClick={handleOpenSources}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 transition-colors"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        Upload documents
+                      </button>
+                      <button
+                        onClick={() => { setPasteMode(true); setShowPlusMenu(false); }}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 transition-colors"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                          <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                        </svg>
+                        Paste text
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chat textarea */}
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -215,8 +554,10 @@ export default function Chat({
                   className="flex-1 resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-800 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none"
                   disabled={isLoading}
                 />
+
+                {/* Send button */}
                 <button
-                  onClick={handleSubmit}
+                  onClick={handleChatSubmit}
                   disabled={!input.trim() || isLoading}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-stone-800 text-white transition-colors hover:bg-stone-700 disabled:bg-stone-300 disabled:cursor-not-allowed"
                 >

@@ -532,6 +532,23 @@ export default function Home() {
     importFileRef.current?.click();
   }, []);
 
+  // ── Reflect tab: update a signal's scores in local graphState ────────────
+  //
+  // Called optimistically by Chat's Reflect tab on every score/note change.
+  // The API call (fire-and-forget) runs in parallel inside Chat.tsx, so this
+  // just keeps graphState — and therefore the debounced saveOntology — in sync.
+  const handleSignalReflect = useCallback(
+    (signalId: string, updates: Partial<{ relevanceScore: number | null; intensityScore: number | null; reflectedAt: string | null; userNote: string | null }>) => {
+      setGraphState((prev) => ({
+        ...prev,
+        evaluativeSignals: prev.evaluativeSignals.map((s) =>
+          s.id === signalId ? { ...s, ...updates } : s
+        ),
+      }));
+    },
+    []
+  );
+
   // ── Sources graph-update handler ─────────────────────────────────────────
 
   const handleGraphUpdate = useCallback(
@@ -874,6 +891,8 @@ export default function Home() {
           isSynthesisLoading={isSynthesisLoading}
           documentCount={documentCount}
           projectBrief={projectBrief}
+          // ── Reflect tab ──────────────────────────────────────────────────
+          onSignalReflect={handleSignalReflect}
         />
         {/* Bottom actions */}
         <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-3">
@@ -979,29 +998,46 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Inspector panel */}
-      {inspectorOpen && (
-        <div className="w-[280px] shrink-0">
-          <Inspector
-            graphState={graphState}
-            selectedNodeId={selectedNodeId}
-            selectedEdgeId={selectedEdgeId}
-            onUpdateNode={handleUpdateNode}
-            onUpdateRelationship={handleUpdateRelationship}
-            onClose={() => {
-              setSelectedNodeId(null);
-              setSelectedEdgeId(null);
-            }}
-            // ── Phase 2 ────────────────────────────────────────────────────
-            brief={projectBrief}
-            documentCount={documentCount}
-            isReprocessing={isReprocessing}
-            onBriefUpdate={handleBriefUpdate}
-            onStartScoping={() => setScopingOpen(true)}
-            onReprocess={handleReprocess}
-          />
-        </div>
-      )}
+      {/* ── Inspector panel — collapsible ─────────────────────────────────── */}
+      {/* The chevron strip is always visible so the user can re-open the inspector
+          without hunting for a hidden button. Width transitions: 304px open, 24px closed. */}
+      <div className={`shrink-0 flex transition-all duration-200 ${inspectorOpen ? "w-[304px]" : "w-6"}`}>
+        {/* Chevron toggle — anchored to the left edge of the inspector area */}
+        <button
+          onClick={() => setInspectorOpen((prev) => !prev)}
+          className="w-6 shrink-0 flex items-center justify-center border-l border-stone-200 bg-white hover:bg-stone-50 transition-colors"
+          title={inspectorOpen ? "Collapse inspector" : "Expand inspector"}
+          aria-label={inspectorOpen ? "Collapse inspector" : "Expand inspector"}
+        >
+          <span className="text-stone-400 text-[10px] select-none">
+            {inspectorOpen ? "›" : "‹"}
+          </span>
+        </button>
+
+        {/* Full inspector — only rendered when open */}
+        {inspectorOpen && (
+          <div className="w-[280px]">
+            <Inspector
+              graphState={graphState}
+              selectedNodeId={selectedNodeId}
+              selectedEdgeId={selectedEdgeId}
+              onUpdateNode={handleUpdateNode}
+              onUpdateRelationship={handleUpdateRelationship}
+              onClose={() => {
+                setSelectedNodeId(null);
+                setSelectedEdgeId(null);
+              }}
+              // ── Phase 2 ──────────────────────────────────────────────────
+              brief={projectBrief}
+              documentCount={documentCount}
+              isReprocessing={isReprocessing}
+              onBriefUpdate={handleBriefUpdate}
+              onStartScoping={() => setScopingOpen(true)}
+              onReprocess={handleReprocess}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
