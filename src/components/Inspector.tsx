@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { GraphState, GraphNode, Relationship, ProjectBrief } from "@/types";
+import type { GraphState, GraphNode, Relationship, ProjectBrief, AttractorConfig } from "@/types";
 import ProjectBriefPanel from "./ProjectBrief";
 
 interface InspectorProps {
   graphState: GraphState;
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
-  onUpdateNode: (id: string, updates: Partial<Pick<GraphNode, "label" | "description" | "type">>) => void;
+  onUpdateNode: (id: string, updates: Partial<Pick<GraphNode, "label" | "description" | "type" | "attractor">>) => void;
+  attractors?: AttractorConfig[];
   onUpdateRelationship: (id: string, updates: Partial<Pick<Relationship, "type" | "description">>) => void;
   onClose: () => void;
   // ── Phase 2 additions (all optional so existing call-sites don't break) ──
@@ -33,6 +34,7 @@ export default function Inspector({
   onBriefUpdate,
   onStartScoping,
   onReprocess,
+  attractors = [],
 }: InspectorProps) {
   const selectedNode = selectedNodeId
     ? graphState.nodes.find((n) => n.id === selectedNodeId)
@@ -44,12 +46,14 @@ export default function Inspector({
   const [editLabel, setEditLabel] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editType, setEditType] = useState("");
+  const [editAttractor, setEditAttractor] = useState("");
 
   useEffect(() => {
     if (selectedNode) {
       setEditLabel(selectedNode.label);
       setEditDescription(selectedNode.description);
       setEditType(selectedNode.type);
+      setEditAttractor(selectedNode.attractor ?? "emergent");
     } else if (selectedEdge) {
       setEditLabel(selectedEdge.type);
       setEditDescription(selectedEdge.description || "");
@@ -62,6 +66,7 @@ export default function Inspector({
       label: editLabel,
       description: editDescription,
       type: editType,
+      attractor: editAttractor,
     });
   };
 
@@ -165,6 +170,25 @@ export default function Inspector({
             />
           </div>
 
+          {attractors.length > 0 && (
+            <div>
+              <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Attractor</label>
+              <select
+                value={editAttractor}
+                onChange={(e) => {
+                  setEditAttractor(e.target.value);
+                  onUpdateNode(selectedNode.id, { attractor: e.target.value });
+                }}
+                disabled={selectedNode.readonly}
+                className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1.5 text-xs text-stone-600 focus:outline-none disabled:opacity-50"
+              >
+                {attractors.map((a) => (
+                  <option key={a.id} value={a.id}>{a.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Type</label>
             <select
@@ -173,7 +197,8 @@ export default function Inspector({
                 setEditType(e.target.value);
                 onUpdateNode(selectedNode.id, { type: e.target.value });
               }}
-              className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1.5 text-xs text-stone-600 focus:outline-none"
+              disabled={selectedNode.readonly}
+              className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1.5 text-xs text-stone-600 focus:outline-none disabled:opacity-50"
             >
               {graphState.entityTypes.map((t) => (
                 <option key={t.id} value={t.id}>{t.label}</option>

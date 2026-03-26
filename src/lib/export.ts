@@ -20,6 +20,7 @@ import type {
   SynthesisResult,
   DocumentClassification,
 } from "@/types";
+import { computeGraphZones } from "./entity-types";
 
 // ── Bundle schema ────────────────────────────────────────────────────────────
 
@@ -77,7 +78,13 @@ export function buildProjectBundle(input: BuildBundleInput): ProjectBundle {
       brief: projectBrief,
     },
     ontology: {
-      nodes: graphState.nodes,
+      nodes: (() => {
+        const zones = computeGraphZones(graphState.nodes, graphState.relationships);
+        return graphState.nodes.map((n) => ({
+          ...n,
+          zone: zones.get(n.id) ?? "emergent",
+        }));
+      })(),
       relationships: graphState.relationships,
       tensions: graphState.tensions,
       evaluativeSignals: graphState.evaluativeSignals,

@@ -16,6 +16,8 @@ import type {
   Relationship,
   ProjectBrief,
   SynthesisResult,
+  AttractorPreset,
+  NodeZone,
 } from "@/types";
 import {
   emptyGraphState,
@@ -33,10 +35,11 @@ import {
   updateNodePosition,
 } from "@/lib/graph-state";
 import { autoLayout } from "@/lib/layout";
-import { addEntityType, updateEntityType } from "@/lib/entity-types";
+import { addEntityType, updateEntityType, getAttractorsForPreset, computeGraphZones } from "@/lib/entity-types";
 import {
   supabase,
   loadOntology,
+  loadOntologyWithParent,
   saveOntology,
   updateProjectMetadata,
   countProjectDocuments,
@@ -60,6 +63,7 @@ export default function Home() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [zoneFilter, setZoneFilter] = useState<NodeZone | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -100,7 +104,7 @@ export default function Home() {
     // Reset graph immediately so the old project's canvas doesn't flash while loading
     setGraphState(emptyGraphState());
 
-    loadOntology(projectId)
+    loadOntologyWithParent(projectId, project?.parent_project_id)
       .then((supabaseGraph) => {
         if (supabaseGraph.nodes.length > 0 || supabaseGraph.relationships.length > 0) {
           // Supabase has data — use it as source of truth
@@ -292,6 +296,7 @@ export default function Home() {
             messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
             graphState,
             projectId,
+            attractorPreset: (project?.metadata as Record<string, unknown>)?.attractorPreset ?? 'startup',
           }),
         });
 
@@ -432,7 +437,7 @@ export default function Home() {
   );
 
   const handleUpdateNode = useCallback(
-    (id: string, updates: Partial<Pick<GraphNode, "label" | "description" | "type">>) => {
+    (id: string, updates: Partial<Pick<GraphNode, "label" | "description" | "type" | "attractor">>) => {
       setGraphState((prev) => updateNode(prev, id, updates));
     },
     []
@@ -844,19 +849,39 @@ export default function Home() {
     );
   }
 
-  // Apply type filter
-  const filteredGraphState = typeFilter
-    ? {
-        ...graphState,
-        nodes: graphState.nodes.filter((n) => n.type === typeFilter),
-        relationships: graphState.relationships.filter((r) => {
-          const filteredNodeIds = new Set(
-            graphState.nodes.filter((n) => n.type === typeFilter).map((n) => n.id)
-          );
-          return filteredNodeIds.has(r.sourceId) && filteredNodeIds.has(r.targetId);
-        }),
-      }
-    : graphState;
+  // Compute attractor preset + zone data
+  const attractorPreset = ((project?.metadata as Record<string, unknown>)?.attractorPreset ?? 'startup') as AttractorPreset;
+  const activeAttractors = getAttractorsForPreset(attractorPreset);
+  const graphZones = computeGraphZones(graphState.nodes, graphState.relationships);
+  const nodeZoneCounts = { emergent: 0, attracted: 0, integrated: 0 };
+  for (const zone of graphZones.values()) {
+    nodeZoneCounts[zone]++;
+  }
+
+  // Apply attractor filter or zone filter
+  const filteredGraphState = (() => {
+    let filteredNodes = graphState.nodes;
+
+    if (typeFilter) {
+      // typeFilter now filters by attractor id
+      filteredNodes = filteredNodes.filter((n) => (n.attractor ?? 'emergent') === typeFilter);
+    }
+
+    if (zoneFilter) {
+      filteredNodes = filteredNodes.filter((n) => graphZones.get(n.id) === zoneFilter);
+    }
+
+    if (!typeFilter && !zoneFilter) return graphState;
+
+    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+    return {
+      ...graphState,
+      nodes: filteredNodes,
+      relationships: graphState.relationships.filter(
+        (r) => filteredNodeIds.has(r.sourceId) && filteredNodeIds.has(r.targetId)
+      ),
+    };
+  })();
 
   return (
     <div className="flex h-screen bg-stone-50">
@@ -974,10 +999,14 @@ export default function Home() {
         )}
         <TypePalette
           entityTypes={graphState.entityTypes}
+          attractors={activeAttractors}
+          nodeZoneCounts={nodeZoneCounts}
           onTypeUpdate={handleTypeUpdate}
           onTypeAdd={handleTypeAdd}
           activeFilter={typeFilter}
           onFilterChange={setTypeFilter}
+          zoneFilter={zoneFilter}
+          onZoneFilterChange={setZoneFilter}
         />
         <div className="flex-1 relative">
           <Canvas
@@ -994,6 +1023,8 @@ export default function Home() {
             onImport={handleImport}
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
+            attractors={activeAttractors}
+            graphZones={graphZones}
           />
         </div>
       </div>
@@ -1034,6 +1065,7 @@ export default function Home() {
               onBriefUpdate={handleBriefUpdate}
               onStartScoping={() => setScopingOpen(true)}
               onReprocess={handleReprocess}
+              attractors={activeAttractors}
             />
           </div>
         )}

@@ -90,6 +90,7 @@ export async function createProject(input: {
   embedding_model?: string;
   phase?: ProjectPhase;
   metadata?: Record<string, unknown>;
+  parent_project_id?: string;
 }): Promise<Project> {
   const { data, error } = await supabase
     .from('projects')
@@ -100,6 +101,7 @@ export async function createProject(input: {
       embedding_model: input.embedding_model ?? 'paraphrase-multilingual-MiniLM-L12-v2',
       phase: input.phase ?? 'preparation',
       metadata: input.metadata ?? {},
+      ...(input.parent_project_id ? { parent_project_id: input.parent_project_id } : {}),
     })
     .select('*')
     .single();
@@ -255,6 +257,7 @@ export async function loadOntology(projectId: string): Promise<GraphState> {
     id: row.id,
     label: row.label,
     type: row.type,
+    attractor: row.attractor ?? 'emergent',
     description: row.description ?? '',
     position: { x: row.position_x ?? 0, y: row.position_y ?? 0 },
     properties: row.properties ?? {},
@@ -297,20 +300,65 @@ export async function loadOntology(projectId: string): Promise<GraphState> {
   return { nodes, relationships, tensions, evaluativeSignals, entityTypes };
 }
 
+/**
+ * Loads an ontology with parent project nodes merged in (if applicable).
+ * Parent nodes are tagged as readonly — visible but not editable from the child project.
+ */
+export async function loadOntologyWithParent(
+  projectId: string,
+  parentProjectId?: string | null
+): Promise<GraphState> {
+  const childGraph = await loadOntology(projectId);
+
+  if (!parentProjectId) return childGraph;
+
+  const parentGraph = await loadOntology(parentProjectId);
+
+  // Tag parent nodes as readonly
+  const parentNodes = parentGraph.nodes.map((n) => ({ ...n, readonly: true }));
+
+  // Merge: parent nodes first, then child nodes (child can shadow parent if same ID)
+  const childNodeIds = new Set(childGraph.nodes.map((n) => n.id));
+  const mergedNodes = [
+    ...parentNodes.filter((n) => !childNodeIds.has(n.id)),
+    ...childGraph.nodes,
+  ];
+
+  // Merge relationships — include parent relationships that reference at least one visible node
+  const allNodeIds = new Set(mergedNodes.map((n) => n.id));
+  const childRelIds = new Set(childGraph.relationships.map((r) => r.id));
+  const parentRels = parentGraph.relationships.filter(
+    (r) => !childRelIds.has(r.id) && allNodeIds.has(r.sourceId) && allNodeIds.has(r.targetId)
+  );
+
+  return {
+    ...childGraph,
+    nodes: mergedNodes,
+    relationships: [...parentRels, ...childGraph.relationships],
+    // Keep child entity types but merge parent's too
+    entityTypes: [
+      ...parentGraph.entityTypes.filter(
+        (pt) => !childGraph.entityTypes.some((ct) => ct.id === pt.id)
+      ),
+      ...childGraph.entityTypes,
+    ],
+  };
+}
+
 export async function saveOntology(projectId: string, state: GraphState): Promise<void> {
   // ── Upsert nodes ──────────────────────────────────────────────────────────
   if (state.nodes.length > 0) {
     const { error } = await supabase.from('ontology_nodes').upsert(
-      state.nodes.map((n) => ({
+      state.nodes.filter((n) => !n.readonly).map((n) => ({
         id: n.id,
         project_id: projectId,
         label: n.label,
         type: n.type,
+        attractor: n.attractor ?? 'emergent',
         description: n.description,
         position_x: n.position.x,
         position_y: n.position.y,
         properties: n.properties ?? {},
-        // preserve source_type if already set — don't override on upsert
       })),
       { onConflict: 'id', ignoreDuplicates: false }
     );

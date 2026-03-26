@@ -21,7 +21,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import OntologyNode from "./OntologyNode";
 import OntologyEdge from "./OntologyEdge";
-import type { GraphState, GraphNode, EntityTypeConfig } from "@/types";
+import type { GraphState, GraphNode, EntityTypeConfig, AttractorConfig, NodeZone } from "@/types";
+import { computeGraphZones } from "@/lib/entity-types";
 import { autoLayout } from "@/lib/layout";
 
 interface CanvasProps {
@@ -38,13 +39,17 @@ interface CanvasProps {
   onImport: () => void;
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
+  attractors?: AttractorConfig[];
+  graphZones?: Map<string, NodeZone>;
 }
 
 const nodeTypes = { ontology: OntologyNode };
 const edgeTypes = { ontology: OntologyEdge };
 
 function graphStateToFlow(
-  graphState: GraphState
+  graphState: GraphState,
+  attractors?: AttractorConfig[],
+  zones?: Map<string, NodeZone>
 ): { nodes: Node[]; edges: Edge[] } {
   const tensionNodeIds = new Set(
     graphState.tensions
@@ -52,16 +57,24 @@ function graphStateToFlow(
       .flatMap((t) => t.relatedNodeIds)
   );
 
+  // Compute zones locally if not provided
+  const nodeZones = zones ?? computeGraphZones(graphState.nodes, graphState.relationships);
+
   const nodes: Node[] = graphState.nodes.map((node) => ({
     id: node.id,
     type: "ontology",
     position: node.position,
+    draggable: !node.readonly,
     data: {
       label: node.label,
       type: node.type,
+      attractor: node.attractor ?? "emergent",
       description: node.description,
       entityTypes: graphState.entityTypes,
+      attractors: attractors ?? [],
+      zone: nodeZones.get(node.id) ?? "emergent",
       hasTension: tensionNodeIds.has(node.id),
+      readonly: node.readonly,
     },
   }));
 
@@ -91,6 +104,8 @@ export default function Canvas({
   onImport,
   selectedNodeId,
   selectedEdgeId,
+  attractors,
+  graphZones,
 }: CanvasProps) {
   const [showNewNodeDialog, setShowNewNodeDialog] = useState<{
     x: number;
@@ -105,8 +120,8 @@ export default function Canvas({
   const [newEdgeType, setNewEdgeType] = useState("related_to");
 
   const { nodes: flowNodes, edges: flowEdges } = useMemo(
-    () => graphStateToFlow(graphState),
-    [graphState]
+    () => graphStateToFlow(graphState, attractors, graphZones),
+    [graphState, attractors, graphZones]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);

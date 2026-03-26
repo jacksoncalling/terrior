@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runConversation } from "@/lib/claude";
 import { logSession } from "@/lib/supabase";
-import type { GraphState } from "@/types";
+import type { GraphState, AttractorPreset } from "@/types";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { messages, graphState, projectId } = body as {
+    const { messages, graphState, projectId, attractorPreset } = body as {
       messages: { role: "user" | "assistant"; content: string }[];
       graphState: GraphState;
       projectId?: string;
+      attractorPreset?: AttractorPreset;
     };
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await runConversation(messages, graphState);
+    const result = await runConversation(messages, graphState, attractorPreset);
 
     // Log session fire-and-forget (don't fail the request if logging fails)
     if (projectId) {

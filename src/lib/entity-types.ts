@@ -1,4 +1,4 @@
-import type { EntityTypeConfig, GraphState } from "@/types";
+import type { EntityTypeConfig, GraphState, AttractorConfig, AttractorPreset, NodeZone, Relationship } from "@/types";
 
 // Color palette for auto-assigning to new types
 const TYPE_COLORS = [
@@ -100,4 +100,80 @@ export function addEntityType(
   if (types.find((t) => t.id === id)) return types;
   const assignedColor = color || getTypeColor(id, types);
   return [...types, { id, label, color: assignedColor }];
+}
+
+// ── Attractor Category Presets ─────────────────────────────────────────────
+//
+// Structural scaffolding for the ontology. Every node gets an attractor
+// (structural placement) alongside its freeform descriptive type.
+// "emergent" is always present — it's the "new shelf" for unplaced nodes.
+
+const EMERGENT_ATTRACTOR: AttractorConfig = {
+  id: "emergent",
+  label: "Emergent",
+  color: "#78716c", // stone
+  description: "Present but not yet placed — the new shelf",
+};
+
+export const STARTUP_ATTRACTORS: AttractorConfig[] = [
+  { id: "domain", label: "Domain", color: "#3b82f6", description: "Subject matter expertise and knowledge areas" },
+  { id: "capability", label: "Capability", color: "#10b981", description: "What the team can do or build" },
+  { id: "toolchain", label: "Toolchain", color: "#f59e0b", description: "Technical stack, platforms, and integrations" },
+  { id: "customer", label: "Customer", color: "#ec4899", description: "Who is served and how" },
+  { id: "method", label: "Method", color: "#8b5cf6", description: "How work is done and delivered" },
+  { id: "value", label: "Value", color: "#14b8a6", description: "What the team optimizes for" },
+  EMERGENT_ATTRACTOR,
+];
+
+export const ENTERPRISE_ATTRACTORS: AttractorConfig[] = [
+  { id: "identity", label: "Identity", color: "#3b82f6", description: "Purpose, values, brand — who the org understands itself to be" },
+  { id: "policy", label: "Policy", color: "#ef4444", description: "Rules, strategies, programmes, commitments" },
+  { id: "structure", label: "Structure", color: "#f59e0b", description: "Formal architecture — roles, reporting, organs" },
+  { id: "people", label: "People", color: "#ec4899", description: "Individuals, groups, teams, culture, leadership" },
+  { id: "functions", label: "Functions", color: "#8b5cf6", description: "Specialist roles, competencies, capabilities" },
+  { id: "processes", label: "Processes", color: "#10b981", description: "Workflows, procedures, routines, rhythms" },
+  { id: "resources", label: "Resources", color: "#14b8a6", description: "Physical, digital, financial, informational assets" },
+  EMERGENT_ATTRACTOR,
+];
+
+export const ATTRACTOR_PRESETS: Record<string, AttractorConfig[]> = {
+  startup: STARTUP_ATTRACTORS,
+  enterprise: ENTERPRISE_ATTRACTORS,
+};
+
+export function getAttractorsForPreset(preset?: AttractorPreset): AttractorConfig[] {
+  if (!preset || preset === "custom") return [EMERGENT_ATTRACTOR];
+  return ATTRACTOR_PRESETS[preset] ?? [EMERGENT_ATTRACTOR];
+}
+
+export function getAttractorColor(attractorId: string, attractors: AttractorConfig[]): string {
+  const found = attractors.find((a) => a.id === attractorId);
+  return found?.color ?? EMERGENT_ATTRACTOR.color;
+}
+
+// ── Node Zone Computation ──────────────────────────────────────────────────
+//
+// Zone is computed client-side from relationship count. Not stored in DB.
+//   0–1 relationships → emergent
+//   2–4 relationships → attracted
+//   5+  relationships → integrated
+
+export function computeNodeZone(nodeId: string, relationships: Relationship[]): NodeZone {
+  const count = relationships.filter(
+    (r) => r.sourceId === nodeId || r.targetId === nodeId
+  ).length;
+  if (count <= 1) return "emergent";
+  if (count <= 4) return "attracted";
+  return "integrated";
+}
+
+export function computeGraphZones(
+  nodes: { id: string }[],
+  relationships: Relationship[]
+): Map<string, NodeZone> {
+  const zones = new Map<string, NodeZone>();
+  for (const node of nodes) {
+    zones.set(node.id, computeNodeZone(node.id, relationships));
+  }
+  return zones;
 }

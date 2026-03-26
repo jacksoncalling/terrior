@@ -17,12 +17,13 @@ import type {
   Relationship,
   TensionMarker,
   AbstractionLayer,
+  AttractorPreset,
   ProjectBrief,
   SynthesisResult,
   DocumentClassification,
 } from "@/types";
 import { v4 as uuidv4 } from "uuid";
-import { ensureTypeExists } from "./entity-types";
+import { ensureTypeExists, getAttractorsForPreset } from "./entity-types";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
 const GEMINI_MODEL   = "gemini-2.5-flash";
@@ -131,9 +132,24 @@ Focus on the evaluative layer — what things mean to people, not just what they
 Extract COMPREHENSIVELY — capture every meaningful entity and relationship.`;
   }
 
+  // Build attractor instruction block
+  const preset = (projectBrief as unknown as Record<string, unknown>)?.attractorPreset as AttractorPreset | undefined;
+  const attractors = getAttractorsForPreset(preset ?? 'startup');
+  const attractorList = attractors
+    .map((a) => `  - "${a.id}" — ${a.description}`)
+    .join("\n");
+
+  const attractorInstructions = `
+ATTRACTOR CATEGORIES (structural scaffolding):
+Each entity MUST be assigned an "attractor" from this list. The attractor indicates where the entity fits in the ontological structure. If unsure, use "emergent".
+${attractorList}
+
+The "type" field is a separate freeform descriptive tag (e.g. "concept", "role", "workflow"). Both fields are required.`;
+
   return `You are TERROIR's extraction engine. Extract a structured knowledge graph from the document below.
 
 ${focusInstructions}
+${attractorInstructions}
 
 CRITICAL: Do NOT create duplicate entities. Check the existing graph context below.
 ${existingContext}${projectContext}
@@ -141,7 +157,7 @@ ${existingContext}${projectContext}
 Respond with valid JSON ONLY — no markdown, no code blocks:
 {
   "entities": [
-    { "label": "string", "type": "string", "description": "string" }
+    { "label": "string", "type": "string", "attractor": "string", "description": "string" }
   ],
   "relationships": [
     { "source_label": "string", "target_label": "string", "type": "string", "description": "string" }
@@ -191,7 +207,7 @@ async function callGemini(prompt: string, maxOutputTokens = 16384): Promise<stri
 
 function assembleGraph(
   extracted: {
-    entities?: { label: string; type: string; description: string }[];
+    entities?: { label: string; type: string; attractor?: string; description: string }[];
     relationships?: { source_label: string; target_label: string; type: string; description?: string }[];
     tensions?: { description: string; related_labels: string[] }[];
     evaluative_signals?: { label: string; direction: string; strength: number; source: string }[];
@@ -223,6 +239,7 @@ function assembleGraph(
       id,
       label: entity.label,
       type: entity.type || "concept",
+      attractor: entity.attractor || "emergent",
       description: entity.description || "",
       position,
     };

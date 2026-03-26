@@ -12,6 +12,7 @@ export interface Project {
   embedding_model: string;
   phase: ProjectPhase;
   metadata: Record<string, unknown>;
+  parent_project_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -23,13 +24,30 @@ export interface EntityTypeConfig {
   color: string;
 }
 
+// ── Attractor presets ────────────────────────────────────────────────────────
+// Structural categories that form the ontological scaffolding.
+// Nodes carry TWO tags: `attractor` (structural) + `type` (freeform descriptive).
+
+export type AttractorPreset = 'startup' | 'enterprise' | 'custom';
+
+export type NodeZone = 'emergent' | 'attracted' | 'integrated';
+
+export interface AttractorConfig {
+  id: string;
+  label: string;
+  color: string;
+  description: string;
+}
+
 export interface GraphNode {
   id: string;
   label: string;
-  type: string; // freeform — matches EntityTypeConfig.id
+  type: string; // freeform descriptive tag — matches EntityTypeConfig.id
+  attractor?: string; // structural category from preset (e.g. 'domain', 'capability'). Defaults to 'emergent'.
   description: string;
   position: { x: number; y: number };
   properties?: Record<string, string>;
+  readonly?: boolean; // true for nodes inherited from parent project
 }
 
 export interface Relationship {

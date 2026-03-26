@@ -25,12 +25,14 @@ export function addNode(
   type: string,
   description: string,
   position: { x: number; y: number },
-  properties?: Record<string, string>
+  properties?: Record<string, string>,
+  attractor?: string
 ): { state: GraphState; node: GraphNode } {
   const node: GraphNode = {
     id: uuidv4(),
     label,
     type,
+    attractor: attractor ?? 'emergent',
     description,
     position,
     properties,
@@ -49,7 +51,7 @@ export function addNode(
 export function updateNode(
   state: GraphState,
   id: string,
-  updates: Partial<Pick<GraphNode, "label" | "description" | "type" | "properties" | "position">>
+  updates: Partial<Pick<GraphNode, "label" | "description" | "type" | "attractor" | "properties" | "position">>
 ): GraphState {
   let updatedTypes = state.entityTypes;
   if (updates.type) {

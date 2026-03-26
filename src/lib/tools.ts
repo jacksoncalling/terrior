@@ -24,14 +24,18 @@ export const toolDefinitions = [
         },
         type: {
           type: "string",
-          description: "The entity type (e.g., 'organisation', 'platform', 'process', 'role', 'document_type', 'goal', 'initiative', or any domain-specific type). Use existing types when possible.",
+          description: "Freeform descriptive type (e.g., 'role', 'workflow', 'concept', 'tool', 'aspiration'). Use existing types when possible.",
+        },
+        attractor: {
+          type: "string",
+          description: "Structural attractor category from the active preset. Check the 'Attractor Categories' section in your context for available options. Use 'emergent' if unsure.",
         },
         description: {
           type: "string",
           description: "A brief description of this entity in the organisation's context",
         },
       },
-      required: ["label", "type", "description"],
+      required: ["label", "type", "attractor", "description"],
     },
   },
   {
@@ -43,7 +47,8 @@ export const toolDefinitions = [
       properties: {
         id: { type: "string", description: "The node ID to update" },
         label: { type: "string", description: "Updated label" },
-        type: { type: "string", description: "Updated type" },
+        type: { type: "string", description: "Updated descriptive type" },
+        attractor: { type: "string", description: "Updated attractor category" },
         description: { type: "string", description: "Updated description" },
       },
       required: ["id"],
@@ -168,19 +173,21 @@ export function executeTool(
         input.type as string,
         input.description as string,
         getAutoPosition(),
-        input.properties as Record<string, string> | undefined
+        input.properties as Record<string, string> | undefined,
+        input.attractor as string | undefined
       );
       return {
-        output: `Node created: "${node.label}" (${node.type}) with id ${node.id}`,
+        output: `Node created: "${node.label}" (${node.type}, attractor: ${node.attractor ?? 'emergent'}) with id ${node.id}`,
         updates: [{ type: "node_created", label: node.label }],
         updatedGraph: state,
       };
     }
     case "update_node": {
-      const updates: Partial<{ label: string; description: string; type: string }> = {};
+      const updates: Partial<{ label: string; description: string; type: string; attractor: string }> = {};
       if (input.label) updates.label = input.label as string;
       if (input.description) updates.description = input.description as string;
       if (input.type) updates.type = input.type as string;
+      if (input.attractor) updates.attractor = input.attractor as string;
       const state = updateNode(graphState, input.id as string, updates);
       return {
         output: `Node ${input.id} updated`,

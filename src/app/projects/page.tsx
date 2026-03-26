@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Project, ProjectPhase } from '@/types';
+import type { Project, ProjectPhase, AttractorPreset } from '@/types';
 import { getProjects, createProject } from '@/lib/supabase';
 import { useProject } from '@/lib/project-context';
+import { ATTRACTOR_PRESETS } from '@/lib/entity-types';
 
 // ── Phase badge ──────────────────────────────────────────────────────────────
 
@@ -36,11 +37,12 @@ interface NewProjectModalProps {
   onCreated: (project: Project) => void;
 }
 
-function NewProjectModal({ onClose, onCreated }: NewProjectModalProps) {
+function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModalProps & { parentProjectId?: string }) {
   const [name, setName] = useState('');
   const [sector, setSector] = useState('');
   const [description, setDescription] = useState('');
   const [embeddingModel, setEmbeddingModel] = useState(EMBEDDING_MODELS[0].value);
+  const [attractorPreset, setAttractorPreset] = useState<AttractorPreset>('startup');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +59,8 @@ function NewProjectModal({ onClose, onCreated }: NewProjectModalProps) {
         description: description.trim() || undefined,
         embedding_model: embeddingModel,
         phase: 'preparation',
+        metadata: { attractorPreset },
+        ...(parentProjectId ? { parent_project_id: parentProjectId } : {}),
       });
       onCreated(project);
     } catch (err) {
@@ -123,6 +127,36 @@ function NewProjectModal({ onClose, onCreated }: NewProjectModalProps) {
             />
           </div>
 
+          {/* Attractor preset */}
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1.5">
+              Ontology scaffolding
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: 'startup' as const, label: 'Small team / Startup', desc: 'Domain, Capability, Toolchain, Customer, Method, Value' },
+                { value: 'enterprise' as const, label: 'Enterprise / Mittelstand', desc: 'Identity, Policy, Structure, People, Functions, Processes, Resources' },
+              ]).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAttractorPreset(opt.value)}
+                  className={`text-left p-3 rounded-lg border transition-all ${
+                    attractorPreset === opt.value
+                      ? 'border-stone-800 bg-stone-50 ring-1 ring-stone-800'
+                      : 'border-stone-200 hover:border-stone-300 bg-white'
+                  }`}
+                >
+                  <span className="block text-xs font-medium text-stone-700">{opt.label}</span>
+                  <span className="block text-[10px] text-stone-400 mt-1 leading-tight">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-stone-400 mt-1.5">
+              Attractor categories guide where entities land. You can customize them later.
+            </p>
+          </div>
+
           {/* Embedding model */}
           <div>
             <label className="block text-xs font-medium text-stone-600 mb-1">
@@ -175,38 +209,57 @@ function NewProjectModal({ onClose, onCreated }: NewProjectModalProps) {
 interface ProjectCardProps {
   project: Project;
   onSelect: (project: Project) => void;
+  onAddSubProject?: (parentId: string) => void;
+  isChild?: boolean;
+  parentName?: string;
 }
 
-function ProjectCard({ project, onSelect }: ProjectCardProps) {
+function ProjectCard({ project, onSelect, onAddSubProject, isChild, parentName }: ProjectCardProps) {
   const updatedAt = new Date(project.updated_at);
   const relativeTime = formatRelativeTime(updatedAt);
+  const preset = (project.metadata as Record<string, unknown>)?.attractorPreset as string | undefined;
 
   return (
-    <button
-      onClick={() => onSelect(project)}
-      className="w-full text-left bg-white border border-stone-200 rounded-xl p-5 hover:border-stone-400 hover:shadow-sm transition-all group"
-    >
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <h3 className="text-sm font-semibold text-stone-800 group-hover:text-stone-900 leading-tight">
-          {project.name}
-        </h3>
-        <PhaseBadge phase={project.phase} />
-      </div>
+    <div className={`w-full text-left bg-white border border-stone-200 rounded-xl p-5 hover:border-stone-400 hover:shadow-sm transition-all group ${isChild ? 'ml-6 border-l-2 border-l-stone-300' : ''}`}>
+      <button onClick={() => onSelect(project)} className="w-full text-left">
+        {parentName && (
+          <p className="text-[10px] text-stone-400 mb-1">{parentName} /</p>
+        )}
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h3 className="text-sm font-semibold text-stone-800 group-hover:text-stone-900 leading-tight">
+            {project.name}
+          </h3>
+          <PhaseBadge phase={project.phase} />
+        </div>
 
-      {project.sector && (
-        <p className="text-[11px] text-stone-400 mb-2">{project.sector}</p>
+        {project.sector && (
+          <p className="text-[11px] text-stone-400 mb-2">{project.sector}</p>
+        )}
+
+        {project.description && (
+          <p className="text-xs text-stone-500 mb-3 line-clamp-2">{project.description}</p>
+        )}
+
+        <div className="flex items-center gap-3 text-[10px] text-stone-400">
+          <span>Updated {relativeTime}</span>
+          {preset && (
+            <>
+              <span className="text-stone-200">·</span>
+              <span className="capitalize">{preset}</span>
+            </>
+          )}
+        </div>
+      </button>
+
+      {!isChild && onAddSubProject && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onAddSubProject(project.id); }}
+          className="mt-3 text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
+        >
+          + Add sub-project
+        </button>
       )}
-
-      {project.description && (
-        <p className="text-xs text-stone-500 mb-3 line-clamp-2">{project.description}</p>
-      )}
-
-      <div className="flex items-center gap-3 text-[10px] text-stone-400">
-        <span>Updated {relativeTime}</span>
-        <span className="text-stone-200">·</span>
-        <span className="font-mono">{project.embedding_model.split('-').slice(0, 2).join('-')}</span>
-      </div>
-    </button>
+    </div>
   );
 }
 
@@ -233,6 +286,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [newProjectParentId, setNewProjectParentId] = useState<string | undefined>();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -321,24 +375,54 @@ export default function ProjectsPage() {
           </div>
         )}
 
-        {!loading && projects.length > 0 && (
-          <>
-            <p className="text-xs text-stone-400 mb-4">
-              {projects.length} {projects.length === 1 ? 'project' : 'projects'}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} onSelect={handleSelect} />
-              ))}
-            </div>
-          </>
-        )}
+        {!loading && projects.length > 0 && (() => {
+          const parentProjects = projects.filter((p) => !p.parent_project_id);
+          const childrenByParent = projects.reduce<Record<string, Project[]>>((acc, p) => {
+            if (p.parent_project_id) {
+              if (!acc[p.parent_project_id]) acc[p.parent_project_id] = [];
+              acc[p.parent_project_id].push(p);
+            }
+            return acc;
+          }, {});
+
+          return (
+            <>
+              <p className="text-xs text-stone-400 mb-4">
+                {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {parentProjects.map((project) => (
+                  <div key={project.id} className="space-y-2">
+                    <ProjectCard
+                      project={project}
+                      onSelect={handleSelect}
+                      onAddSubProject={(parentId) => {
+                        setNewProjectParentId(parentId);
+                        setShowModal(true);
+                      }}
+                    />
+                    {childrenByParent[project.id]?.map((child) => (
+                      <ProjectCard
+                        key={child.id}
+                        project={child}
+                        onSelect={handleSelect}
+                        isChild
+                        parentName={project.name}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </>
+          );
+        })()}
       </main>
 
       {showModal && (
         <NewProjectModal
-          onClose={() => setShowModal(false)}
+          onClose={() => { setShowModal(false); setNewProjectParentId(undefined); }}
           onCreated={handleCreated}
+          parentProjectId={newProjectParentId}
         />
       )}
     </div>

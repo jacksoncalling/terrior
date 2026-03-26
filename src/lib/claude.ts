@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { GraphState, GraphUpdate } from "@/types";
+import type { GraphState, GraphUpdate, AttractorPreset } from "@/types";
 import { toolDefinitions, executeTool, resetNodeCounter } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
 
@@ -20,14 +20,15 @@ interface ConversationResult {
 
 export async function runConversation(
   messages: ConversationMessage[],
-  graphState: GraphState
+  graphState: GraphState,
+  attractorPreset?: AttractorPreset
 ): Promise<ConversationResult> {
   let currentGraph = structuredClone(graphState);
   const allUpdates: GraphUpdate[] = [];
   resetNodeCounter();
 
   // Build system prompt ONCE per request (perf fix)
-  const systemPrompt = buildSystemPrompt(currentGraph);
+  const systemPrompt = buildSystemPrompt(currentGraph, attractorPreset);
 
   // Trim message history to last 20 messages (perf fix)
   const trimmedMessages = messages.length > 20

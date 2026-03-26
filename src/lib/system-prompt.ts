@@ -1,4 +1,5 @@
-import type { GraphState } from "@/types";
+import type { GraphState, AttractorConfig, AttractorPreset } from "@/types";
+import { getAttractorsForPreset, computeGraphZones } from "./entity-types";
 
 function formatGraphContext(graph: GraphState): string {
   if (
@@ -12,17 +13,19 @@ function formatGraphContext(graph: GraphState): string {
   const sections: string[] = [];
 
   if (graph.nodes.length > 0) {
-    const byType: Record<string, typeof graph.nodes> = {};
+    // Group nodes by attractor (primary), show type as secondary info
+    const byAttractor: Record<string, typeof graph.nodes> = {};
     for (const node of graph.nodes) {
-      if (!byType[node.type]) byType[node.type] = [];
-      byType[node.type].push(node);
+      const att = node.attractor ?? "emergent";
+      if (!byAttractor[att]) byAttractor[att] = [];
+      byAttractor[att].push(node);
     }
 
     const nodeLines: string[] = [];
-    for (const [type, nodes] of Object.entries(byType)) {
-      nodeLines.push(`  ${type}:`);
+    for (const [attractor, nodes] of Object.entries(byAttractor)) {
+      nodeLines.push(`  [${attractor}]:`);
       for (const node of nodes) {
-        nodeLines.push(`    - "${node.label}" (id: ${node.id}) — ${node.description}`);
+        nodeLines.push(`    - "${node.label}" (type: ${node.type}, id: ${node.id}) — ${node.description}`);
       }
     }
     sections.push(`Entities (${graph.nodes.length}):\n${nodeLines.join("\n")}`);
@@ -58,13 +61,53 @@ function formatGraphContext(graph: GraphState): string {
   return sections.join("\n\n");
 }
 
+function formatAttractorCategories(attractors: AttractorConfig[]): string {
+  const lines = attractors.map((a) => `  - "${a.id}" — ${a.description}`);
+  return `\n## Attractor Categories (Active Preset)
+
+Every entity you create MUST be assigned an attractor from this list. The attractor is the structural scaffolding — where the entity fits in the larger ontological architecture. Use "emergent" when the entity doesn't clearly belong to any category yet.
+
+${lines.join("\n")}
+
+The "type" field is separate — it's a freeform descriptive tag (e.g. "role", "workflow", "concept"). Both attractor and type are required on every node.`;
+}
+
 function formatEntityTypes(graph: GraphState): string {
   if (graph.entityTypes.length === 0) return "";
   const typeList = graph.entityTypes.map((t) => `  - "${t.id}" (${t.label})`).join("\n");
-  return `\n## Current Entity Types in the Palette\n${typeList}\n\nWhen creating nodes, prefer using these existing types. If the entity doesn't fit any existing type, create a new descriptive type — it will be added to the palette automatically.`;
+  return `\n## Current Descriptive Types in the Palette\n${typeList}\n\nWhen creating nodes, prefer using these existing descriptive types. If the entity doesn't fit any existing type, create a new descriptive type — it will be added to the palette automatically.`;
 }
 
-export function buildSystemPrompt(graphState: GraphState): string {
+function formatEmergentZone(graph: GraphState): string {
+  if (graph.nodes.length === 0) return "";
+
+  const zones = computeGraphZones(graph.nodes, graph.relationships);
+  const emergentNodes = graph.nodes.filter((n) => zones.get(n.id) === "emergent");
+
+  if (emergentNodes.length === 0) return "";
+
+  const lines = emergentNodes.map((n) => {
+    const relCount = graph.relationships.filter(
+      (r) => r.sourceId === n.id || r.targetId === n.id
+    ).length;
+    return `  - "${n.label}" (${n.type}) — ${relCount} connections`;
+  });
+
+  return `\n## Emergent Zone (${emergentNodes.length} nodes)
+
+These nodes are present in the organisation's language but not yet well-connected in the graph (0–1 relationships). They are real signals — not noise. They represent concepts that haven't found their place in the ontological structure yet.
+
+${lines.join("\n")}
+
+Suggested actions:
+- Ask the consultant or stakeholder what these concepts connect to
+- Look for relationship opportunities when new entities are discussed
+- Consider whether any emergent nodes are duplicates of existing well-connected nodes`;
+}
+
+export function buildSystemPrompt(graphState: GraphState, attractorPreset?: AttractorPreset): string {
+  const attractors = getAttractorsForPreset(attractorPreset ?? "startup");
+
   return `You are TERROIR, an ethnographic research companion for organisational knowledge discovery.
 
 Your role is to listen — through narrative inquiry and conversational exploration — and surface the ontology already latent in an organisation's stories, practices, and platform structures.
@@ -79,13 +122,15 @@ You listen for the ontology that is already present, and make it visible.
 
 1. Ask open, exploratory questions about how the organisation thinks, works, and stores knowledge
 2. Extract entities and relationships from what you hear — use the organisation's own vocabulary
-3. Flag tensions where different perspectives or platform structures conflict
-4. Track evaluative signals — what the organisation values, fears, and moves toward
-5. Build the knowledge map progressively — don't force extraction, let understanding accumulate
+3. Assign each entity an attractor category (structural) and a descriptive type (semantic)
+4. Flag tensions where different perspectives or platform structures conflict
+5. Track evaluative signals — what the organisation values, fears, and moves toward
+6. Build the knowledge map progressively — don't force extraction, let understanding accumulate
+${formatAttractorCategories(attractors)}
 
-## Entity Types
+## Descriptive Types
 
-Entity types are emergent — they come from the narrative, not from a fixed taxonomy. Each story reveals different kinds of elements. When you extract an entity, choose a type that fits its nature. Use existing types from the palette when appropriate. When you encounter something genuinely new, create a descriptive type for it.
+Descriptive types are emergent — they come from the narrative, not from a fixed taxonomy. Each story reveals different kinds of elements. When you extract an entity, choose a descriptive type that fits its nature. Use existing types from the palette when appropriate.
 
 The user can also create nodes directly on the canvas. You will see these in the graph context — acknowledge them and ask questions about them.
 ${formatEntityTypes(graphState)}
@@ -111,6 +156,7 @@ You understand the baked-in ontologies of major enterprise platforms:
 ## Guidelines for Tool Use
 
 - **Before creating any node**, scan the Current Knowledge Graph below for an existing node with the same or a very similar label. If one exists, use its ID to create a relationship instead. Never create a duplicate.
+- **Always assign an attractor** from the active preset. Use "emergent" when genuinely unsure.
 - Create nodes as entities emerge naturally from conversation. Use the organisation's own vocabulary.
 - Create relationships when you understand how entities connect — including to nodes that already exist in the graph.
 - Flag tensions when you notice divergences or conflicts.
@@ -121,6 +167,7 @@ You understand the baked-in ontologies of major enterprise platforms:
 ## Current Knowledge Graph
 
 ${formatGraphContext(graphState)}
+${formatEmergentZone(graphState)}
 
 ## Response Style
 
