@@ -230,6 +230,25 @@ export async function clearDocuments(projectId: string): Promise<void> {
   if (docError) throw new Error(`clearDocuments (documents): ${docError.message}`);
 }
 
+/**
+ * Deletes a single document and its chunks by document ID.
+ */
+export async function deleteDocument(documentId: string): Promise<void> {
+  const { error: chunkError } = await supabase
+    .from('document_chunks')
+    .delete()
+    .eq('document_id', documentId);
+
+  if (chunkError) throw new Error(`deleteDocument (chunks): ${chunkError.message}`);
+
+  const { error: docError } = await supabase
+    .from('documents')
+    .delete()
+    .eq('id', documentId);
+
+  if (docError) throw new Error(`deleteDocument: ${docError.message}`);
+}
+
 // ── Ontology load / save ─────────────────────────────────────────────────────
 //
 // loadOntology: fetches all 5 ontology tables for a project in parallel and

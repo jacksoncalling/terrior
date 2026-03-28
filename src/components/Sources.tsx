@@ -35,6 +35,7 @@ interface SourceFile {
   content?: string;                          // parsed text from ingest (needed for classify + extract)
   classification?: DocumentClassification;   // verdict from Gemini classification
   isPasted?: boolean;                        // true for paste-text entries (no file upload)
+  documentId?: string;                       // Supabase document id (set after ingest)
 }
 
 interface SourcesProps {
@@ -71,6 +72,17 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
   }, []);
 
+  const removeFile = useCallback(async (file: SourceFile) => {
+    // Remove from local state immediately (optimistic)
+    setFiles((prev) => prev.filter((f) => f.id !== file.id));
+    // If the file was ingested, delete it from Supabase too
+    if (file.documentId) {
+      await fetch(`/api/documents/${file.documentId}`, { method: "DELETE" }).catch((err) =>
+        console.warn("[Sources] Failed to delete document from Supabase:", err)
+      );
+    }
+  }, []);
+
   // ── Phase 1: Parallel ingest ──────────────────────────────────────────────
 
   const ingestFile = useCallback(
@@ -88,8 +100,8 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
           const err = await res.json().catch(() => ({}));
           throw new Error((err as { error?: string }).error || `Ingest failed (${res.status})`);
         }
-        const data = await res.json() as { content: string; chunkCount: number; title: string };
-        updateFile(meta.id, { chunkCount: data.chunkCount, content: data.content });
+        const data = await res.json() as { documentId: string; content: string; chunkCount: number; title: string };
+        updateFile(meta.id, { chunkCount: data.chunkCount, content: data.content, documentId: data.documentId });
         return { id: meta.id, content: data.content, title: data.title || meta.name };
       } catch (err) {
         updateFile(meta.id, {
@@ -640,6 +652,15 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                       )}
                       <p className="text-[11px] font-medium text-stone-700 truncate flex-1">{f.name}</p>
                       <VerdictBadge file={f} />
+                      {!["uploading", "classifying", "extracting"].includes(f.status) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeFile(f); }}
+                          className="text-stone-300 hover:text-red-400 transition-colors text-[11px] leading-none shrink-0 ml-0.5"
+                          title="Remove from list"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                     <p
                       className={`text-[10px] mt-0.5 ${
