@@ -21,6 +21,10 @@ import type {
   ProjectBrief,
   SynthesisResult,
   DocumentClassification,
+  CompactEntity,
+  MergeGroup,
+  CrossDocRelationship,
+  AttractorReassignment,
 } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { ensureTypeExists, getAttractorsForPreset } from "./entity-types";
@@ -611,4 +615,162 @@ export async function runGeminiSynthesis(
     documentCount: documents.length,
     generatedAt:   new Date().toISOString(),
   };
+}
+
+// ── Cross-document integration ────────────────────────────────────────────────
+//
+// After all documents in a batch are extracted, this pass looks across the full
+// entity set to:
+//   1. Merge near-duplicate entities from different documents
+//   2. Generate relationships between entities that span documents
+//   3. Correct attractor assignments that were wrong in per-document isolation
+//
+// Thinking is disabled — same rationale as extraction. Faster, consistent JSON.
+
+function buildIntegrationPrompt(
+  entities: CompactEntity[],
+  compactRels: { sourceLabel: string; targetLabel: string; type: string }[],
+  projectBrief?: ProjectBrief
+): string {
+  const preset = (projectBrief as unknown as Record<string, unknown>)?.attractorPreset as AttractorPreset | undefined;
+  const attractors = getAttractorsForPreset(preset ?? "startup");
+  const attractorList = attractors.map((a) => `  - "${a.id}" — ${a.description}`).join("\n");
+
+  const briefSection = projectBrief
+    ? `PROJECT CONTEXT:
+- Sector: ${projectBrief.sector ?? "not specified"}
+- Org size: ${projectBrief.orgSize ?? "not specified"}
+- Discovery goal: ${projectBrief.discoveryGoal ?? "not specified"}
+- Key themes: ${(projectBrief.keyThemes ?? []).join(", ") || "none"}`
+    : "";
+
+  // Compact entity list — id is essential so Gemini can reference it in outputs
+  const entityJson = JSON.stringify(entities, null, 0);
+
+  // Compact relationship list — labels only, for readability
+  const relLines = compactRels
+    .slice(0, 2000) // cap at 2000 rels to stay within context
+    .map((r) => `${r.sourceLabel} —[${r.type}]→ ${r.targetLabel}`)
+    .join("\n");
+
+  return `You are TERROIR's cross-document integration engine. You have been given the complete entity set extracted from multiple source documents. Your job is to integrate these entities into a coherent, well-connected knowledge graph.
+
+${briefSection}
+
+ATTRACTOR CATEGORIES:
+${attractorList}
+
+CURRENT ENTITIES (${entities.length} total):
+${entityJson}
+
+EXISTING RELATIONSHIPS (${compactRels.length} total):
+${relLines}
+
+YOUR THREE TASKS:
+
+### Phase 1: Entity Merges
+Identify entities that refer to the same concept but were extracted from different documents with slightly different wording or framing. Only merge if you are confident — do not merge entities that are genuinely distinct.
+
+For each merge group output:
+- canonicalLabel: the best unified label
+- canonicalDescription: a combined description (2-3 sentences max)
+- entityIdsToMerge: array of entity IDs from the list above (minimum 2, must be valid IDs from the list)
+
+### Phase 2: Cross-Document Relationships
+Identify the most important relationships between entities that are NOT already connected. Focus on:
+- Entities from different attractor categories that are clearly related
+- Entities that share themes but have no path between them
+- Do NOT recreate existing relationships
+- Generate at most ${Math.min(Math.ceil(compactRels.length * 3), 200)} new relationships (quality over quantity)
+
+For each new relationship output:
+- sourceEntityId: valid entity ID from the list above
+- targetEntityId: valid entity ID from the list above
+- type: short verb phrase (e.g. "enables", "depends_on", "challenges", "informs")
+- description: optional one sentence
+
+### Phase 3: Attractor Reassignment
+Now that you can see all entities together, identify any entities whose attractor was assigned incorrectly in per-document isolation. Only reassign where you are confident.
+
+For each reassignment output:
+- entityId: valid entity ID from the list above
+- oldAttractor: current value
+- newAttractor: corrected value from the attractor categories above
+- reason: one sentence
+
+Respond with a single JSON object — no markdown, no code blocks:
+{
+  "mergeGroups": [
+    { "canonicalLabel": "string", "canonicalDescription": "string", "entityIdsToMerge": ["id1", "id2"] }
+  ],
+  "newRelationships": [
+    { "sourceEntityId": "string", "targetEntityId": "string", "type": "string", "description": "string" }
+  ],
+  "reassignments": [
+    { "entityId": "string", "oldAttractor": "string", "newAttractor": "string", "reason": "string" }
+  ]
+}`;
+}
+
+export interface IntegrationOutput {
+  mergeGroups:      MergeGroup[];
+  newRelationships: CrossDocRelationship[];
+  reassignments:    AttractorReassignment[];
+}
+
+/**
+ * Runs the cross-document integration pass via Gemini 2.5 Flash.
+ *
+ * Sends the full entity + relationship set as a compact payload.
+ * Thinking is disabled for speed and reliable JSON output (same as extraction).
+ *
+ * @param entities      Compact entity list (id + label + attractor + truncated desc)
+ * @param compactRels   Existing relationships as label pairs (for Gemini context)
+ * @param projectBrief  Optional brief for calibrating integration focus
+ */
+export async function integrateEntities(
+  entities:    CompactEntity[],
+  compactRels: { sourceLabel: string; targetLabel: string; type: string }[],
+  projectBrief?: ProjectBrief
+): Promise<IntegrationOutput> {
+  const validIds = new Set(entities.map((e) => e.id));
+
+  const prompt = buildIntegrationPrompt(entities, compactRels, projectBrief);
+  const raw    = await callGemini(prompt, 32768, false, true); // no JSON mode, thinking off
+  let rawJson  = stripJsonFences(raw);
+
+  let parsed: IntegrationOutput | null = null;
+  try {
+    parsed = JSON.parse(rawJson) as IntegrationOutput;
+  } catch {
+    console.error("[integrate] Gemini returned unparseable JSON. First 500 chars:", rawJson.slice(0, 500));
+    // Retry once with explicit JSON reinforcement
+    const retryRaw  = await callGemini(
+      prompt + "\n\nCRITICAL: Respond with valid JSON only. No text before or after the JSON object.",
+      32768, false, true
+    );
+    rawJson = stripJsonFences(retryRaw);
+    try {
+      parsed = JSON.parse(rawJson) as IntegrationOutput;
+    } catch {
+      console.error("[integrate] Retry also failed. Returning empty result.");
+      return { mergeGroups: [], newRelationships: [], reassignments: [] };
+    }
+  }
+
+  // Validate all entity IDs referenced in the response — drop anything hallucinated
+  const mergeGroups = (parsed.mergeGroups ?? []).filter(
+    (g) => g.entityIdsToMerge?.length >= 2 &&
+           g.entityIdsToMerge.every((id) => validIds.has(id))
+  );
+
+  const newRelationships = (parsed.newRelationships ?? []).filter(
+    (r) => validIds.has(r.sourceEntityId) && validIds.has(r.targetEntityId)
+  );
+
+  const reassignments = (parsed.reassignments ?? []).filter(
+    (r) => validIds.has(r.entityId)
+  );
+
+  return { mergeGroups, newRelationships, reassignments };
 }

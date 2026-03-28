@@ -201,6 +201,54 @@ export interface GraphGap {
   relatedNodeIds?: string[];
 }
 
+// ── Cross-document integration ────────────────────────────────────────────────
+//
+// Phase 5 of the Sources pipeline. After all documents are extracted,
+// a single Gemini pass merges near-duplicate entities across documents,
+// generates cross-document relationships, and corrects attractor assignments
+// that were misleading when seen in per-document isolation.
+
+/** Compact entity sent to Gemini for the integration pass (descriptions truncated to 100 chars) */
+export interface CompactEntity {
+  id: string;
+  label: string;
+  type: string;
+  attractor: string;
+  desc: string;
+}
+
+/** A set of entities that refer to the same concept across different documents */
+export interface MergeGroup {
+  canonicalLabel: string;
+  canonicalDescription: string;
+  /** All entity IDs in the group — survivor is determined by relationship count, not position */
+  entityIdsToMerge: string[];
+}
+
+/** A new relationship to create between entities from different source documents */
+export interface CrossDocRelationship {
+  sourceEntityId: string;
+  targetEntityId: string;
+  type: string;
+  description?: string;
+}
+
+/** An attractor correction — per-document context was insufficient to assign correctly */
+export interface AttractorReassignment {
+  entityId: string;
+  oldAttractor: string;
+  newAttractor: string;
+  reason: string;
+}
+
+/** Summary returned by /api/integrate */
+export interface IntegrationResult {
+  mergeGroupCount: number;
+  entitiesMerged: number;      // non-survivor nodes deleted
+  relationshipsAdded: number;
+  attractorsReassigned: number;
+}
+
 /** Full output from the Haiku cross-source synthesis pass */
 export interface SynthesisResult {
   narrativeSummary: string;       // 2-3 paragraph prose overview of findings

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 import type {
   Project,
   ProjectPhase,
@@ -8,6 +9,10 @@ import type {
   TensionMarker,
   EvaluativeSignal,
   EntityTypeConfig,
+  CompactEntity,
+  MergeGroup,
+  CrossDocRelationship,
+  AttractorReassignment,
 } from '@/types';
 
 // NEXT_PUBLIC_ prefix makes these available in both server and client bundles.
@@ -247,6 +252,248 @@ export async function deleteDocument(documentId: string): Promise<void> {
     .eq('id', documentId);
 
   if (docError) throw new Error(`deleteDocument: ${docError.message}`);
+}
+
+// ── Cross-document integration helpers ──────────────────────────────────────
+
+/**
+ * Loads all entities for a project in compact form for the integration prompt.
+ * Descriptions are truncated to 100 chars to keep the Gemini payload lean.
+ */
+export async function getProjectEntitiesCompact(projectId: string): Promise<CompactEntity[]> {
+  const { data, error } = await supabase
+    .from('ontology_nodes')
+    .select('id, label, type, attractor, description')
+    .eq('project_id', projectId);
+
+  if (error) throw new Error(`getProjectEntitiesCompact: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id:       row.id,
+    label:    row.label ?? '',
+    type:     row.type ?? 'concept',
+    attractor: row.attractor ?? 'emergent',
+    desc:     (row.description ?? '').slice(0, 100),
+  }));
+}
+
+/**
+ * Executes a list of entity merge groups against Supabase.
+ *
+ * For each group:
+ *  1. Picks the entity with the most relationships as the survivor
+ *  2. Updates survivor with canonical label + description
+ *  3. Re-points all relationships from non-survivors → survivor
+ *  4. Re-points tension markers referencing non-survivors → survivor
+ *  5. Deletes non-survivor entities
+ * After all groups: deduplicates any relationships with identical (source, target, type).
+ *
+ * Returns the number of non-survivor entities deleted.
+ */
+export async function executeMerges(
+  projectId: string,
+  mergeGroups: MergeGroup[]
+): Promise<number> {
+  if (mergeGroups.length === 0) return 0;
+
+  // Load all relationships upfront — used to pick survivors + update in-memory
+  const { data: allRels, error: relsError } = await supabase
+    .from('ontology_relationships')
+    .select('id, source_node_id, target_node_id, type')
+    .eq('project_id', projectId);
+  if (relsError) throw new Error(`executeMerges (load rels): ${relsError.message}`);
+
+  // Load all tension markers upfront — need to re-point related_node_ids arrays
+  const { data: allTensions, error: tensionError } = await supabase
+    .from('tension_markers')
+    .select('id, related_node_ids')
+    .eq('project_id', projectId);
+  if (tensionError) throw new Error(`executeMerges (load tensions): ${tensionError.message}`);
+
+  const rels = allRels ?? [];
+  const tensions = allTensions ?? [];
+  let totalDeleted = 0;
+
+  for (const group of mergeGroups) {
+    const { canonicalLabel, canonicalDescription, entityIdsToMerge } = group;
+    if (!entityIdsToMerge || entityIdsToMerge.length < 2) continue;
+
+    // Count relationships per candidate to pick the survivor
+    const relCounts: Record<string, number> = {};
+    for (const id of entityIdsToMerge) relCounts[id] = 0;
+    for (const rel of rels) {
+      if (relCounts[rel.source_node_id] !== undefined) relCounts[rel.source_node_id]++;
+      if (relCounts[rel.target_node_id]  !== undefined) relCounts[rel.target_node_id]++;
+    }
+
+    // Survivor = entity with the most relationships (ties broken by list order)
+    const survivorId = entityIdsToMerge.reduce((best, id) =>
+      (relCounts[id] ?? 0) > (relCounts[best] ?? 0) ? id : best
+    );
+    const nonSurvivorIds = entityIdsToMerge.filter((id) => id !== survivorId);
+
+    // Update survivor with Gemini's canonical label + description
+    const { error: survivorError } = await supabase
+      .from('ontology_nodes')
+      .update({ label: canonicalLabel, description: canonicalDescription })
+      .eq('id', survivorId);
+    if (survivorError) {
+      console.warn(`[integrate] Failed to update survivor ${survivorId}: ${survivorError.message}`);
+      continue;
+    }
+
+    // Re-point relationships: all references to non-survivors → survivor
+    for (const oldId of nonSurvivorIds) {
+      await supabase.from('ontology_relationships')
+        .update({ source_node_id: survivorId })
+        .eq('project_id', projectId)
+        .eq('source_node_id', oldId);
+
+      await supabase.from('ontology_relationships')
+        .update({ target_node_id: survivorId })
+        .eq('project_id', projectId)
+        .eq('target_node_id', oldId);
+    }
+
+    // Re-point tension markers — replace non-survivor IDs with survivor in each array
+    for (const tension of tensions) {
+      const ids: string[] = tension.related_node_ids ?? [];
+      if (!ids.some((id) => nonSurvivorIds.includes(id))) continue;
+
+      const updatedIds = [...new Set(
+        ids.map((id) => (nonSurvivorIds.includes(id) ? survivorId : id))
+      )];
+
+      await supabase.from('tension_markers')
+        .update({ related_node_ids: updatedIds })
+        .eq('id', tension.id);
+    }
+
+    // Delete non-survivor nodes
+    for (const oldId of nonSurvivorIds) {
+      await supabase.from('ontology_nodes').delete().eq('id', oldId);
+    }
+    totalDeleted += nonSurvivorIds.length;
+
+    // Keep in-memory rels accurate for subsequent merge groups in this batch
+    for (const rel of rels) {
+      if (nonSurvivorIds.includes(rel.source_node_id)) rel.source_node_id = survivorId;
+      if (nonSurvivorIds.includes(rel.target_node_id))  rel.target_node_id  = survivorId;
+    }
+  }
+
+  // Deduplicate relationships: after re-pointing, some may now share (source, target, type)
+  const { data: postRels } = await supabase
+    .from('ontology_relationships')
+    .select('id, source_node_id, target_node_id, type')
+    .eq('project_id', projectId);
+
+  const seen = new Set<string>();
+  const dupes: string[] = [];
+  for (const rel of postRels ?? []) {
+    const key = `${rel.source_node_id}|${rel.target_node_id}|${rel.type}`;
+    if (seen.has(key)) {
+      dupes.push(rel.id);
+    } else {
+      seen.add(key);
+    }
+  }
+  if (dupes.length > 0) {
+    await supabase.from('ontology_relationships').delete().in('id', dupes);
+  }
+
+  return totalDeleted;
+}
+
+/**
+ * Inserts new cross-document relationships.
+ * Validates that both entity endpoints exist (they may have shifted after merges).
+ * Skips any that would create a duplicate (same source, target, type).
+ *
+ * Returns the number of relationships actually inserted.
+ */
+export async function addCrossDocRelationships(
+  projectId: string,
+  newRelationships: CrossDocRelationship[]
+): Promise<number> {
+  if (newRelationships.length === 0) return 0;
+
+  // Validate entity IDs against current node set (post-merge)
+  const { data: existingNodes } = await supabase
+    .from('ontology_nodes')
+    .select('id')
+    .eq('project_id', projectId);
+  const validIds = new Set((existingNodes ?? []).map((n) => n.id));
+
+  // Build dedup key set from current relationships
+  const { data: existingRels } = await supabase
+    .from('ontology_relationships')
+    .select('source_node_id, target_node_id, type')
+    .eq('project_id', projectId);
+  const existingKeys = new Set(
+    (existingRels ?? []).map((r) => `${r.source_node_id}|${r.target_node_id}|${r.type}`)
+  );
+
+  const toInsert: {
+    id: string; project_id: string;
+    source_node_id: string; target_node_id: string;
+    type: string; description: string | null;
+  }[] = [];
+
+  for (const rel of newRelationships) {
+    if (!validIds.has(rel.sourceEntityId) || !validIds.has(rel.targetEntityId)) {
+      console.warn(`[integrate] Skipping cross-doc rel — entity not found: ${rel.sourceEntityId} → ${rel.targetEntityId}`);
+      continue;
+    }
+    const key = `${rel.sourceEntityId}|${rel.targetEntityId}|${rel.type}`;
+    if (existingKeys.has(key)) continue;
+
+    toInsert.push({
+      id:             uuidv4(),
+      project_id:     projectId,
+      source_node_id: rel.sourceEntityId,
+      target_node_id: rel.targetEntityId,
+      type:           rel.type,
+      description:    rel.description ?? null,
+    });
+    existingKeys.add(key); // prevent intra-batch dupes
+  }
+
+  if (toInsert.length === 0) return 0;
+
+  const { error } = await supabase.from('ontology_relationships').insert(toInsert);
+  if (error) throw new Error(`addCrossDocRelationships: ${error.message}`);
+
+  return toInsert.length;
+}
+
+/**
+ * Applies attractor reassignments — updates the `attractor` field on individual nodes.
+ * Scoped to the project for safety. Logs and continues on per-node failures.
+ *
+ * Returns the number of nodes successfully reassigned.
+ */
+export async function reassignAttractors(
+  projectId: string,
+  reassignments: AttractorReassignment[]
+): Promise<number> {
+  if (reassignments.length === 0) return 0;
+
+  let count = 0;
+  for (const r of reassignments) {
+    const { error } = await supabase
+      .from('ontology_nodes')
+      .update({ attractor: r.newAttractor })
+      .eq('id', r.entityId)
+      .eq('project_id', projectId); // project scope guard
+
+    if (error) {
+      console.warn(`[integrate] Failed to reassign attractor for ${r.entityId}: ${error.message}`);
+    } else {
+      count++;
+    }
+  }
+  return count;
 }
 
 // ── Ontology load / save ─────────────────────────────────────────────────────

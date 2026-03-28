@@ -203,6 +203,16 @@ Or use the VS Code launch config (`terroir-dev`).
 - **Paste-text bypasses ingest:** enters pipeline at classify phase, skips `/api/ingest`. Same downstream flow.
 - **Supabase migrations:** always paste the SQL directly into the Supabase SQL Editor — never reference the file path.
 
+**Cross-document integration**
+- Integration runs AFTER all documents in a batch are extracted — it is Phase 5 of the Sources pipeline, not part of extraction
+- Triggered manually via the "Run integration" button (violet panel, appears when ≥1 file is `done`)
+- API route: `POST /api/integrate` — takes `{ projectId }`, returns `{ updatedGraph, result }`
+- Three sequential mutation phases: (1) merge near-duplicate entities → (2) add cross-doc relationships → (3) correct attractor assignments
+- Entity merges: survivor = entity with most existing relationships. Gemini provides canonical label + description. All rels + tension markers re-pointed to survivor, non-survivors deleted. Duplicate rels deduped after.
+- After merges, non-survivor entity IDs are remapped to their survivors before phases 2 + 3 execute (Gemini's response uses pre-merge IDs)
+- Compact payload: first 100 chars of description per entity to stay within context limits
+- `thinkingBudget: 0` same as extraction — faster and reliable JSON
+
 **Gemini extraction — known gotchas (debugged 2026-03-28)**
 Bulk document extraction was silently returning 0 entities for 11/13 podcast transcripts. Three fixes were applied, in order:
 

@@ -3,12 +3,14 @@
 /**
  * Sources — document upload, classification & extraction panel.
  *
- * 4-phase flow (Phase 2.5):
- *   1. INGEST — parallel POST /api/ingest for all files (parse + chunk + embed)
- *              OR direct paste (skips ingest, goes straight to classify)
+ * 5-phase flow:
+ *   1. INGEST   — parallel POST /api/ingest for all files (parse + chunk + embed)
+ *                 OR direct paste (skips ingest, goes straight to classify)
  *   2. CLASSIFY — batch POST /api/classify (Gemini evaluates all docs in one call)
- *   3. REVIEW — user sees EXTRACT/CAUTION/SKIP verdicts, can override
- *   4. EXTRACT — sequential POST /api/extract-gemini for approved files only
+ *   3. REVIEW   — user sees EXTRACT/CAUTION/SKIP verdicts, can override
+ *   4. EXTRACT  — sequential POST /api/extract-gemini for approved files only
+ *   5. INTEGRATE — optional POST /api/integrate — merges cross-doc duplicates,
+ *                  adds cross-document relationships, corrects attractor assignments
  *
  * Files are extracted sequentially so each extraction sees the latest graph
  * state for deduplication. Ingest is parallelised (no dedup concern there).
@@ -20,7 +22,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { GraphState, GraphUpdate, ProjectBrief, DocumentClassification, ClassificationVerdict } from "@/types";
+import type { GraphState, GraphUpdate, ProjectBrief, DocumentClassification, ClassificationVerdict, IntegrationResult } from "@/types";
 import { autoLayout } from "@/lib/layout";
 
 interface SourceFile {
@@ -55,6 +57,10 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
   const [isClassifying, setIsClassifying] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [hasClassified, setHasClassified] = useState(false);
+
+  // ── Phase 5: Integration state ────────────────────────────────────────────
+  const [integrationState, setIntegrationState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [integrationResult, setIntegrationResult] = useState<IntegrationResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Paste-text mode ───────────────────────────────────────────────────────
@@ -261,6 +267,39 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
 
     setIsExtracting(false);
   }, [files, projectId, projectBrief, onGraphUpdate, updateFile]);
+
+  // ── Phase 5: Integration pass ─────────────────────────────────────────────
+  // Calls /api/integrate which runs a Gemini pass over the full entity set:
+  //   - Merges near-duplicate entities across documents
+  //   - Adds cross-document relationships
+  //   - Corrects attractor assignments
+
+  const runIntegration = useCallback(async () => {
+    if (!projectId) return;
+    setIntegrationState("running");
+    setIntegrationResult(null);
+    try {
+      const res = await fetch("/api/integrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || `Integration failed (${res.status})`);
+      }
+
+      const data = await res.json() as { updatedGraph: GraphState; result: IntegrationResult };
+      const laidOut = autoLayout(data.updatedGraph);
+      onGraphUpdate(laidOut, []); // refresh canvas with integrated graph
+      setIntegrationResult(data.result);
+      setIntegrationState("done");
+    } catch (err) {
+      console.error("[Sources] Integration error:", err);
+      setIntegrationState("error");
+    }
+  }, [projectId, onGraphUpdate]);
 
   // ── Enqueue: ingest → classify → wait for user ────────────────────────────
 
@@ -555,6 +594,60 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
           <p className="text-[9px] text-stone-400 mt-1">
             Click a verdict badge to override · SKIP docs won&apos;t be extracted
           </p>
+        </div>
+      )}
+
+      {/* ── Phase 5: Integration panel ───────────────────────────────────── */}
+      {files.some((f) => f.status === "done") && (
+        <div className="mx-4 mb-3 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2.5">
+          {integrationState === "idle" && (
+            <>
+              <p className="text-[10px] text-violet-700 font-medium mb-1">
+                Cross-document integration
+              </p>
+              <p className="text-[10px] text-violet-500 mb-2">
+                {graphState.nodes.length} entities extracted — merge duplicates, connect across documents, correct attractors.
+              </p>
+              <button
+                onClick={runIntegration}
+                className="text-[10px] font-medium text-white bg-violet-600 hover:bg-violet-700 px-3 py-1 rounded-md transition-colors"
+              >
+                Run integration
+              </button>
+            </>
+          )}
+          {integrationState === "running" && (
+            <p className="text-[10px] text-violet-500 animate-pulse font-medium">
+              Integrating across documents…
+            </p>
+          )}
+          {integrationState === "done" && integrationResult && (
+            <>
+              <p className="text-[10px] text-violet-700 font-medium mb-1">Integration complete</p>
+              <p className="text-[10px] text-violet-500">
+                Merged {integrationResult.entitiesMerged} entities into {integrationResult.mergeGroupCount} groups
+                {integrationResult.relationshipsAdded > 0 && ` · +${integrationResult.relationshipsAdded} cross-doc relationships`}
+                {integrationResult.attractorsReassigned > 0 && ` · ${integrationResult.attractorsReassigned} attractors corrected`}
+              </p>
+              <button
+                onClick={() => { setIntegrationState("idle"); setIntegrationResult(null); }}
+                className="mt-1.5 text-[9px] text-violet-400 underline underline-offset-2 hover:text-violet-600"
+              >
+                Run again
+              </button>
+            </>
+          )}
+          {integrationState === "error" && (
+            <>
+              <p className="text-[10px] text-red-500 font-medium">Integration failed — check console for details.</p>
+              <button
+                onClick={() => setIntegrationState("idle")}
+                className="mt-1 text-[9px] text-stone-400 underline underline-offset-2 hover:text-stone-600"
+              >
+                Try again
+              </button>
+            </>
+          )}
         </div>
       )}
 
