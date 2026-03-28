@@ -199,9 +199,18 @@ Or use the VS Code launch config (`terroir-dev`).
 - **Optimistic updates in Reflect tab:** `onSignalReflect` updates `graphState` immediately; API write is fire-and-forget with `.catch()`.
 
 **Deployment**
-- **Vercel timeout:** `/api/reprocess` has `export const maxDuration = 300` — required for 5+ large documents.
+- **Vercel timeout:** `/api/reprocess` and `/api/extract-gemini` both have `export const maxDuration = 300` — required for large documents. On Vercel Hobby the effective cap is lower, which is why extraction was also moved to non-thinking mode (see below).
 - **Paste-text bypasses ingest:** enters pipeline at classify phase, skips `/api/ingest`. Same downstream flow.
 - **Supabase migrations:** always paste the SQL directly into the Supabase SQL Editor — never reference the file path.
+
+**Gemini extraction — known gotchas (debugged 2026-03-28)**
+Bulk document extraction was silently returning 0 entities for 11/13 podcast transcripts. Three fixes were applied, in order:
+
+1. **`maxDuration = 300` on `/api/extract-gemini`** — the route was missing it (only `/api/reprocess` had it). Without it, Vercel kills the function at the plan default (10s Hobby / 60s Pro) before Gemini responds.
+
+2. **Remove `responseMimeType: "application/json"` from extraction calls** — Gemini 2.5 Flash (thinking model) silently returns `{}` or empty arrays when JSON mode is forced on long/complex prompts. The prompt already instructs plain JSON output. `stripJsonFences()` was added as a fallback to strip markdown code fences if Gemini wraps the response anyway. Classify and synthesis keep JSON mode (shorter prompts, works fine).
+
+3. **Disable thinking for extraction: `thinkingConfig: { thinkingBudget: 0 }` inside `generationConfig`** — Gemini 2.5 Flash thinking mode runs a reasoning pass before generating output. For structured extraction this is slow (30–90s, exceeds Hobby timeout) and interferes with JSON output. Disabling thinking drops response time to 3–8s and produces consistent JSON. Classify and synthesis keep thinking enabled. Note: `thinkingConfig` must be nested inside `generationConfig`, not at the request body top level — the API returns a 400 otherwise.
 
 ---
 
