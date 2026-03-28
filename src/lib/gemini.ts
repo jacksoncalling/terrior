@@ -176,19 +176,21 @@ ${text}`;
 
 // ── Gemini REST call ─────────────────────────────────────────────────────────
 
-async function callGemini(prompt: string, maxOutputTokens = 32768): Promise<string> {
+async function callGemini(prompt: string, maxOutputTokens = 32768, useJsonMode = true): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not set");
+
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0.1,
+    maxOutputTokens,
+  };
+  if (useJsonMode) generationConfig.responseMimeType = "application/json";
 
   const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens,
-        responseMimeType: "application/json",
-      },
+      generationConfig,
     }),
   });
 
@@ -201,6 +203,12 @@ async function callGemini(prompt: string, maxOutputTokens = 32768): Promise<stri
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Empty response from Gemini");
   return text;
+}
+
+// Strip markdown code fences if Gemini wraps JSON in ```json ... ```
+function stripJsonFences(raw: string): string {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return fenced ? fenced[1].trim() : raw.trim();
 }
 
 // ── Graph assembly (mirrors extract.ts logic) ────────────────────────────────
@@ -339,15 +347,25 @@ export async function extractOntologyWithGemini(
   abstractionLayer?: AbstractionLayer,
   projectBrief?: ProjectBrief
 ): Promise<GeminiExtractionResult> {
-  const prompt  = buildExtractionPrompt(text, graphState, abstractionLayer, projectBrief);
-  const rawJson = await callGemini(prompt);
+  const prompt = buildExtractionPrompt(text, graphState, abstractionLayer, projectBrief);
+  // Skip JSON mode for extraction — Gemini 2.5 Flash (thinking model) can return
+  // empty {} when responseMimeType:"application/json" is set for long/complex prompts.
+  // The prompt already instructs plain JSON output; we strip fences as fallback.
+  const raw = await callGemini(prompt, 32768, false);
+  const rawJson = stripJsonFences(raw);
 
   let extracted;
   try {
     extracted = JSON.parse(rawJson);
   } catch {
-    console.error("Gemini returned invalid JSON:", rawJson.slice(0, 200));
+    console.error("[extract] Gemini returned unparseable response. First 500 chars:", rawJson.slice(0, 500));
     return { updatedGraph: graphState, graphUpdates: [] };
+  }
+
+  // Guard against empty response (e.g. {} or {"entities":[]})
+  const entityCount = (extracted.entities ?? []).length;
+  if (entityCount === 0) {
+    console.warn("[extract] Gemini returned 0 entities. Raw response (first 500 chars):", rawJson.slice(0, 500));
   }
 
   return assembleGraph(extracted, graphState);
