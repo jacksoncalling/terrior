@@ -176,7 +176,7 @@ ${text}`;
 
 // ── Gemini REST call ─────────────────────────────────────────────────────────
 
-async function callGemini(prompt: string, maxOutputTokens = 16384): Promise<string> {
+async function callGemini(prompt: string, maxOutputTokens = 32768): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not set");
 
   const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {

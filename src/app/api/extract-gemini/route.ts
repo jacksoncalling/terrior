@@ -22,6 +22,8 @@ import { extractOntologyWithGemini } from "@/lib/gemini";
 import { logSession } from "@/lib/supabase";
 import type { GraphState, AbstractionLayer, ProjectBrief } from "@/types";
 
+export const maxDuration = 300;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
