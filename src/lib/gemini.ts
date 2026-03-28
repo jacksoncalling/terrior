@@ -184,12 +184,12 @@ async function callGemini(prompt: string, maxOutputTokens = 32768, useJsonMode =
     maxOutputTokens,
   };
   if (useJsonMode) generationConfig.responseMimeType = "application/json";
+  if (disableThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
 
   const body: Record<string, unknown> = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig,
   };
-  if (disableThinking) body.thinkingConfig = { thinkingBudget: 0 };
 
   const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
     method: "POST",
