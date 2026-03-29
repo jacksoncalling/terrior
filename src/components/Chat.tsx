@@ -242,7 +242,7 @@ function TensionCard({
 }: {
   tension: import("@/types").TensionMarker;
   nodes: import("@/types").GraphNode[];
-  onResolve: (tensionId: string) => void;
+  onResolve?: (tensionId: string) => void;
 }) {
   const linkedLabels = tension.relatedNodeIds
     .map((id) => nodes.find((n) => n.id === id)?.label)

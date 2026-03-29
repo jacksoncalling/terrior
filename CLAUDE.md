@@ -257,3 +257,4 @@ Bulk document extraction was silently returning 0 entities for 11/13 podcast tra
 - **Supabase migrations** — always show the SQL inline in the response, never just the filename
 - **Commits** — use `/commit` skill; don't push without asking
 - **Bug fixes** — count as their own commits, don't bundle with features
+- **Always run `/review` before `/commit`** on non-trivial sessions — TypeScript won't catch async error-swallowing or DB/client divergence bugs. See `~/.claude/learnings/2026-03-29-review-before-commit-workflow.md`
