@@ -18,7 +18,7 @@ Primary personas:
 
 ---
 
-## Current State — Updated 2026-03-27
+## Current State — Updated 2026-03-29
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
@@ -29,6 +29,10 @@ Primary personas:
 - System prompt groups nodes by attractor, includes emergent zone context
 - JSON export includes `attractor`, `type`, and computed `zone` per node
 - Share button, Reflect tab, collapsible Inspector — all still working
+- **Graph clarity features (Phase 6 — 2026-03-29):**
+  - **Tensions in Reflect tab** — unresolved tensions visible below signals with full description, linked entity labels, and "Mark resolved" button. Reflect tab shows red count badge when tensions exist.
+  - **Signal deduplication pass** — "Deduplicate" button appears in Reflect tab when signal count > 20. Triggers a Gemini pass that groups near-duplicates, picks canonical label + richer description, deletes non-survivors from Supabase. Shows summary: "382 → 41 signals (341 merged into 12 clusters)". Route: `POST /api/signals/deduplicate`.
+  - **Filter-first canvas rendering** — attractor filter now shows matching nodes + their direct neighbors (not just matching nodes). Stats panel shows "X of Y entities" count when filtered.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal (caught silently).
@@ -36,7 +40,7 @@ Primary personas:
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
 
 ### What's next
-1. **Test on Vercel with real data** — open Step Into More, verify 126 nodes render with attractor bar + emergent zone styling. Reprocess to assign attractors.
+1. **Test graph clarity features on Vercel** — open Step Into More (126 nodes), apply an attractor filter and verify neighbors are visible + count shows "X of Y". Check Reflect tab for tensions + dedup button.
 2. **1-hour workshop demo script** — design the flow for the 2-man AI startup CEO session (15 docs + 1 hour conversation → show value)
 3. **OpenClaw segment exploration** — assess whether Terroir can serve Claude/AI power users who want to map their automation landscape
 
@@ -137,6 +141,7 @@ All tables scoped by `project_id`.
 | `src/app/api/synthesis/route.ts` | Gemini cross-source synthesis |
 | `src/app/api/reprocess/route.ts` | Re-extract all docs with new lens (maxDuration = 300) |
 | `src/app/api/reflect/route.ts` | PATCH — write reflection scores for a signal |
+| `src/app/api/signals/deduplicate/route.ts` | POST — Gemini dedup pass + Supabase merges for evaluative signals |
 
 ### Components
 | File | Purpose |
@@ -203,6 +208,11 @@ Or use the VS Code launch config (`terroir-dev`).
 - **Paste-text bypasses ingest:** enters pipeline at classify phase, skips `/api/ingest`. Same downstream flow.
 - **Supabase migrations:** always paste the SQL directly into the Supabase SQL Editor — never reference the file path.
 
+**Graph clarity**
+- **Attractor filter includes neighbors:** When a TypePalette attractor filter is active, `filteredGraphState` in page.tsx includes matching nodes + their direct neighbors (not exclusive). Zone filter (Emergent) remains exclusive. Stats panel shows "X of Y entities" count.
+- **Tensions resolve via graphState:** `handleTensionResolve` in page.tsx sets `tension.status = "resolved"` locally; `saveOntology` (debounced 800ms) persists it. No dedicated API route.
+- **Signal dedup pattern:** Same as entity integration pass — Gemini groups near-duplicates in one call, `executeSignalMerges` in supabase.ts applies batch deletes + survivor update, API route at `POST /api/signals/deduplicate`.
+
 **Cross-document integration**
 - Integration runs AFTER all documents in a batch are extracted — it is Phase 5 of the Sources pipeline, not part of extraction
 - Triggered manually via the "Run integration" button (violet panel, appears when ≥1 file is `done`)
@@ -234,7 +244,8 @@ Bulk document extraction was silently returning 0 entities for 11/13 podcast tra
 | Phase 3 — Cloud deployment (Vercel, Share button, Realtime) | Mar 24 | ✅ Complete |
 | Phase 3.5 — Reflect tab (signal rating, UI restructure, collapsible inspector) | Mar 26 | ✅ Complete |
 | Phase 4 — Ontology scaffolding (attractor presets, emergent zone, nested ontologies) | Mar 27 | ✅ Complete |
-| Phase 5 — PoC validation + demo prep | TBD | 🟥 Next |
+| Phase 5 — Graph clarity (tensions visible, signal dedup, filter-first canvas) | Mar 29 | ✅ Complete |
+| Phase 6 — PoC validation + demo prep | TBD | 🟥 Next |
 
 ---
 

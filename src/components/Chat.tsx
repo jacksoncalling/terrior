@@ -38,6 +38,10 @@ interface ChatProps {
     signalId: string,
     updates: Partial<Pick<EvaluativeSignal, "relevanceScore" | "intensityScore" | "reflectedAt" | "userNote">>
   ) => void;
+  /** Called when the user resolves a tension in the Reflect tab. */
+  onTensionResolve?: (tensionId: string) => void;
+  /** Called after signal deduplication completes — updates graphState with merged signals. */
+  onSignalDedup?: (updatedSignals: EvaluativeSignal[]) => void;
 }
 
 // ── Direction icon map ────────────────────────────────────────────────────────
@@ -229,6 +233,41 @@ function SignalCard({
   );
 }
 
+// ── TensionCard ───────────────────────────────────────────────────────────────
+// Displays a single unresolved tension with linked entity labels + resolve button.
+function TensionCard({
+  tension,
+  nodes,
+  onResolve,
+}: {
+  tension: import("@/types").TensionMarker;
+  nodes: import("@/types").GraphNode[];
+  onResolve: (tensionId: string) => void;
+}) {
+  const linkedLabels = tension.relatedNodeIds
+    .map((id) => nodes.find((n) => n.id === id)?.label)
+    .filter(Boolean) as string[];
+
+  return (
+    <div className="rounded-lg border border-red-100 bg-red-50/40 px-3 py-2.5 space-y-1.5">
+      <p className="text-xs text-stone-700 leading-snug">{tension.description}</p>
+      {linkedLabels.length > 0 && (
+        <p className="text-[10px] text-stone-400 leading-tight">
+          {linkedLabels.join(" · ")}
+        </p>
+      )}
+      {onResolve && (
+        <button
+          onClick={() => onResolve(tension.id)}
+          className="text-[10px] text-stone-500 hover:text-stone-700 transition-colors border border-stone-200 rounded px-2 py-0.5 hover:bg-white"
+        >
+          Mark resolved
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Chat component ────────────────────────────────────────────────────────────
 
 export default function Chat({
@@ -246,6 +285,8 @@ export default function Chat({
   documentCount = 0,
   projectBrief,
   onSignalReflect,
+  onTensionResolve,
+  onSignalDedup,
 }: ChatProps) {
   // ── Panel mode ────────────────────────────────────────────────────────────
   // "sources" mode is triggered by the + menu, not a tab, but lives in the
@@ -260,6 +301,10 @@ export default function Chat({
   // ── Paste-text state (replaces the old "Extract" tab) ────────────────────
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteInput, setPasteInput] = useState("");
+
+  // ── Signal dedup state ───────────────────────────────────────────────────
+  const [dedupState, setDedupState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [dedupSummary, setDedupSummary] = useState<string>("");
 
   // ── + menu state ──────────────────────────────────────────────────────────
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -331,21 +376,61 @@ export default function Chat({
     setShowPlusMenu(false);
   };
 
+  // ── Signal dedup handler ─────────────────────────────────────────────────
+  const handleDedup = async () => {
+    if (!projectId || dedupState === "running") return;
+    setDedupState("running");
+    try {
+      const res = await fetch("/api/signals/deduplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          signals: graphState.evaluativeSignals,
+          projectBrief,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Deduplication failed");
+      }
+      const { updatedSignals, clusterCount, originalCount, mergedCount } = await res.json();
+      onSignalDedup?.(updatedSignals);
+      if (clusterCount === 0) {
+        setDedupSummary("No duplicates found");
+      } else {
+        setDedupSummary(`${originalCount} → ${updatedSignals.length} signals (${mergedCount} merged into ${clusterCount} cluster${clusterCount === 1 ? "" : "s"})`);
+      }
+      setDedupState("done");
+    } catch (err) {
+      console.error("[dedup]", err);
+      setDedupState("error");
+    }
+  };
+
   // ── Tab button renderer ───────────────────────────────────────────────────
   // When in sources mode, the pre-sources tab stays visually active so the
   // user always knows where they came from and how to get back.
+  const unresolvedTensionCount = graphState.tensions.filter((t) => t.status === "unresolved").length;
+
   const tabBtn = (label: string, value: "chat" | "synthesis" | "reflect") => {
     const isActive = mode === value || (mode === "sources" && preSourcesToab === value);
+    const badge = value === "reflect" && unresolvedTensionCount > 0 ? unresolvedTensionCount : null;
     return (
       <button
         onClick={() => { setMode(value); setPasteMode(false); }}
-        className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
+        className={`relative rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
           isActive
             ? "bg-stone-800 text-white"
             : "bg-stone-100 text-stone-500 hover:bg-stone-200"
         }`}
       >
         {label}
+        {badge !== null && (
+          <span className={`ml-1 text-[9px] px-1 rounded-full ${isActive ? "bg-white/20" : "bg-red-100 text-red-600"}`}>
+            {badge}
+          </span>
+        )}
       </button>
     );
   };
@@ -394,39 +479,96 @@ export default function Chat({
 
       {/* ── Reflect tab ───────────────────────────────────────────────────── */}
       {mode === "reflect" && (
-        <div className="flex-1 overflow-y-auto px-4 py-3">
-          <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-3">
-            Evaluative Signals
-            {graphState.evaluativeSignals.length > 0 && (
-              <span className="ml-1.5 normal-case font-normal">
-                — {graphState.evaluativeSignals.filter(
-                  (s) => s.relevanceScore != null || s.intensityScore != null
-                ).length} of {graphState.evaluativeSignals.length} rated
-              </span>
-            )}
-          </p>
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
 
-          {graphState.evaluativeSignals.length === 0 ? (
-            <div className="flex items-start justify-center pt-8">
-              <p className="text-xs text-stone-400 text-center leading-relaxed max-w-[240px]">
-                No evaluative signals yet. Use the{" "}
-                <span className="font-medium">+</span> button to upload documents
-                or paste text, or describe the organisation in Chat to surface
-                what it values and fears.
+          {/* ── Tensions section ─────────────────────────────────────────── */}
+          {unresolvedTensionCount > 0 && (
+            <div>
+              <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-2">
+                Tensions
+                <span className="ml-1.5 normal-case font-normal text-red-500">
+                  — {unresolvedTensionCount} unresolved
+                </span>
               </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {graphState.evaluativeSignals.map((s) => (
-                <SignalCard
-                  key={s.id}
-                  signal={s}
-                  projectId={projectId}
-                  onReflect={(updates) => onSignalReflect?.(s.id, updates)}
-                />
-              ))}
+              <div className="space-y-2">
+                {graphState.tensions
+                  .filter((t) => t.status === "unresolved")
+                  .map((t) => (
+                    <TensionCard
+                      key={t.id}
+                      tension={t}
+                      nodes={graphState.nodes}
+                      onResolve={onTensionResolve}
+                    />
+                  ))}
+              </div>
             </div>
           )}
+
+          {/* ── Evaluative signals section ───────────────────────────────── */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
+                Evaluative Signals
+                {graphState.evaluativeSignals.length > 0 && (
+                  <span className="ml-1.5 normal-case font-normal">
+                    — {graphState.evaluativeSignals.filter(
+                      (s) => s.relevanceScore != null || s.intensityScore != null
+                    ).length} of {graphState.evaluativeSignals.length} rated
+                  </span>
+                )}
+              </p>
+              {/* Dedup button — only shown when signal count > 20 */}
+              {graphState.evaluativeSignals.length > 20 && dedupState !== "running" && (
+                <button
+                  onClick={handleDedup}
+                  className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors border border-stone-200 rounded px-2 py-0.5 hover:bg-stone-50"
+                >
+                  Deduplicate
+                </button>
+              )}
+              {dedupState === "running" && (
+                <span className="text-[10px] text-stone-400 italic">Deduplicating…</span>
+              )}
+            </div>
+
+            {/* Dedup result banner */}
+            {dedupState === "done" && dedupSummary && (
+              <div className="mb-2 rounded-lg bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-500 flex items-center justify-between">
+                <span>{dedupSummary}</span>
+                <button onClick={() => setDedupState("idle")} className="text-stone-300 hover:text-stone-500 ml-2">×</button>
+              </div>
+            )}
+            {dedupState === "error" && (
+              <div className="mb-2 rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-[10px] text-red-500 flex items-center justify-between">
+                <span>Deduplication failed — try again</span>
+                <button onClick={() => setDedupState("idle")} className="text-red-300 hover:text-red-500 ml-2">×</button>
+              </div>
+            )}
+
+            {graphState.evaluativeSignals.length === 0 ? (
+              <div className="flex items-start justify-center pt-8">
+                <p className="text-xs text-stone-400 text-center leading-relaxed max-w-[240px]">
+                  No evaluative signals yet. Use the{" "}
+                  <span className="font-medium">+</span> button to upload documents
+                  or paste text, or describe the organisation in Chat to surface
+                  what it values and fears.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {graphState.evaluativeSignals.map((s) => (
+                  <SignalCard
+                    key={s.id}
+                    signal={s}
+                    projectId={projectId}
+                    onReflect={(updates) => onSignalReflect?.(s.id, updates)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 

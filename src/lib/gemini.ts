@@ -718,6 +718,114 @@ export interface IntegrationOutput {
   reassignments:    AttractorReassignment[];
 }
 
+// ── Signal deduplication ──────────────────────────────────────────────────────
+//
+// Reviews all evaluative signals and groups near-duplicates into merge groups.
+// Gemini picks a canonical label + richer description for each cluster.
+// Thinking disabled — same rationale as extraction (faster, consistent JSON).
+
+export interface SignalMergeGroup {
+  canonicalLabel:       string;
+  canonicalDescription: string;
+  canonicalDirection:   "toward" | "away_from" | "protecting";
+  signalIdsToMerge:     string[];
+}
+
+function buildSignalDeduplicationPrompt(
+  signals: import("@/types").EvaluativeSignal[],
+  projectBrief?: ProjectBrief
+): string {
+  const briefSection = projectBrief
+    ? `PROJECT CONTEXT:
+- Sector: ${projectBrief.sector ?? "not specified"}
+- Org size: ${projectBrief.orgSize ?? "not specified"}
+- Discovery goal: ${projectBrief.discoveryGoal ?? "not specified"}`
+    : "";
+
+  const signalList = JSON.stringify(
+    signals.map((s) => ({
+      id:     s.id,
+      label:  s.label,
+      dir:    s.direction,
+      str:    s.strength,
+      source: s.sourceDescription?.slice(0, 80) ?? "",
+    })),
+    null, 0
+  );
+
+  return `You are TERROIR's signal deduplication engine. Review the evaluative signals below and identify groups of signals that refer to the same underlying concept — the same value, fear, or orientation — possibly phrased differently across multiple source documents.
+
+Only merge signals that are GENUINELY near-duplicate (same underlying meaning). Do NOT merge signals that are merely related or thematically similar.
+
+${briefSection}
+
+SIGNALS (${signals.length} total):
+${signalList}
+
+For each merge group, output:
+- canonicalLabel: the best unified short label
+- canonicalDescription: 1-2 sentences with enough context to be readable standalone (richer than any individual label)
+- canonicalDirection: "toward" | "away_from" | "protecting" (dominant direction across the group)
+- signalIdsToMerge: array of signal IDs — minimum 2, ALL must be valid IDs from the list above
+
+Signals not in any group should be left unchanged. Return only groups with 2+ IDs.
+
+Respond with valid JSON only — no markdown, no code blocks:
+{
+  "mergeGroups": [
+    {
+      "canonicalLabel": "string",
+      "canonicalDescription": "string",
+      "canonicalDirection": "toward|away_from|protecting",
+      "signalIdsToMerge": ["id1", "id2"]
+    }
+  ]
+}`;
+}
+
+/**
+ * Groups near-duplicate evaluative signals into merge clusters via Gemini 2.5 Flash.
+ * Thinking disabled — same rationale as extraction (faster, consistent JSON).
+ *
+ * @param signals      All evaluative signals for the project
+ * @param projectBrief Optional brief for context
+ * @returns            Array of merge groups (each with 2+ signal IDs)
+ */
+export async function deduplicateSignals(
+  signals: import("@/types").EvaluativeSignal[],
+  projectBrief?: ProjectBrief
+): Promise<SignalMergeGroup[]> {
+  if (signals.length < 2) return [];
+
+  const validIds = new Set(signals.map((s) => s.id));
+  const prompt   = buildSignalDeduplicationPrompt(signals, projectBrief);
+  const raw      = await callGemini(prompt, 16384, false, true);
+  const rawJson  = stripJsonFences(raw);
+
+  let parsed: { mergeGroups: SignalMergeGroup[] } | null = null;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    console.error("[dedup] Gemini returned unparseable JSON:", rawJson.slice(0, 300));
+    return [];
+  }
+
+  // Validate: drop groups with hallucinated IDs or fewer than 2 members
+  const all = parsed?.mergeGroups ?? [];
+  const valid = all.filter(
+    (g) =>
+      g.signalIdsToMerge?.length >= 2 &&
+      g.signalIdsToMerge.every((id) => validIds.has(id)) &&
+      g.canonicalLabel?.trim() &&
+      g.canonicalDescription?.trim() &&
+      ["toward", "away_from", "protecting"].includes(g.canonicalDirection)
+  );
+  if (valid.length < all.length) {
+    console.warn(`[dedup] Dropped ${all.length - valid.length} invalid merge group(s) from Gemini response`);
+  }
+  return valid;
+}
+
 /**
  * Runs the cross-document integration pass via Gemini 2.5 Flash.
  *

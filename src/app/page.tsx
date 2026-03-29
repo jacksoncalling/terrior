@@ -554,6 +554,21 @@ export default function Home() {
     []
   );
 
+  // ── Tension resolve handler ──────────────────────────────────────────────
+  const handleTensionResolve = useCallback((tensionId: string) => {
+    setGraphState((prev) => ({
+      ...prev,
+      tensions: prev.tensions.map((t) =>
+        t.id === tensionId ? { ...t, status: "resolved" as const } : t
+      ),
+    }));
+  }, []);
+
+  // ── Signal dedup handler ─────────────────────────────────────────────────
+  const handleSignalDedup = useCallback((updatedSignals: import("@/types").EvaluativeSignal[]) => {
+    setGraphState((prev) => ({ ...prev, evaluativeSignals: updatedSignals }));
+  }, []);
+
   // ── Sources graph-update handler ─────────────────────────────────────────
 
   const handleGraphUpdate = useCallback(
@@ -860,18 +875,31 @@ export default function Home() {
 
   // Apply attractor filter or zone filter
   const filteredGraphState = (() => {
+    if (!typeFilter && !zoneFilter) return graphState;
+
     let filteredNodes = graphState.nodes;
 
     if (typeFilter) {
-      // typeFilter now filters by attractor id
-      filteredNodes = filteredNodes.filter((n) => (n.attractor ?? 'emergent') === typeFilter);
+      // Primary set: nodes matching the attractor
+      const matchingIds = new Set(
+        filteredNodes
+          .filter((n) => (n.attractor ?? "emergent") === typeFilter)
+          .map((n) => n.id)
+      );
+      // Expand to direct neighbors so the context around each attractor is visible
+      const neighborIds = new Set<string>();
+      for (const rel of graphState.relationships) {
+        if (matchingIds.has(rel.sourceId)) neighborIds.add(rel.targetId);
+        if (matchingIds.has(rel.targetId)) neighborIds.add(rel.sourceId);
+      }
+      filteredNodes = filteredNodes.filter(
+        (n) => matchingIds.has(n.id) || neighborIds.has(n.id)
+      );
     }
 
     if (zoneFilter) {
       filteredNodes = filteredNodes.filter((n) => graphZones.get(n.id) === zoneFilter);
     }
-
-    if (!typeFilter && !zoneFilter) return graphState;
 
     const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
     return {
@@ -918,6 +946,8 @@ export default function Home() {
           projectBrief={projectBrief}
           // ── Reflect tab ──────────────────────────────────────────────────
           onSignalReflect={handleSignalReflect}
+          onTensionResolve={handleTensionResolve}
+          onSignalDedup={handleSignalDedup}
         />
         {/* Bottom actions */}
         <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-3">
@@ -1025,6 +1055,7 @@ export default function Home() {
             selectedEdgeId={selectedEdgeId}
             attractors={activeAttractors}
             graphZones={graphZones}
+            totalNodeCount={graphState.nodes.length}
           />
         </div>
       </div>

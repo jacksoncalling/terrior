@@ -41,6 +41,8 @@ interface CanvasProps {
   selectedEdgeId: string | null;
   attractors?: AttractorConfig[];
   graphZones?: Map<string, NodeZone>;
+  /** Total node count across the unfiltered graph — used to show "Showing X of Y" */
+  totalNodeCount?: number;
 }
 
 const nodeTypes = { ontology: OntologyNode };
@@ -106,6 +108,7 @@ export default function Canvas({
   selectedEdgeId,
   attractors,
   graphZones,
+  totalNodeCount,
 }: CanvasProps) {
   const [showNewNodeDialog, setShowNewNodeDialog] = useState<{
     x: number;
@@ -278,7 +281,14 @@ export default function Canvas({
                 <span className="font-medium text-stone-700">
                   {graphState.nodes.length}
                 </span>{" "}
-                entities
+                {totalNodeCount != null && totalNodeCount > graphState.nodes.length ? (
+                  <>
+                    <span className="text-stone-400">of {totalNodeCount}</span>{" "}
+                    entities
+                  </>
+                ) : (
+                  "entities"
+                )}
                 {graphState.relationships.length > 0 && (
                   <>
                     {" · "}

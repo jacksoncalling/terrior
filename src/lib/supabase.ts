@@ -496,6 +496,83 @@ export async function reassignAttractors(
   return count;
 }
 
+// ── Signal deduplication helpers ─────────────────────────────────────────────
+
+/**
+ * Executes signal merge groups against Supabase.
+ *
+ * For each group:
+ *  1. Picks the signal with the highest strength as the survivor (ties broken by list order)
+ *  2. Updates survivor with canonical label + description + direction
+ *  3. Deletes non-survivors
+ *
+ * Returns the updated evaluative signal list (survivors only, with canonical data applied).
+ */
+export async function executeSignalMerges(
+  projectId: string,
+  mergeGroups: import("@/lib/gemini").SignalMergeGroup[],
+  signals: EvaluativeSignal[]
+): Promise<EvaluativeSignal[]> {
+  if (mergeGroups.length === 0) return signals;
+
+  let updated = [...signals];
+
+  for (const group of mergeGroups) {
+    const { canonicalLabel, canonicalDescription, canonicalDirection, signalIdsToMerge } = group;
+    if (!signalIdsToMerge || signalIdsToMerge.length < 2) continue;
+
+    const members = signalIdsToMerge
+      .map((id) => updated.find((s) => s.id === id))
+      .filter(Boolean) as EvaluativeSignal[];
+    if (members.length < 2) continue;
+
+    // Survivor = highest strength (ties broken by order)
+    const survivor     = members.reduce((best, s) => (s.strength ?? 0) >= (best.strength ?? 0) ? s : best);
+    const nonSurvivors = members.filter((s) => s.id !== survivor.id);
+
+    // Update survivor in Supabase
+    const { error: updateErr } = await supabase
+      .from("evaluative_signals")
+      .update({
+        label:              canonicalLabel,
+        source_description: canonicalDescription,
+        direction:          canonicalDirection,
+      })
+      .eq("id", survivor.id)
+      .eq("project_id", projectId);
+
+    if (updateErr) {
+      console.warn(`[dedup] Failed to update survivor ${survivor.id}: ${updateErr.message}`);
+      continue;
+    }
+
+    // Delete non-survivors from Supabase (batch)
+    if (nonSurvivors.length > 0) {
+      const { error: deleteErr } = await supabase
+        .from("evaluative_signals")
+        .delete()
+        .in("id", nonSurvivors.map((s) => s.id))
+        .eq("project_id", projectId);
+      if (deleteErr) {
+        console.warn(`[dedup] Failed to delete non-survivors for survivor ${survivor.id}: ${deleteErr.message}`);
+        continue;
+      }
+    }
+
+    // Update in-memory list: remove non-survivors, patch survivor
+    const nonSurvivorIds = new Set(nonSurvivors.map((s) => s.id));
+    updated = updated
+      .filter((s) => !nonSurvivorIds.has(s.id))
+      .map((s) =>
+        s.id === survivor.id
+          ? { ...s, label: canonicalLabel, sourceDescription: canonicalDescription, direction: canonicalDirection }
+          : s
+      );
+  }
+
+  return updated;
+}
+
 // ── Ontology load / save ─────────────────────────────────────────────────────
 //
 // loadOntology: fetches all 5 ontology tables for a project in parallel and
