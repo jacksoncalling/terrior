@@ -761,6 +761,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
     const { error } = await supabase.from('tension_markers').upsert(
       state.tensions.map((t) => ({
         id: t.id,
+        tension_id: t.id,  // legacy NOT NULL column — mirrors uuid id
         project_id: projectId,
         description: t.description,
         related_node_ids: t.relatedNodeIds,
@@ -776,6 +777,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
     const { error } = await supabase.from('evaluative_signals').upsert(
       state.evaluativeSignals.map((s) => ({
         id: s.id,
+        signal_id: s.id,  // legacy NOT NULL column — mirrors uuid id
         project_id: projectId,
         label: s.label,
         direction: s.direction,
