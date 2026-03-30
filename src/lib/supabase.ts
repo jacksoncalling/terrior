@@ -694,6 +694,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
     const { error } = await supabase.from('ontology_nodes').upsert(
       state.nodes.filter((n) => !n.readonly).map((n) => ({
         id: n.id,
+        node_id: n.id,  // legacy NOT NULL column — mirrors uuid id
         project_id: projectId,
         label: n.label,
         type: n.type,
@@ -713,6 +714,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
     const { error } = await supabase.from('ontology_relationships').upsert(
       state.relationships.map((r) => ({
         id: r.id,
+        rel_id: r.id,  // legacy NOT NULL column — mirrors uuid id
         project_id: projectId,
         source_node_id: r.sourceId,
         target_node_id: r.targetId,
