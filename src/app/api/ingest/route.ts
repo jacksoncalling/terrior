@@ -4,7 +4,7 @@
  * Accepts a file upload (multipart/form-data) and:
  *  1. Parses the file (PDF, DOCX, TXT, MD, JSON) → plain text
  *  2. Chunks the text
- *  3. Generates local embeddings (Transformers.js)
+ *  3. Generates embeddings (Gemini Embedding API)
  *  4. Saves document + chunks to Supabase (scoped to projectId)
  *
  * Returns: { documentId, chunkCount, title }
@@ -78,29 +78,22 @@ export async function POST(req: NextRequest) {
 
     // ── Embed + save chunks ──────────────────────────────────────────────────
     // Embeddings power the Compare/Search feature (vector similarity).
-    // If the ONNX runtime is unavailable (Vercel serverless), embedBatch returns
-    // empty arrays and we skip chunk storage. The document text is still saved
-    // above, so Gemini extraction (the main pipeline) is unaffected.
+    // Uses Gemini Embedding API — works on both local and Vercel.
     const texts      = chunks.map((c) => c.content);
     const embeddings = await embedBatch(texts);
-    const embeddingsAvailable = embeddings.length > 0 && embeddings[0].length > 0;
 
-    if (embeddingsAvailable) {
-      const rows = chunks.map((chunk, i) => ({
-        document_id: documentId,
-        project_id:  projectId,
-        content:     chunk.content,
-        chunk_index: chunk.chunkIndex,
-        embedding:   embeddings[i],
-      }));
+    const rows = chunks.map((chunk, i) => ({
+      document_id: documentId,
+      project_id:  projectId,
+      content:     chunk.content,
+      chunk_index: chunk.chunkIndex,
+      embedding:   embeddings[i],
+    }));
 
-      const { error: chunkError } = await supabase.from("document_chunks").insert(rows);
-      if (chunkError) {
-        console.error("Chunk insert error:", chunkError);
-        return NextResponse.json({ error: chunkError.message }, { status: 500 });
-      }
-    } else {
-      console.warn("[ingest] Skipping chunk storage — embeddings unavailable (vector search disabled)");
+    const { error: chunkError } = await supabase.from("document_chunks").insert(rows);
+    if (chunkError) {
+      console.error("Chunk insert error:", chunkError);
+      return NextResponse.json({ error: chunkError.message }, { status: 500 });
     }
 
     return NextResponse.json({

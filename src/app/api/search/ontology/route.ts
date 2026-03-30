@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         nodesUsed: matchedEntities.length,
         graphSize: graphState?.nodes?.length || 0,
       },
-      model: 'paraphrase-multilingual-MiniLM-L12-v2',
+      model: 'gemini-embedding-001',
       type: 'ontology',
     });
   } catch (err) {

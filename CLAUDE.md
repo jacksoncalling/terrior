@@ -18,31 +18,37 @@ Primary personas:
 
 ---
 
-## Current State — Updated 2026-03-29
+## Current State — Updated 2026-03-30
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
-- **Attractor category presets** — dual-tagging: every node carries `attractor` (structural) + `type` (freeform descriptive). Startup preset: Domain, Capability, Toolchain, Customer, Method, Value. Enterprise preset: Identity, Policy, Structure, People, Functions, Processes, Resources. Selected at project creation.
-- **Emergent zone** — nodes with 0–1 relationships get dashed borders + reduced opacity. "Emergent" filter chip with count badge in TypePalette. System prompt includes emergent zone section with suggested follow-up actions.
-- **Nested ontologies** — `parent_project_id` on projects. Parent nodes appear read-only in child canvas. Projects page groups children under parents with "+ Add sub-project" buttons.
-- Gemini extraction and Sonnet chat both assign attractors on node creation
-- System prompt groups nodes by attractor, includes emergent zone context
-- JSON export includes `attractor`, `type`, and computed `zone` per node
+- **Hub nodes as real entities (Phase 7 — 2026-03-30):** Attractor categories are now real hub nodes in the graph, not metadata tags. This is the shift from taxonomy to ontology — hubs are traversable, not just searchable.
+  - Hub nodes seeded from preset on project creation (`is_hub=true`). Startup: Domain, Capability, Toolchain, Customer, Method, Value, Emergent. Enterprise: Identity, Policy, Structure, People, Functions, Processes, Resources, Emergent.
+  - Every entity connects to a hub via `belongs_to_hub` relationship. `create_node` tool requires `hub_id` — code enforces, not just prompt.
+  - New `get_hub_context` tool: Sonnet retrieves a specific hub's subgraph on demand (members, relationships, tensions).
+  - System prompt sends hub summaries (~200 tokens) instead of full graph dump. Scales to 500+ nodes without consuming context.
+  - Multi-hub membership: a node can belong to multiple hubs with different relationship descriptions.
+  - Hub-to-hub relationships allowed (both explicit and implicit via shared members).
+  - Auto-migration: existing projects get hubs seeded + `belongs_to_hub` relationships created from cached `attractor` field on first load.
+  - Hub visual treatment: larger nodes with colored backgrounds, dotted `belongs_to_hub` edges, hub color inherited by member nodes.
+  - Inspector shows "Hub" dropdown (updates `belongs_to_hub` relationship, not just tag). Hub nodes show info panel instead of dropdown.
+  - TypePalette label changed to "Hubs". Filter by hub traverses relationships, not metadata.
+  - Export stats separate hub count from entity count, exclude hub edges from relationship count.
+- **Emergent zone** — nodes with 0–1 relationships get dashed borders + reduced opacity. "Emergent" filter chip with count badge. Emergent hub is always present as catch-all.
+- **Nested ontologies** — `parent_project_id` on projects. Parent nodes appear read-only in child canvas.
+- **Graph clarity features (Phase 6 — 2026-03-29):** Tensions in Reflect tab, signal dedup, filter-first canvas with neighbor inclusion.
 - Share button, Reflect tab, collapsible Inspector — all still working
-- **Graph clarity features (Phase 6 — 2026-03-29):**
-  - **Tensions in Reflect tab** — unresolved tensions visible below signals with full description, linked entity labels, and "Mark resolved" button. Reflect tab shows red count badge when tensions exist.
-  - **Signal deduplication pass** — "Deduplicate" button appears in Reflect tab when signal count > 20. Triggers a Gemini pass that groups near-duplicates, picks canonical label + richer description, deletes non-survivors from Supabase. Shows summary: "382 → 41 signals (341 merged into 12 clusters)". Route: `POST /api/signals/deduplicate`.
-  - **Filter-first canvas rendering** — attractor filter now shows matching nodes + their direct neighbors (not just matching nodes). Stats panel shows "X of Y entities" count when filtered.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal (caught silently).
-- **Existing nodes all tagged "emergent"** — pre-existing entities need re-extraction or manual attractor assignment to distribute across categories. Reprocess via Sources will auto-assign.
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
+- **Gemini hub fallback** — if Gemini returns a hub slug that doesn't match any hub node, the entity gets no `belongs_to_hub` relationship (orphaned). Should fall back to emergent hub.
 
 ### What's next
-1. **Test graph clarity features on Vercel** — open Step Into More (126 nodes), apply an attractor filter and verify neighbors are visible + count shows "X of Y". Check Reflect tab for tensions + dedup button.
-2. **1-hour workshop demo script** — design the flow for the 2-man AI startup CEO session (15 docs + 1 hour conversation → show value)
-3. **OpenClaw segment exploration** — assess whether Terroir can serve Claude/AI power users who want to map their automation landscape
+1. **Run Supabase migration** — `ALTER TABLE ontology_nodes ADD COLUMN IF NOT EXISTS is_hub BOOLEAN DEFAULT false;` — required for hub persistence
+2. **Test hub nodes on Vercel** — open Step Into More, verify migration seeds 7 hub nodes + creates `belongs_to_hub` relationships for 126 existing entities. Check hub filter, Inspector hub dropdown, and `get_hub_context` via chat.
+3. **1-hour workshop demo script** — design the flow for the 2-man AI startup CEO session (15 docs + 1 hour conversation → show value)
+4. **Anthropic architecture program prep** — Terroir as the portfolio project. Hub architecture demonstrates taxonomy→ontology distinction, programmatic enforcement (Level 2+3), and context window scaling.
 
 ---
 
@@ -52,11 +58,11 @@ Primary personas:
 |-------|-----------|
 | Framework | Next.js (app router, TypeScript) |
 | UI | ReactFlow (graph canvas) + Tailwind |
-| AI — Chat | Claude Sonnet + 9 graph tools |
+| AI — Chat | Claude Sonnet + 10 graph tools (incl. `get_hub_context`) |
 | AI — Documents | Gemini 2.5 Flash (extract + classify + synthesise) |
 | AI — Scoping | Claude Haiku (scoping dialogue only) |
 | Database | Supabase (postgres + realtime) |
-| Embeddings | Transformers.js local (paraphrase-multilingual-MiniLM-L12-v2) |
+| Embeddings | Gemini Embedding API (gemini-embedding-001, 768d) |
 | Layout | Dagre (hierarchical auto-layout) |
 | Hosting | Vercel |
 
@@ -88,7 +94,7 @@ Interactive ReactFlow graph. Drag/click/auto-layout. Type-filtered via TypePalet
 - Evaluative signals live exclusively in the **Reflect tab** — not in Inspector
 
 ### TypePalette (above canvas)
-Attractor categories from active preset, color-coded. Click to filter canvas by attractor. "Emergent" chip with count badge shows nodes with 0–1 relationships. Click again to clear.
+Hub nodes as filter chips, color-coded. Click to filter canvas by hub membership (traverses `belongs_to_hub` relationships + shows direct neighbors). "Emergent" chip with count badge shows nodes with 0–1 relationships. Click again to clear.
 
 ### Other pages
 - `/projects` — multi-project management
@@ -104,8 +110,8 @@ All tables scoped by `project_id`.
 | Table | Purpose |
 |-------|---------|
 | `projects` | Project metadata, brief in `metadata.brief`, attractor preset in `metadata.attractorPreset`, optional `parent_project_id` for nesting |
-| `ontology_nodes` | Graph nodes (label, type, attractor, description, position) |
-| `ontology_relationships` | Edges between nodes |
+| `ontology_nodes` | Graph nodes (label, type, attractor, is_hub, description, position). Hub nodes have `is_hub=true`. |
+| `ontology_relationships` | Edges between nodes. Includes `belongs_to_hub` type for hub membership. |
 | `tension_markers` | Unresolved/resolved tensions flagged by Claude |
 | `evaluative_signals` | What the org values/fears. Cols: `label`, `direction`, `strength`, `relevance_score`, `intensity_score`, `reflected_at`, `user_note` |
 | `entity_type_configs` | Color + label per entity type (has UUID bug — see above) |
@@ -118,6 +124,8 @@ All tables scoped by `project_id`.
 - `002_enable_realtime.sql` — Realtime publication for `ontology_nodes` (and possibly `ontology_relationships` — unconfirmed)
 - `003_reflect_scores.sql` — adds `relevance_score`, `intensity_score`, `reflected_at`, `user_note` to `evaluative_signals` ✅ run
 - `004_attractor_and_nesting.sql` — adds `attractor` TEXT to `ontology_nodes`, `parent_project_id` UUID to `projects`, index on parent ✅ run
+- `005_hub_nodes.sql` — adds `is_hub` BOOLEAN to `ontology_nodes`, index on `(project_id) WHERE is_hub = true` ⬜ pending
+- `006_embedding_768d.sql` — resizes `document_chunks.embedding` from vector(384) to vector(768), truncates old chunks, recreates search RPCs ✅ run
 
 ---
 
@@ -163,7 +171,7 @@ All tables scoped by `project_id`.
 | `src/lib/claude.ts` | Claude Sonnet + tool use loop |
 | `src/lib/gemini.ts` | Gemini: extraction + classification + synthesis |
 | `src/lib/haiku.ts` | Haiku client: scoping dialogue only |
-| `src/lib/tools.ts` | 9 graph tool definitions (add/delete/update nodes, edges, signals) |
+| `src/lib/tools.ts` | 10 graph tool definitions (incl. `get_hub_context` for on-demand subgraph retrieval) |
 | `src/lib/graph-state.ts` | Pure graph state mutation functions |
 | `src/lib/entity-types.ts` | Entity type management (has UUID bug) |
 | `src/lib/system-prompt.ts` | Dynamic system prompt builder (graph state → context) |
@@ -208,8 +216,15 @@ Or use the VS Code launch config (`terroir-dev`).
 - **Paste-text bypasses ingest:** enters pipeline at classify phase, skips `/api/ingest`. Same downstream flow.
 - **Supabase migrations:** always paste the SQL directly into the Supabase SQL Editor — never reference the file path.
 
+**Hub nodes & ontology structure**
+- **Taxonomy vs ontology (hub enforcement):** Categories/attractors are real hub nodes, not metadata tags. `create_node` requires `hub_id` (tool schema) + API validates it exists (code). Prompts guide *which* hub; code enforces *a hub is chosen*. See `~/.claude/learnings/2026-03-30-taxonomy-vs-ontology-enforcement.md`
+- **Context window scaling:** System prompt sends hub summaries (~200 tokens), not full graph. `get_hub_context` tool retrieves detail on demand. Hub nodes provide natural retrieval boundaries. See `~/.claude/learnings/2026-03-30-context-window-scaling-hub-summaries.md`
+- **`belongs_to_hub` is the source of truth:** The `node.attractor` field is a cached convenience — derived from the primary hub relationship. The real hub membership lives in `belongs_to_hub` edges. Filtering, system prompt, and export all read from relationships.
+- **Hub seeding:** Hubs are created on project creation (`createProject` in supabase.ts) and on first load of legacy projects (`migrateToHubNodes` in entity-types.ts). Both paths are idempotent.
+- **Hub nodes are protected:** Cannot be deleted via `delete_node` tool. Cannot have `belongs_to_hub` edges deleted via `delete_relationship`. Sonnet gets an error and retries.
+
 **Graph clarity**
-- **Attractor filter includes neighbors:** When a TypePalette attractor filter is active, `filteredGraphState` in page.tsx includes matching nodes + their direct neighbors (not exclusive). Zone filter (Emergent) remains exclusive. Stats panel shows "X of Y entities" count.
+- **Hub filter includes neighbors:** When a TypePalette hub filter is active, `filteredGraphState` in page.tsx finds hub members via `belongs_to_hub` relationships + includes their direct neighbors (semantic relationships only, not hub edges). Zone filter (Emergent) remains exclusive. Stats panel shows "X of Y entities" count (excluding hub nodes).
 - **Tensions resolve via graphState:** `handleTensionResolve` in page.tsx sets `tension.status = "resolved"` locally; `saveOntology` (debounced 800ms) persists it. No dedicated API route.
 - **Signal dedup pattern:** Same as entity integration pass — Gemini groups near-duplicates in one call, `executeSignalMerges` in supabase.ts applies batch deletes + survivor update, API route at `POST /api/signals/deduplicate`.
 
@@ -245,7 +260,8 @@ Bulk document extraction was silently returning 0 entities for 11/13 podcast tra
 | Phase 3.5 — Reflect tab (signal rating, UI restructure, collapsible inspector) | Mar 26 | ✅ Complete |
 | Phase 4 — Ontology scaffolding (attractor presets, emergent zone, nested ontologies) | Mar 27 | ✅ Complete |
 | Phase 5 — Graph clarity (tensions visible, signal dedup, filter-first canvas) | Mar 29 | ✅ Complete |
-| Phase 6 — PoC validation + demo prep | TBD | 🟥 Next |
+| Phase 6 — Hub nodes (taxonomy → ontology, programmatic enforcement, context scaling) | Mar 30 | ✅ Complete (pending Supabase migration) |
+| Phase 7 — PoC validation + demo prep + Anthropic architecture program | TBD | 🟥 Next |
 
 ---
 

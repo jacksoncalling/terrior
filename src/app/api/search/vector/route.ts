@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       query,
       results: deduped,
-      model: 'paraphrase-multilingual-MiniLM-L12-v2',
+      model: 'gemini-embedding-001',
       type: 'vector',
     });
   } catch (err) {
