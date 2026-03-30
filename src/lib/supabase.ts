@@ -819,43 +819,33 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
   }
 
   // ── Delete rows removed from state ────────────────────────────────────────
-  // Only delete if we have IDs to check against (otherwise skip to avoid nuking everything)
-  const nodeIds = state.nodes.map((n) => n.id);
-  const relIds = state.relationships.map((r) => r.id);
-  const tensionIds = state.tensions.map((t) => t.id);
-  const signalIds = state.evaluativeSignals.map((s) => s.id);
-  const entityTypeIds = state.entityTypes.map((et) => et.id);
+  // Strategy: SELECT existing DB IDs → diff against local state → DELETE only the
+  // removed IDs. This avoids NOT IN (all current IDs) which generates URLs that
+  // exceed PostgREST's limit for large graphs (300+ nodes).
 
-  if (nodeIds.length > 0) {
-    await supabase.from('ontology_nodes')
-      .delete()
-      .eq('project_id', projectId)
-      .not('id', 'in', `(${nodeIds.map((id) => `'${id}'`).join(',')})`);
-  }
-  if (relIds.length > 0) {
-    await supabase.from('ontology_relationships')
-      .delete()
-      .eq('project_id', projectId)
-      .not('id', 'in', `(${relIds.map((id) => `'${id}'`).join(',')})`);
-  }
-  if (tensionIds.length > 0) {
-    await supabase.from('tension_markers')
-      .delete()
-      .eq('project_id', projectId)
-      .not('id', 'in', `(${tensionIds.map((id) => `'${id}'`).join(',')})`);
-  }
-  if (signalIds.length > 0) {
-    await supabase.from('evaluative_signals')
-      .delete()
-      .eq('project_id', projectId)
-      .not('id', 'in', `(${signalIds.map((id) => `'${id}'`).join(',')})`);
-  }
-  if (entityTypeIds.length > 0) {
-    await supabase.from('entity_type_configs')
-      .delete()
-      .eq('project_id', projectId)
-      .not('type_id', 'in', `(${entityTypeIds.map((id) => `'${id}'`).join(',')})`);
-  }
+  const nodeIds    = new Set(state.nodes.map((n) => n.id));
+  const relIds     = new Set(state.relationships.map((r) => r.id));
+  const tensionIds = new Set(state.tensions.map((t) => t.id));
+  const signalIds  = new Set(state.evaluativeSignals.map((s) => s.id));
+
+  const [dbNodes, dbRels, dbTensions, dbSignals] = await Promise.all([
+    supabase.from('ontology_nodes').select('id').eq('project_id', projectId),
+    supabase.from('ontology_relationships').select('id').eq('project_id', projectId),
+    supabase.from('tension_markers').select('id').eq('project_id', projectId),
+    supabase.from('evaluative_signals').select('id').eq('project_id', projectId),
+  ]);
+
+  const removedNodes    = (dbNodes.data    ?? []).map((r) => r.id).filter((id) => !nodeIds.has(id));
+  const removedRels     = (dbRels.data     ?? []).map((r) => r.id).filter((id) => !relIds.has(id));
+  const removedTensions = (dbTensions.data ?? []).map((r) => r.id).filter((id) => !tensionIds.has(id));
+  const removedSignals  = (dbSignals.data  ?? []).map((r) => r.id).filter((id) => !signalIds.has(id));
+
+  await Promise.all([
+    removedNodes.length    > 0 ? supabase.from('ontology_nodes').delete().in('id', removedNodes) : null,
+    removedRels.length     > 0 ? supabase.from('ontology_relationships').delete().in('id', removedRels) : null,
+    removedTensions.length > 0 ? supabase.from('tension_markers').delete().in('id', removedTensions) : null,
+    removedSignals.length  > 0 ? supabase.from('evaluative_signals').delete().in('id', removedSignals) : null,
+  ].filter(Boolean));
 }
 
 // ── Session logging ──────────────────────────────────────────────────────────
