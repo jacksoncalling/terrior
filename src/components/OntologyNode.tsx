@@ -8,6 +8,7 @@ interface OntologyNodeData {
   label: string;
   type: string;
   attractor?: string;
+  is_hub?: boolean;
   description: string;
   entityTypes: EntityTypeConfig[];
   attractors?: AttractorConfig[];
@@ -15,15 +16,16 @@ interface OntologyNodeData {
   hasTension: boolean;
   selected?: boolean;
   readonly?: boolean;
+  hubColor?: string; // color inherited from the hub this node belongs to
 }
 
 function OntologyNodeComponent({ data }: NodeProps) {
-  const { label, type, attractor, entityTypes, attractors, zone, hasTension, readonly } =
+  const { label, type, attractor, is_hub, entityTypes, attractors, zone, hasTension, readonly, hubColor } =
     data as unknown as OntologyNodeData;
 
   // Attractor color is the primary visual indicator
   const attractorConfig = (attractors || []).find((a: AttractorConfig) => a.id === attractor);
-  const attractorColor = attractorConfig?.color || "#78716c";
+  const attractorColor = hubColor || attractorConfig?.color || "#78716c";
   const attractorLabel = attractorConfig?.label || attractor || "Emergent";
 
   const typeConfig = (entityTypes || []).find((t: EntityTypeConfig) => t.id === type);
@@ -32,7 +34,49 @@ function OntologyNodeComponent({ data }: NodeProps) {
   // Zone-based visual treatment
   const isEmergent = zone === "emergent";
   const isReadonly = readonly === true;
+  const isHub = is_hub === true;
 
+  // Hub nodes get a distinct, larger treatment
+  if (isHub) {
+    return (
+      <div
+        className="rounded-xl border-2 shadow-md min-w-[180px] max-w-[220px] transition-all"
+        style={{
+          borderColor: attractorColor,
+          backgroundColor: `${attractorColor}10`,
+        }}
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!bg-stone-400 !w-2.5 !h-2.5 !border-white !border-2"
+        />
+
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: attractorColor }}
+            />
+            <span className="text-xs font-bold text-stone-800 leading-tight truncate">
+              {label}
+            </span>
+          </div>
+          <div className="text-[10px] text-stone-500 leading-snug line-clamp-2">
+            {data.description as string}
+          </div>
+        </div>
+
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!bg-stone-400 !w-2.5 !h-2.5 !border-white !border-2"
+        />
+      </div>
+    );
+  }
+
+  // Regular node treatment
   return (
     <div
       className={`rounded-lg border-2 bg-white shadow-sm min-w-[140px] max-w-[200px] transition-opacity ${

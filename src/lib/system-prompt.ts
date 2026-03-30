@@ -1,75 +1,57 @@
-import type { GraphState, AttractorConfig, AttractorPreset } from "@/types";
-import { getAttractorsForPreset, computeGraphZones } from "./entity-types";
+import type { GraphState, AttractorPreset } from "@/types";
+import { HUB_RELATIONSHIP_TYPE } from "@/types";
+import { getHubNodes, getHubMembers, getHubSummaries, computeGraphZones } from "./entity-types";
 
-function formatGraphContext(graph: GraphState): string {
-  if (
-    graph.nodes.length === 0 &&
-    graph.tensions.length === 0 &&
-    graph.evaluativeSignals.length === 0
-  ) {
-    return "The knowledge graph is empty. This is a new engagement — begin by listening and understanding.";
-  }
+/**
+ * Format hub summaries — compact overview of the graph structure.
+ * This replaces the full node listing to scale with graph size.
+ */
+function formatHubSummaries(graph: GraphState): string {
+  const hubs = getHubNodes(graph);
+  if (hubs.length === 0) return "No hub nodes found. The graph has no structural scaffolding yet.";
 
-  const sections: string[] = [];
+  const summaries = getHubSummaries(graph);
+  const lines = summaries.map((s) => {
+    const recentNames = s.recentMembers.map((m) => `"${m.label}"`).join(", ");
+    return `  - "${s.hub.label}" (id: ${s.hub.id}) — ${s.hub.description}\n    ${s.memberCount} members, ${s.tensionCount} tensions${recentNames ? ` | Recent: ${recentNames}` : ""}`;
+  });
 
-  if (graph.nodes.length > 0) {
-    // Group nodes by attractor (primary), show type as secondary info
-    const byAttractor: Record<string, typeof graph.nodes> = {};
-    for (const node of graph.nodes) {
-      const att = node.attractor ?? "emergent";
-      if (!byAttractor[att]) byAttractor[att] = [];
-      byAttractor[att].push(node);
-    }
-
-    const nodeLines: string[] = [];
-    for (const [attractor, nodes] of Object.entries(byAttractor)) {
-      nodeLines.push(`  [${attractor}]:`);
-      for (const node of nodes) {
-        nodeLines.push(`    - "${node.label}" (type: ${node.type}, id: ${node.id}) — ${node.description}`);
-      }
-    }
-    sections.push(`Entities (${graph.nodes.length}):\n${nodeLines.join("\n")}`);
-  }
-
-  if (graph.relationships.length > 0) {
-    const relLines = graph.relationships.map((r) => {
-      const source = graph.nodes.find((n) => n.id === r.sourceId);
-      const target = graph.nodes.find((n) => n.id === r.targetId);
-      return `  - "${source?.label || r.sourceId}" --[${r.type}]--> "${target?.label || r.targetId}"${r.description ? ` (${r.description})` : ""} (id: ${r.id})`;
-    });
-    sections.push(`Relationships (${graph.relationships.length}):\n${relLines.join("\n")}`);
-  }
-
-  if (graph.tensions.length > 0) {
-    const tensionLines = graph.tensions.map((t) => {
-      const relatedLabels = t.relatedNodeIds
-        .map((id) => graph.nodes.find((n) => n.id === id)?.label || id)
-        .join(", ");
-      return `  - [${t.status}] "${t.description}" (involves: ${relatedLabels}) (id: ${t.id})`;
-    });
-    sections.push(`Tension Markers (${graph.tensions.length}):\n${tensionLines.join("\n")}`);
-  }
-
-  if (graph.evaluativeSignals.length > 0) {
-    const signalLines = graph.evaluativeSignals.map(
-      (s) =>
-        `  - "${s.label}" — ${s.direction} (strength: ${s.strength}/5) — detected from: ${s.sourceDescription}`
-    );
-    sections.push(`Evaluative Signals (${graph.evaluativeSignals.length}):\n${signalLines.join("\n")}`);
-  }
-
-  return sections.join("\n\n");
+  const totalNodes = graph.nodes.filter((n) => !n.is_hub).length;
+  return `Hub Nodes (${hubs.length} hubs, ${totalNodes} entities):\n${lines.join("\n")}`;
 }
 
-function formatAttractorCategories(attractors: AttractorConfig[]): string {
-  const lines = attractors.map((a) => `  - "${a.id}" — ${a.description}`);
-  return `\n## Attractor Categories (Active Preset)
+/**
+ * Format emergent zone — nodes with 0-1 connections that need attention.
+ * Always included in the system prompt since these are actionable.
+ */
+function formatEmergentZone(graph: GraphState): string {
+  if (graph.nodes.length === 0) return "";
 
-Every entity you create MUST be assigned an attractor from this list. The attractor is the structural scaffolding — where the entity fits in the larger ontological architecture. Use "emergent" when the entity doesn't clearly belong to any category yet.
+  const zones = computeGraphZones(graph.nodes, graph.relationships);
+  const emergentNodes = graph.nodes.filter(
+    (n) => !n.is_hub && zones.get(n.id) === "emergent"
+  );
+
+  if (emergentNodes.length === 0) return "";
+
+  const lines = emergentNodes.map((n) => {
+    const relCount = graph.relationships.filter(
+      (r) => r.sourceId === n.id || r.targetId === n.id
+    ).length;
+    return `  - "${n.label}" (${n.type}, id: ${n.id}) — ${relCount} connections`;
+  });
+
+  return `\n## Emergent Zone (${emergentNodes.length} nodes)
+
+These nodes are present in the organisation's language but not yet well-connected in the graph (0–1 relationships). They are real signals — not noise.
 
 ${lines.join("\n")}
 
-The "type" field is separate — it's a freeform descriptive tag (e.g. "role", "workflow", "concept"). Both attractor and type are required on every node.`;
+Suggested actions:
+- Ask the consultant what these concepts connect to
+- Look for relationship opportunities when new entities are discussed
+- Consider whether any emergent nodes are duplicates of existing well-connected nodes
+- Use get_hub_context to check if they should belong to a different hub`;
 }
 
 function formatEntityTypes(graph: GraphState): string {
@@ -78,35 +60,54 @@ function formatEntityTypes(graph: GraphState): string {
   return `\n## Current Descriptive Types in the Palette\n${typeList}\n\nWhen creating nodes, prefer using these existing descriptive types. If the entity doesn't fit any existing type, create a new descriptive type — it will be added to the palette automatically.`;
 }
 
-function formatEmergentZone(graph: GraphState): string {
-  if (graph.nodes.length === 0) return "";
+function formatRelationshipSummary(graph: GraphState): string {
+  // Only show non-hub relationships in the summary
+  const semanticRels = graph.relationships.filter((r) => r.type !== HUB_RELATIONSHIP_TYPE);
+  if (semanticRels.length === 0) return "";
 
-  const zones = computeGraphZones(graph.nodes, graph.relationships);
-  const emergentNodes = graph.nodes.filter((n) => zones.get(n.id) === "emergent");
-
-  if (emergentNodes.length === 0) return "";
-
-  const lines = emergentNodes.map((n) => {
-    const relCount = graph.relationships.filter(
-      (r) => r.sourceId === n.id || r.targetId === n.id
-    ).length;
-    return `  - "${n.label}" (${n.type}) — ${relCount} connections`;
+  const relLines = semanticRels.slice(0, 30).map((r) => {
+    const source = graph.nodes.find((n) => n.id === r.sourceId);
+    const target = graph.nodes.find((n) => n.id === r.targetId);
+    return `  - "${source?.label || r.sourceId}" --[${r.type}]--> "${target?.label || r.targetId}"${r.description ? ` (${r.description})` : ""} (id: ${r.id})`;
   });
 
-  return `\n## Emergent Zone (${emergentNodes.length} nodes)
+  const suffix = semanticRels.length > 30
+    ? `\n  ... and ${semanticRels.length - 30} more. Use get_hub_context to see relationships within a specific hub.`
+    : "";
 
-These nodes are present in the organisation's language but not yet well-connected in the graph (0–1 relationships). They are real signals — not noise. They represent concepts that haven't found their place in the ontological structure yet.
+  return `\nRelationships (${semanticRels.length}):\n${relLines.join("\n")}${suffix}`;
+}
 
-${lines.join("\n")}
+function formatTensions(graph: GraphState): string {
+  if (graph.tensions.length === 0) return "";
+  const tensionLines = graph.tensions.map((t) => {
+    const relatedLabels = t.relatedNodeIds
+      .map((id) => graph.nodes.find((n) => n.id === id)?.label || id)
+      .join(", ");
+    return `  - [${t.status}] "${t.description}" (involves: ${relatedLabels}) (id: ${t.id})`;
+  });
+  return `\nTension Markers (${graph.tensions.length}):\n${tensionLines.join("\n")}`;
+}
 
-Suggested actions:
-- Ask the consultant or stakeholder what these concepts connect to
-- Look for relationship opportunities when new entities are discussed
-- Consider whether any emergent nodes are duplicates of existing well-connected nodes`;
+function formatSignals(graph: GraphState): string {
+  if (graph.evaluativeSignals.length === 0) return "";
+  const signalLines = graph.evaluativeSignals.slice(0, 20).map(
+    (s) => `  - "${s.label}" — ${s.direction} (strength: ${s.strength}/5)`
+  );
+  const suffix = graph.evaluativeSignals.length > 20
+    ? `\n  ... and ${graph.evaluativeSignals.length - 20} more.`
+    : "";
+  return `\nEvaluative Signals (${graph.evaluativeSignals.length}):\n${signalLines.join("\n")}${suffix}`;
 }
 
 export function buildSystemPrompt(graphState: GraphState, attractorPreset?: AttractorPreset): string {
-  const attractors = getAttractorsForPreset(attractorPreset ?? "startup");
+  const hubs = getHubNodes(graphState);
+  const hasHubs = hubs.length > 0;
+
+  // Build hub listing for the prompt
+  const hubListing = hasHubs
+    ? hubs.map((h) => `  - "${h.label}" (id: ${h.id}) — ${h.description}`).join("\n")
+    : "No hubs seeded yet.";
 
   return `You are TERROIR, an ethnographic research companion for organisational knowledge discovery.
 
@@ -122,17 +123,25 @@ You listen for the ontology that is already present, and make it visible.
 
 1. Ask open, exploratory questions about how the organisation thinks, works, and stores knowledge
 2. Extract entities and relationships from what you hear — use the organisation's own vocabulary
-3. Assign each entity an attractor category (structural) and a descriptive type (semantic)
+3. Connect each entity to a hub node (structural category) and assign a descriptive type (semantic detail)
 4. Flag tensions where different perspectives or platform structures conflict
 5. Track evaluative signals — what the organisation values, fears, and moves toward
 6. Build the knowledge map progressively — don't force extraction, let understanding accumulate
-${formatAttractorCategories(attractors)}
+
+## Hub Nodes (Structural Scaffolding)
+
+Hub nodes are real entities in the graph that serve as structural anchors. Every entity you create MUST be connected to a hub via the \`hub_id\` parameter on \`create_node\`. Hubs are the "shelves" — entities are the "items" placed on them.
+
+Available hubs:
+${hubListing}
+
+When creating a node, choose the hub that best fits the entity's structural role. Use the Emergent hub if you're unsure — the consultant can reassign later. A node can belong to multiple hubs (use create_relationship with type "belongs_to_hub" for additional hubs).
+
+Use \`get_hub_context\` to retrieve full details about a hub's members, relationships, and tensions before answering questions about a specific area.
 
 ## Descriptive Types
 
 Descriptive types are emergent — they come from the narrative, not from a fixed taxonomy. Each story reveals different kinds of elements. When you extract an entity, choose a descriptive type that fits its nature. Use existing types from the palette when appropriate.
-
-The user can also create nodes directly on the canvas. You will see these in the graph context — acknowledge them and ask questions about them.
 ${formatEntityTypes(graphState)}
 
 ## Inquiry Approaches
@@ -155,10 +164,10 @@ You understand the baked-in ontologies of major enterprise platforms:
 
 ## Guidelines for Tool Use
 
-- **Before creating any node**, scan the Current Knowledge Graph below for an existing node with the same or a very similar label. If one exists, use its ID to create a relationship instead. Never create a duplicate.
-- **Always assign an attractor** from the active preset. Use "emergent" when genuinely unsure.
-- Create nodes as entities emerge naturally from conversation. Use the organisation's own vocabulary.
-- Create relationships when you understand how entities connect — including to nodes that already exist in the graph.
+- **Before creating any node**, check the Hub Summaries below. Use \`get_hub_context\` if you need to see members of a specific hub.
+- **Every node MUST connect to a hub** via the \`hub_id\` parameter. The code enforces this — if you provide an invalid hub_id, the tool will return an error with available hubs.
+- **Hub nodes cannot be deleted.** They are structural anchors. You can rename them via update_node.
+- Create relationships when you understand how entities connect — including hub-to-hub relationships for structural connections.
 - Flag tensions when you notice divergences or conflicts.
 - Set evaluative signals when the conversation reveals what the organisation values or fears.
 - Extract comprehensively — capture all the key entities mentioned, not just one.
@@ -166,7 +175,10 @@ You understand the baked-in ontologies of major enterprise platforms:
 
 ## Current Knowledge Graph
 
-${formatGraphContext(graphState)}
+${formatHubSummaries(graphState)}
+${formatRelationshipSummary(graphState)}
+${formatTensions(graphState)}
+${formatSignals(graphState)}
 ${formatEmergentZone(graphState)}
 
 ## Response Style

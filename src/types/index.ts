@@ -26,7 +26,9 @@ export interface EntityTypeConfig {
 
 // ── Attractor presets ────────────────────────────────────────────────────────
 // Structural categories that form the ontological scaffolding.
-// Nodes carry TWO tags: `attractor` (structural) + `type` (freeform descriptive).
+// Hub nodes are real entities in the graph. Regular nodes connect to hubs
+// via `belongs_to_hub` relationships. The `attractor` field is a cached
+// reference to the primary hub (derived from relationships, not authoritative).
 
 export type AttractorPreset = 'startup' | 'enterprise' | 'custom';
 
@@ -39,11 +41,15 @@ export interface AttractorConfig {
   description: string;
 }
 
+/** Relationship type constant for hub membership edges */
+export const HUB_RELATIONSHIP_TYPE = 'belongs_to_hub';
+
 export interface GraphNode {
   id: string;
   label: string;
   type: string; // freeform descriptive tag — matches EntityTypeConfig.id
-  attractor?: string; // structural category from preset (e.g. 'domain', 'capability'). Defaults to 'emergent'.
+  attractor?: string; // cached primary hub id (derived from belongs_to_hub relationships). Defaults to 'emergent'.
+  is_hub?: boolean; // true for hub/attractor nodes seeded from preset
   description: string;
   position: { x: number; y: number };
   properties?: Record<string, string>;

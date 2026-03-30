@@ -20,7 +20,8 @@ import type {
   SynthesisResult,
   DocumentClassification,
 } from "@/types";
-import { computeGraphZones } from "./entity-types";
+import { HUB_RELATIONSHIP_TYPE } from "@/types";
+import { computeGraphZones, getHubNodes, getHubMembers } from "./entity-types";
 
 // ── Bundle schema ────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ export interface ProjectBundle {
   classifications: DocumentClassification[];
   stats: {
     nodeCount: number;
+    hubCount: number;
     relationshipCount: number;
     tensionCount: number;
     entityTypeCount: number;
@@ -93,8 +95,9 @@ export function buildProjectBundle(input: BuildBundleInput): ProjectBundle {
     synthesis: synthesisResult,
     classifications,
     stats: {
-      nodeCount: graphState.nodes.length,
-      relationshipCount: graphState.relationships.length,
+      nodeCount: graphState.nodes.filter((n) => !n.is_hub).length,
+      hubCount: getHubNodes(graphState).length,
+      relationshipCount: graphState.relationships.filter((r) => r.type !== HUB_RELATIONSHIP_TYPE).length,
       tensionCount: graphState.tensions.length,
       entityTypeCount: graphState.entityTypes.length,
       documentCount,

@@ -22,6 +22,7 @@ import "@xyflow/react/dist/style.css";
 import OntologyNode from "./OntologyNode";
 import OntologyEdge from "./OntologyEdge";
 import type { GraphState, GraphNode, EntityTypeConfig, AttractorConfig, NodeZone } from "@/types";
+import { HUB_RELATIONSHIP_TYPE } from "@/types";
 import { computeGraphZones } from "@/lib/entity-types";
 import { autoLayout } from "@/lib/layout";
 
@@ -62,32 +63,57 @@ function graphStateToFlow(
   // Compute zones locally if not provided
   const nodeZones = zones ?? computeGraphZones(graphState.nodes, graphState.relationships);
 
+  // Build a map of node → primary hub color for visual inheritance
+  const nodeHubColorMap = new Map<string, string>();
+  for (const rel of graphState.relationships) {
+    if (rel.type === HUB_RELATIONSHIP_TYPE) {
+      const hub = graphState.nodes.find((n) => n.id === rel.targetId && n.is_hub);
+      if (hub && !nodeHubColorMap.has(rel.sourceId)) {
+        nodeHubColorMap.set(rel.sourceId, hub.properties?.color ?? "#78716c");
+      }
+    }
+  }
+
   const nodes: Node[] = graphState.nodes.map((node) => ({
     id: node.id,
     type: "ontology",
     position: node.position,
-    draggable: !node.readonly,
+    draggable: !node.readonly && !node.is_hub, // Hub nodes are not draggable by default
     data: {
       label: node.label,
       type: node.type,
       attractor: node.attractor ?? "emergent",
+      is_hub: node.is_hub,
       description: node.description,
       entityTypes: graphState.entityTypes,
       attractors: attractors ?? [],
-      zone: nodeZones.get(node.id) ?? "emergent",
+      zone: node.is_hub ? "integrated" : (nodeZones.get(node.id) ?? "emergent"),
       hasTension: tensionNodeIds.has(node.id),
       readonly: node.readonly,
+      hubColor: node.is_hub
+        ? (node.properties?.color ?? "#78716c")
+        : nodeHubColorMap.get(node.id),
     },
   }));
 
-  const edges: Edge[] = graphState.relationships.map((rel) => ({
-    id: rel.id,
-    source: rel.sourceId,
-    target: rel.targetId,
-    type: "ontology",
-    data: { label: rel.type, description: rel.description },
-    markerEnd: { type: MarkerType.ArrowClosed, color: "#d6d3d1" },
-  }));
+  const edges: Edge[] = graphState.relationships.map((rel) => {
+    const isHubEdge = rel.type === HUB_RELATIONSHIP_TYPE;
+    return {
+      id: rel.id,
+      source: rel.sourceId,
+      target: rel.targetId,
+      type: "ontology",
+      data: {
+        label: isHubEdge ? "" : rel.type, // Don't label hub edges
+        description: rel.description,
+        isHubEdge,
+      },
+      style: isHubEdge ? { strokeDasharray: "4 4", stroke: "#d6d3d1", strokeWidth: 1 } : undefined,
+      markerEnd: isHubEdge
+        ? undefined // No arrow on hub edges
+        : { type: MarkerType.ArrowClosed, color: "#d6d3d1" },
+    };
+  });
 
   return { nodes, edges };
 }
@@ -279,9 +305,9 @@ export default function Canvas({
             ) : (
               <>
                 <span className="font-medium text-stone-700">
-                  {graphState.nodes.length}
+                  {graphState.nodes.filter((n) => !n.is_hub).length}
                 </span>{" "}
-                {totalNodeCount != null && totalNodeCount > graphState.nodes.length ? (
+                {totalNodeCount != null && totalNodeCount > graphState.nodes.filter((n) => !n.is_hub).length ? (
                   <>
                     <span className="text-stone-400">of {totalNodeCount}</span>{" "}
                     entities
@@ -289,15 +315,18 @@ export default function Canvas({
                 ) : (
                   "entities"
                 )}
-                {graphState.relationships.length > 0 && (
-                  <>
-                    {" · "}
-                    <span className="font-medium text-stone-700">
-                      {graphState.relationships.length}
-                    </span>{" "}
-                    relationships
-                  </>
-                )}
+                {(() => {
+                  const semanticRels = graphState.relationships.filter((r) => r.type !== HUB_RELATIONSHIP_TYPE);
+                  return semanticRels.length > 0 ? (
+                    <>
+                      {" · "}
+                      <span className="font-medium text-stone-700">
+                        {semanticRels.length}
+                      </span>{" "}
+                      relationships
+                    </>
+                  ) : null;
+                })()}
                 {graphState.tensions.filter((t) => t.status === "unresolved").length > 0 && (
                   <>
                     {" · "}

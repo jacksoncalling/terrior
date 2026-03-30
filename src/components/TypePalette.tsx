@@ -25,7 +25,7 @@ export default function TypePalette({
   return (
     <div className="flex items-center gap-1.5 px-3 py-2 border-b border-stone-200 bg-white overflow-x-auto">
       <span className="text-[10px] text-stone-400 uppercase tracking-wide shrink-0 mr-1">
-        Attractors
+        Hubs
       </span>
 
       <button

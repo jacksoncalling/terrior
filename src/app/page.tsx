@@ -19,6 +19,7 @@ import type {
   AttractorPreset,
   NodeZone,
 } from "@/types";
+import { HUB_RELATIONSHIP_TYPE } from "@/types";
 import {
   emptyGraphState,
   saveToLocalStorage,
@@ -35,7 +36,7 @@ import {
   updateNodePosition,
 } from "@/lib/graph-state";
 import { autoLayout } from "@/lib/layout";
-import { addEntityType, updateEntityType, getAttractorsForPreset, computeGraphZones } from "@/lib/entity-types";
+import { addEntityType, updateEntityType, getAttractorsForPreset, computeGraphZones, migrateToHubNodes } from "@/lib/entity-types";
 import {
   supabase,
   loadOntology,
@@ -106,15 +107,26 @@ export default function Home() {
 
     loadOntologyWithParent(projectId, project?.parent_project_id)
       .then((supabaseGraph) => {
+        const preset = ((project?.metadata as Record<string, unknown>)?.attractorPreset ?? 'startup') as AttractorPreset;
+
         if (supabaseGraph.nodes.length > 0 || supabaseGraph.relationships.length > 0) {
-          // Supabase has data — use it as source of truth
-          setGraphState(supabaseGraph);
+          // Migrate to hub nodes if this project predates the hub system
+          const migrated = migrateToHubNodes(supabaseGraph, preset);
+          setGraphState(migrated);
+
+          // If migration added hubs, save back to Supabase
+          if (migrated !== supabaseGraph) {
+            saveOntology(projectId, migrated).catch((err) =>
+              console.warn('Hub migration save failed (non-fatal):', err)
+            );
+          }
         } else {
           // Supabase empty (e.g. debounced save didn't fire before navigation) —
           // fall back to project-scoped localStorage (safe: key includes projectId)
           const local = loadFromLocalStorage(projectId);
           if (local && (local.nodes.length > 0 || local.relationships.length > 0)) {
-            setGraphState(local);
+            const migrated = migrateToHubNodes(local, preset);
+            setGraphState(migrated);
           }
         }
       })
@@ -438,7 +450,11 @@ export default function Home() {
 
   const handleUpdateNode = useCallback(
     (id: string, updates: Partial<Pick<GraphNode, "label" | "description" | "type" | "attractor">>) => {
-      setGraphState((prev) => updateNode(prev, id, updates));
+      // If attractor changed, pass it as newHubId so belongs_to_hub relationship is updated
+      const newHubId = updates.attractor;
+      const nodeUpdates = { ...updates };
+      if (newHubId) delete nodeUpdates.attractor;
+      setGraphState((prev) => updateNode(prev, id, nodeUpdates, newHubId));
     },
     []
   );
@@ -869,36 +885,69 @@ export default function Home() {
   const activeAttractors = getAttractorsForPreset(attractorPreset);
   const graphZones = computeGraphZones(graphState.nodes, graphState.relationships);
   const nodeZoneCounts = { emergent: 0, attracted: 0, integrated: 0 };
-  for (const zone of graphZones.values()) {
-    nodeZoneCounts[zone]++;
+  for (const [nodeId, zone] of graphZones.entries()) {
+    // Only count non-hub nodes for zone counts
+    const node = graphState.nodes.find((n) => n.id === nodeId);
+    if (node && !node.is_hub) {
+      nodeZoneCounts[zone]++;
+    }
   }
 
-  // Apply attractor filter or zone filter
+  // Apply hub filter or zone filter
+  // typeFilter is an attractor_id slug (e.g. "domain", "capability") — we find the hub node
+  // and filter to its members via belongs_to_hub relationships.
   const filteredGraphState = (() => {
     if (!typeFilter && !zoneFilter) return graphState;
 
     let filteredNodes = graphState.nodes;
 
     if (typeFilter) {
-      // Primary set: nodes matching the attractor
-      const matchingIds = new Set(
-        filteredNodes
-          .filter((n) => (n.attractor ?? "emergent") === typeFilter)
-          .map((n) => n.id)
+      // Find the hub node matching this attractor slug
+      const hubNode = graphState.nodes.find(
+        (n) => n.is_hub && (n.properties?.attractor_id === typeFilter)
       );
-      // Expand to direct neighbors so the context around each attractor is visible
-      const neighborIds = new Set<string>();
-      for (const rel of graphState.relationships) {
-        if (matchingIds.has(rel.sourceId)) neighborIds.add(rel.targetId);
-        if (matchingIds.has(rel.targetId)) neighborIds.add(rel.sourceId);
+
+      if (hubNode) {
+        // Primary set: nodes with belongs_to_hub relationship to this hub
+        const memberIds = new Set(
+          graphState.relationships
+            .filter((r) => r.type === HUB_RELATIONSHIP_TYPE && r.targetId === hubNode.id)
+            .map((r) => r.sourceId)
+        );
+        // Always include the hub node itself
+        memberIds.add(hubNode.id);
+
+        // Expand to direct neighbors (non-hub relationships)
+        const neighborIds = new Set<string>();
+        for (const rel of graphState.relationships) {
+          if (rel.type === HUB_RELATIONSHIP_TYPE) continue; // skip hub edges for neighbor expansion
+          if (memberIds.has(rel.sourceId)) neighborIds.add(rel.targetId);
+          if (memberIds.has(rel.targetId)) neighborIds.add(rel.sourceId);
+        }
+
+        filteredNodes = filteredNodes.filter(
+          (n) => memberIds.has(n.id) || neighborIds.has(n.id)
+        );
+      } else {
+        // Fallback: filter by attractor property (backwards compat for unmigrated data)
+        const matchingIds = new Set(
+          filteredNodes
+            .filter((n) => (n.attractor ?? "emergent") === typeFilter)
+            .map((n) => n.id)
+        );
+        const neighborIds = new Set<string>();
+        for (const rel of graphState.relationships) {
+          if (matchingIds.has(rel.sourceId)) neighborIds.add(rel.targetId);
+          if (matchingIds.has(rel.targetId)) neighborIds.add(rel.sourceId);
+        }
+        filteredNodes = filteredNodes.filter(
+          (n) => matchingIds.has(n.id) || neighborIds.has(n.id)
+        );
       }
-      filteredNodes = filteredNodes.filter(
-        (n) => matchingIds.has(n.id) || neighborIds.has(n.id)
-      );
     }
 
     if (zoneFilter) {
-      filteredNodes = filteredNodes.filter((n) => graphZones.get(n.id) === zoneFilter);
+      filteredNodes = filteredNodes.filter((n) => !n.is_hub && graphZones.get(n.id) === zoneFilter);
     }
 
     const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
@@ -1055,7 +1104,7 @@ export default function Home() {
             selectedEdgeId={selectedEdgeId}
             attractors={activeAttractors}
             graphZones={graphZones}
-            totalNodeCount={graphState.nodes.length}
+            totalNodeCount={graphState.nodes.filter((n) => !n.is_hub).length}
           />
         </div>
       </div>

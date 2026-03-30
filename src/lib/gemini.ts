@@ -27,7 +27,8 @@ import type {
   AttractorReassignment,
 } from "@/types";
 import { v4 as uuidv4 } from "uuid";
-import { ensureTypeExists, getAttractorsForPreset } from "./entity-types";
+import { HUB_RELATIONSHIP_TYPE } from "@/types";
+import { ensureTypeExists, getAttractorsForPreset, getHubNodes, findHubByAttractorId } from "./entity-types";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
 const GEMINI_MODEL   = "gemini-2.5-flash";
@@ -136,24 +137,40 @@ Focus on the evaluative layer — what things mean to people, not just what they
 Extract COMPREHENSIVELY — capture every meaningful entity and relationship.`;
   }
 
-  // Build attractor instruction block
-  const preset = (projectBrief as unknown as Record<string, unknown>)?.attractorPreset as AttractorPreset | undefined;
-  const attractors = getAttractorsForPreset(preset ?? 'startup');
-  const attractorList = attractors
-    .map((a) => `  - "${a.id}" — ${a.description}`)
-    .join("\n");
+  // Build hub instruction block — tell Gemini about available hubs
+  const hubNodes = getHubNodes(graphState);
+  let hubInstructions: string;
 
-  const attractorInstructions = `
-ATTRACTOR CATEGORIES (structural scaffolding):
-Each entity MUST be assigned an "attractor" from this list. The attractor indicates where the entity fits in the ontological structure. If unsure, use "emergent".
+  if (hubNodes.length > 0) {
+    // Use actual hub nodes from the graph
+    const hubList = hubNodes
+      .map((h) => `  - "${h.properties?.attractor_id ?? h.label.toLowerCase()}" (hub: "${h.label}") — ${h.description}`)
+      .join("\n");
+    hubInstructions = `
+HUB CATEGORIES (structural scaffolding — these are real nodes in the graph):
+Each entity MUST be assigned a "hub" from this list. The hub indicates which structural category the entity belongs to. If unsure, use "emergent".
+${hubList}
+
+The "type" field is a separate freeform descriptive tag (e.g. "concept", "role", "workflow"). Both fields are required.`;
+  } else {
+    // Fallback: use preset config (for projects without seeded hubs yet)
+    const preset = (projectBrief as unknown as Record<string, unknown>)?.attractorPreset as AttractorPreset | undefined;
+    const attractors = getAttractorsForPreset(preset ?? 'startup');
+    const attractorList = attractors
+      .map((a) => `  - "${a.id}" — ${a.description}`)
+      .join("\n");
+    hubInstructions = `
+HUB CATEGORIES (structural scaffolding):
+Each entity MUST be assigned a "hub" from this list. The hub indicates where the entity fits in the ontological structure. If unsure, use "emergent".
 ${attractorList}
 
 The "type" field is a separate freeform descriptive tag (e.g. "concept", "role", "workflow"). Both fields are required.`;
+  }
 
   return `You are TERROIR's extraction engine. Extract a structured knowledge graph from the document below.
 
 ${focusInstructions}
-${attractorInstructions}
+${hubInstructions}
 
 CRITICAL: Do NOT create duplicate entities. Check the existing graph context below.
 ${existingContext}${projectContext}
@@ -161,7 +178,7 @@ ${existingContext}${projectContext}
 Respond with valid JSON ONLY — no markdown, no code blocks:
 {
   "entities": [
-    { "label": "string", "type": "string", "attractor": "string", "description": "string" }
+    { "label": "string", "type": "string", "hub": "string", "description": "string" }
   ],
   "relationships": [
     { "source_label": "string", "target_label": "string", "type": "string", "description": "string" }
@@ -222,7 +239,7 @@ function stripJsonFences(raw: string): string {
 
 function assembleGraph(
   extracted: {
-    entities?: { label: string; type: string; attractor?: string; description: string }[];
+    entities?: { label: string; type: string; hub?: string; attractor?: string; description: string }[];
     relationships?: { source_label: string; target_label: string; type: string; description?: string }[];
     tensions?: { description: string; related_labels: string[] }[];
     evaluative_signals?: { label: string; direction: string; strength: number; source: string }[];
@@ -238,7 +255,7 @@ function assembleGraph(
     labelToId[node.label.toLowerCase()] = node.id;
   }
 
-  // Create entities
+  // Create entities with hub relationships
   let col = 0, row = 0;
   for (const entity of extracted.entities ?? []) {
     if (!entity.label) continue;
@@ -246,24 +263,43 @@ function assembleGraph(
     if (existingId) continue; // dedup
 
     const id = uuidv4();
-    const position = { x: 150 + col * 250, y: 150 + row * 200 };
+    const position = { x: 150 + col * 250, y: 250 + row * 200 }; // y=250 to leave room for hub row
     col++;
     if (col >= 4) { col = 0; row++; }
+
+    // Resolve hub: Gemini returns "hub" field (or legacy "attractor")
+    const hubSlug = entity.hub || entity.attractor || "emergent";
+    const hubNode = findHubByAttractorId(hubSlug, currentGraph);
 
     const node: GraphNode = {
       id,
       label: entity.label,
       type: entity.type || "concept",
-      attractor: entity.attractor || "emergent",
+      attractor: hubSlug, // cached for backwards compat
       description: entity.description || "",
       position,
     };
 
+    // Add node
     currentGraph = {
       ...currentGraph,
       nodes: [...currentGraph.nodes, node],
       entityTypes: ensureTypeExists(currentGraph.entityTypes, node.type),
     };
+
+    // Create belongs_to_hub relationship if hub exists
+    if (hubNode) {
+      const hubRel: Relationship = {
+        id: uuidv4(),
+        sourceId: id,
+        targetId: hubNode.id,
+        type: HUB_RELATIONSHIP_TYPE,
+      };
+      currentGraph = {
+        ...currentGraph,
+        relationships: [...currentGraph.relationships, hubRel],
+      };
+    }
 
     labelToId[entity.label.toLowerCase()] = id;
     updates.push({ type: "node_created", label: entity.label });

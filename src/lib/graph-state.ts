@@ -7,7 +7,8 @@ import type {
   EvaluativeSignal,
   EntityTypeConfig,
 } from "@/types";
-import { getDefaultEntityTypes, ensureTypeExists } from "./entity-types";
+import { HUB_RELATIONSHIP_TYPE } from "@/types";
+import { getDefaultEntityTypes, ensureTypeExists, findHubByAttractorId } from "./entity-types";
 
 export function emptyGraphState(): GraphState {
   return {
@@ -26,22 +27,68 @@ export function addNode(
   description: string,
   position: { x: number; y: number },
   properties?: Record<string, string>,
-  attractor?: string
+  hubId?: string,
+  hubDescription?: string
 ): { state: GraphState; node: GraphNode } {
+  // Resolve hub: if hubId is a hub node ID, use it directly.
+  // If it's an attractor slug (e.g. "domain"), find the hub node.
+  let resolvedHubId: string | undefined;
+  let attractorCache = 'emergent';
+
+  if (hubId) {
+    const directHub = state.nodes.find((n) => n.id === hubId && n.is_hub);
+    if (directHub) {
+      resolvedHubId = directHub.id;
+      attractorCache = directHub.properties?.attractor_id ?? directHub.label.toLowerCase();
+    } else {
+      // Try to find hub by attractor_id property (e.g. "domain", "capability")
+      const hubBySlug = findHubByAttractorId(hubId, state);
+      if (hubBySlug) {
+        resolvedHubId = hubBySlug.id;
+        attractorCache = hubId;
+      }
+    }
+  }
+
+  // Fallback: find the emergent hub
+  if (!resolvedHubId) {
+    const emergentHub = findHubByAttractorId('emergent', state);
+    if (emergentHub) {
+      resolvedHubId = emergentHub.id;
+      attractorCache = 'emergent';
+    }
+  }
+
   const node: GraphNode = {
     id: uuidv4(),
     label,
     type,
-    attractor: attractor ?? 'emergent',
+    attractor: attractorCache,
     description,
     position,
     properties,
   };
+
   const updatedTypes = ensureTypeExists(state.entityTypes, type);
+  let newRelationships = state.relationships;
+
+  // Auto-create belongs_to_hub relationship if we found a hub
+  if (resolvedHubId) {
+    const hubRel: Relationship = {
+      id: uuidv4(),
+      sourceId: node.id,
+      targetId: resolvedHubId,
+      type: HUB_RELATIONSHIP_TYPE,
+      description: hubDescription,
+    };
+    newRelationships = [...newRelationships, hubRel];
+  }
+
   return {
     state: {
       ...state,
       nodes: [...state.nodes, node],
+      relationships: newRelationships,
       entityTypes: updatedTypes,
     },
     node,
@@ -51,16 +98,97 @@ export function addNode(
 export function updateNode(
   state: GraphState,
   id: string,
-  updates: Partial<Pick<GraphNode, "label" | "description" | "type" | "attractor" | "properties" | "position">>
+  updates: Partial<Pick<GraphNode, "label" | "description" | "type" | "attractor" | "properties" | "position">>,
+  newHubId?: string,
+  hubDescription?: string
 ): GraphState {
   let updatedTypes = state.entityTypes;
   if (updates.type) {
     updatedTypes = ensureTypeExists(updatedTypes, updates.type);
   }
+
+  let updatedRelationships = state.relationships;
+  const nodeUpdates = { ...updates };
+
+  // If changing hub, update the belongs_to_hub relationship + attractor cache
+  if (newHubId) {
+    // Resolve hub (by ID or attractor slug)
+    let resolvedHub = state.nodes.find((n) => n.id === newHubId && n.is_hub);
+    if (!resolvedHub) {
+      resolvedHub = findHubByAttractorId(newHubId, state);
+    }
+
+    if (resolvedHub) {
+      // Remove old hub relationships for this node
+      updatedRelationships = updatedRelationships.filter(
+        (r) => !(r.sourceId === id && r.type === HUB_RELATIONSHIP_TYPE)
+      );
+      // Add new hub relationship
+      updatedRelationships = [
+        ...updatedRelationships,
+        {
+          id: uuidv4(),
+          sourceId: id,
+          targetId: resolvedHub.id,
+          type: HUB_RELATIONSHIP_TYPE,
+          description: hubDescription,
+        },
+      ];
+      // Update attractor cache
+      nodeUpdates.attractor = resolvedHub.properties?.attractor_id ?? resolvedHub.label.toLowerCase();
+    }
+  }
+
   return {
     ...state,
-    nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n)),
+    nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...nodeUpdates } : n)),
+    relationships: updatedRelationships,
     entityTypes: updatedTypes,
+  };
+}
+
+/** Add a node to an additional hub (multi-hub membership) */
+export function addNodeToHub(
+  state: GraphState,
+  nodeId: string,
+  hubId: string,
+  description?: string
+): GraphState {
+  const hub = state.nodes.find((n) => n.id === hubId && n.is_hub);
+  if (!hub) return state;
+
+  // Check if relationship already exists
+  const exists = state.relationships.some(
+    (r) => r.sourceId === nodeId && r.targetId === hubId && r.type === HUB_RELATIONSHIP_TYPE
+  );
+  if (exists) return state;
+
+  return {
+    ...state,
+    relationships: [
+      ...state.relationships,
+      {
+        id: uuidv4(),
+        sourceId: nodeId,
+        targetId: hubId,
+        type: HUB_RELATIONSHIP_TYPE,
+        description,
+      },
+    ],
+  };
+}
+
+/** Remove a node from a hub */
+export function removeNodeFromHub(
+  state: GraphState,
+  nodeId: string,
+  hubId: string
+): GraphState {
+  return {
+    ...state,
+    relationships: state.relationships.filter(
+      (r) => !(r.sourceId === nodeId && r.targetId === hubId && r.type === HUB_RELATIONSHIP_TYPE)
+    ),
   };
 }
 

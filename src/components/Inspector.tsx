@@ -170,9 +170,9 @@ export default function Inspector({
             />
           </div>
 
-          {attractors.length > 0 && (
+          {attractors.length > 0 && !selectedNode.is_hub && (
             <div>
-              <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Attractor</label>
+              <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Hub</label>
               <select
                 value={editAttractor}
                 onChange={(e) => {
@@ -186,6 +186,15 @@ export default function Inspector({
                   <option key={a.id} value={a.id}>{a.label}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {selectedNode.is_hub && (
+            <div className="rounded-lg bg-stone-50 px-3 py-2 border border-stone-100">
+              <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Hub Node</span>
+              <p className="text-[11px] text-stone-400 mt-0.5">
+                Structural anchor — entities connect to this hub. Rename via the label field above.
+              </p>
             </div>
           )}
 

@@ -1,4 +1,5 @@
 import type { GraphState, GraphUpdate } from "@/types";
+import { HUB_RELATIONSHIP_TYPE } from "@/types";
 import {
   addNode,
   updateNode,
@@ -9,12 +10,13 @@ import {
   resolveTension,
   setEvaluativeSignal,
 } from "./graph-state";
+import { getHubNodes, getHubMembers, getHubSummaries } from "./entity-types";
 
 export const toolDefinitions = [
   {
     name: "create_node",
     description:
-      "Create a new entity node in the knowledge graph. IMPORTANT: Before calling this tool, check the Current Knowledge Graph in your context for any node with the same or a very similar label. If a matching node already exists, do NOT create a duplicate — instead use create_relationship to connect to that existing node using its ID. Only call create_node when the entity is genuinely absent from the graph. Use the organisation's own vocabulary for labels. The type can be any descriptive category — use existing types from the palette when appropriate, or create new ones that fit the domain.",
+      "Create a new entity node in the knowledge graph. IMPORTANT: Before calling this tool, check the Hub Summaries in your context for the current graph structure. If a node with the same label already exists, do NOT create a duplicate — instead use create_relationship. Every node MUST be connected to a hub. Use get_hub_context to see available hubs and their members before creating nodes.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -26,29 +28,33 @@ export const toolDefinitions = [
           type: "string",
           description: "Freeform descriptive type (e.g., 'role', 'workflow', 'concept', 'tool', 'aspiration'). Use existing types when possible.",
         },
-        attractor: {
+        hub_id: {
           type: "string",
-          description: "Structural attractor category from the active preset. Check the 'Attractor Categories' section in your context for available options. Use 'emergent' if unsure.",
+          description: "ID of the hub node this entity belongs to. Check 'Hub Nodes' in your context for available hubs and their IDs. Use the Emergent hub if unsure where the entity belongs.",
+        },
+        hub_description: {
+          type: "string",
+          description: "Optional: why this entity belongs to this hub (e.g., 'core delivery method', 'primary customer segment')",
         },
         description: {
           type: "string",
           description: "A brief description of this entity in the organisation's context",
         },
       },
-      required: ["label", "type", "attractor", "description"],
+      required: ["label", "type", "hub_id", "description"],
     },
   },
   {
     name: "update_node",
     description:
-      "Update an existing node's label, type, or description when new information refines your understanding.",
+      "Update an existing node's label, type, description, or hub assignment when new information refines your understanding.",
     input_schema: {
       type: "object" as const,
       properties: {
         id: { type: "string", description: "The node ID to update" },
         label: { type: "string", description: "Updated label" },
         type: { type: "string", description: "Updated descriptive type" },
-        attractor: { type: "string", description: "Updated attractor category" },
+        new_hub_id: { type: "string", description: "Move node to a different hub (replaces current primary hub)" },
         description: { type: "string", description: "Updated description" },
       },
       required: ["id"],
@@ -56,7 +62,7 @@ export const toolDefinitions = [
   },
   {
     name: "delete_node",
-    description: "Remove a node that was created in error or is no longer relevant.",
+    description: "Remove a node that was created in error or is no longer relevant. Cannot delete hub nodes.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -67,7 +73,7 @@ export const toolDefinitions = [
   },
   {
     name: "create_relationship",
-    description: "Create a relationship between two existing nodes. Use this when you discover how entities relate.",
+    description: "Create a relationship between two existing nodes. Use this when you discover how entities relate. Can also connect hub nodes to each other.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -91,6 +97,17 @@ export const toolDefinitions = [
         id: { type: "string", description: "The relationship ID to delete" },
       },
       required: ["id"],
+    },
+  },
+  {
+    name: "get_hub_context",
+    description: "Retrieve detailed context for a specific hub — its member nodes, their relationships, and tensions. Use this before answering questions about a specific area of the ontology.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        hub_id: { type: "string", description: "The hub node ID to get context for" },
+      },
+      required: ["hub_id"],
     },
   },
   {
@@ -153,7 +170,7 @@ function getAutoPosition(): { x: number; y: number } {
   const col = nodeCounter % 4;
   const row = Math.floor(nodeCounter / 4);
   nodeCounter++;
-  return { x: 150 + col * 250, y: 150 + row * 200 };
+  return { x: 150 + col * 250, y: 250 + row * 200 }; // y=250 to leave room for hub row at top
 }
 
 export function resetNodeCounter(): void {
@@ -167,6 +184,26 @@ export function executeTool(
 ): ToolResult {
   switch (name) {
     case "create_node": {
+      // Validate hub_id exists and is a hub node
+      const hubId = input.hub_id as string;
+      const hubNode = graphState.nodes.find((n) => n.id === hubId && n.is_hub);
+      if (!hubNode) {
+        // Try to find by attractor_id (backwards compat with old attractor slugs)
+        const hubBySlug = graphState.nodes.find(
+          (n) => n.is_hub && n.properties?.attractor_id === hubId
+        );
+        if (!hubBySlug) {
+          const availableHubs = getHubNodes(graphState)
+            .map((h) => `${h.id} ("${h.label}")`)
+            .join(", ");
+          return {
+            output: `Error: hub_id "${hubId}" not found. Available hubs: ${availableHubs}`,
+            updates: [],
+            updatedGraph: graphState,
+          };
+        }
+      }
+
       const { state, node } = addNode(
         graphState,
         input.label as string,
@@ -174,21 +211,46 @@ export function executeTool(
         input.description as string,
         getAutoPosition(),
         input.properties as Record<string, string> | undefined,
-        input.attractor as string | undefined
+        hubId,
+        input.hub_description as string | undefined
       );
+
+      const hubLabel = hubNode?.label ?? graphState.nodes.find(
+        (n) => n.is_hub && n.properties?.attractor_id === hubId
+      )?.label ?? hubId;
+
       return {
-        output: `Node created: "${node.label}" (${node.type}, attractor: ${node.attractor ?? 'emergent'}) with id ${node.id}`,
+        output: `Node created: "${node.label}" (${node.type}) → hub "${hubLabel}" with id ${node.id}`,
         updates: [{ type: "node_created", label: node.label }],
         updatedGraph: state,
       };
     }
     case "update_node": {
-      const updates: Partial<{ label: string; description: string; type: string; attractor: string }> = {};
+      const targetNode = graphState.nodes.find((n) => n.id === input.id);
+      if (targetNode?.is_hub) {
+        // Hub nodes can only have label and description updated
+        const hubUpdates: Partial<{ label: string; description: string }> = {};
+        if (input.label) hubUpdates.label = input.label as string;
+        if (input.description) hubUpdates.description = input.description as string;
+        const state = updateNode(graphState, input.id as string, hubUpdates);
+        return {
+          output: `Hub node ${input.id} updated`,
+          updates: [{ type: "node_updated", label: (input.label as string) || (input.id as string) }],
+          updatedGraph: state,
+        };
+      }
+
+      const updates: Partial<{ label: string; description: string; type: string }> = {};
       if (input.label) updates.label = input.label as string;
       if (input.description) updates.description = input.description as string;
       if (input.type) updates.type = input.type as string;
-      if (input.attractor) updates.attractor = input.attractor as string;
-      const state = updateNode(graphState, input.id as string, updates);
+
+      const state = updateNode(
+        graphState,
+        input.id as string,
+        updates,
+        input.new_hub_id as string | undefined
+      );
       return {
         output: `Node ${input.id} updated`,
         updates: [{ type: "node_updated", label: (input.label as string) || (input.id as string) }],
@@ -197,6 +259,13 @@ export function executeTool(
     }
     case "delete_node": {
       const node = graphState.nodes.find((n) => n.id === input.id);
+      if (node?.is_hub) {
+        return {
+          output: `Error: cannot delete hub node "${node.label}". Hub nodes are structural anchors.`,
+          updates: [],
+          updatedGraph: graphState,
+        };
+      }
       const state = deleteNode(graphState, input.id as string);
       return {
         output: `Node ${input.id} deleted`,
@@ -228,11 +297,76 @@ export function executeTool(
       };
     }
     case "delete_relationship": {
+      // Prevent deleting belongs_to_hub relationships via this tool
+      const rel = graphState.relationships.find((r) => r.id === input.id);
+      if (rel?.type === HUB_RELATIONSHIP_TYPE) {
+        return {
+          output: `Error: cannot delete hub membership relationship. Use update_node with new_hub_id to reassign hubs.`,
+          updates: [],
+          updatedGraph: graphState,
+        };
+      }
       const state = deleteRelationship(graphState, input.id as string);
       return {
         output: `Relationship ${input.id} deleted`,
         updates: [{ type: "relationship_deleted", label: input.id as string }],
         updatedGraph: state,
+      };
+    }
+    case "get_hub_context": {
+      const hub = graphState.nodes.find((n) => n.id === input.hub_id && n.is_hub);
+      if (!hub) {
+        return {
+          output: `Error: hub "${input.hub_id}" not found.`,
+          updates: [],
+          updatedGraph: graphState,
+        };
+      }
+
+      const members = getHubMembers(hub.id, graphState);
+      const memberIds = new Set(members.map((m) => m.id));
+
+      // Get relationships between members (not hub relationships)
+      const memberRels = graphState.relationships.filter(
+        (r) =>
+          r.type !== HUB_RELATIONSHIP_TYPE &&
+          (memberIds.has(r.sourceId) || memberIds.has(r.targetId))
+      );
+
+      // Get tensions involving members
+      const tensions = graphState.tensions.filter(
+        (t) => t.status === "unresolved" && t.relatedNodeIds.some((id) => memberIds.has(id))
+      );
+
+      const memberLines = members.map(
+        (m) => `  - "${m.label}" (type: ${m.type}, id: ${m.id}) — ${m.description}`
+      );
+      const relLines = memberRels.map((r) => {
+        const src = graphState.nodes.find((n) => n.id === r.sourceId);
+        const tgt = graphState.nodes.find((n) => n.id === r.targetId);
+        return `  - "${src?.label}" --[${r.type}]--> "${tgt?.label}"${r.description ? ` (${r.description})` : ""} (id: ${r.id})`;
+      });
+      const tensionLines = tensions.map((t) => {
+        const labels = t.relatedNodeIds
+          .map((id) => graphState.nodes.find((n) => n.id === id)?.label || id)
+          .join(", ");
+        return `  - "${t.description}" (involves: ${labels})`;
+      });
+
+      const output = [
+        `Hub: "${hub.label}" (${hub.description})`,
+        `Members (${members.length}):`,
+        memberLines.length > 0 ? memberLines.join("\n") : "  (no members yet)",
+        `\nRelationships (${memberRels.length}):`,
+        relLines.length > 0 ? relLines.join("\n") : "  (none)",
+        `\nUnresolved Tensions (${tensions.length}):`,
+        tensionLines.length > 0 ? tensionLines.join("\n") : "  (none)",
+      ].join("\n");
+
+      return {
+        output,
+        updates: [],
+        updatedGraph: graphState,
       };
     }
     case "flag_tension": {

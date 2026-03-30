@@ -13,7 +13,9 @@ import type {
   MergeGroup,
   CrossDocRelationship,
   AttractorReassignment,
+  AttractorPreset,
 } from '@/types';
+import { seedHubNodes } from './entity-types';
 
 // NEXT_PUBLIC_ prefix makes these available in both server and client bundles.
 // Fallback to unprefixed versions for scripts/API routes that set them directly.
@@ -112,6 +114,32 @@ export async function createProject(input: {
     .single();
 
   if (error) throw new Error(`createProject: ${error.message}`);
+
+  // Seed hub nodes from the attractor preset
+  const preset = (input.metadata?.attractorPreset as AttractorPreset) ?? 'startup';
+  const hubNodes = seedHubNodes(preset);
+
+  if (hubNodes.length > 0) {
+    const { error: hubError } = await supabase.from('ontology_nodes').insert(
+      hubNodes.map((n) => ({
+        id: n.id,
+        node_id: n.id,
+        project_id: data.id,
+        label: n.label,
+        type: n.type,
+        attractor: n.attractor ?? 'emergent',
+        is_hub: true,
+        description: n.description,
+        position_x: n.position.x,
+        position_y: n.position.y,
+        properties: n.properties ?? {},
+      }))
+    );
+    if (hubError) {
+      console.warn(`createProject: hub seeding failed (non-fatal): ${hubError.message}`);
+    }
+  }
+
   return data;
 }
 
@@ -601,6 +629,7 @@ export async function loadOntology(projectId: string): Promise<GraphState> {
     label: row.label,
     type: row.type,
     attractor: row.attractor ?? 'emergent',
+    is_hub: row.is_hub === true,
     description: row.description ?? '',
     position: { x: row.position_x ?? 0, y: row.position_y ?? 0 },
     properties: row.properties ?? {},
@@ -699,6 +728,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
         label: n.label,
         type: n.type,
         attractor: n.attractor ?? 'emergent',
+        is_hub: n.is_hub === true,
         description: n.description,
         position_x: n.position.x,
         position_y: n.position.y,
