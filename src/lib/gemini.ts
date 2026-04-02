@@ -359,7 +359,7 @@ function assembleGraph(
             id: uuidv4(),
             label: s.label,
             direction: (s.direction as "toward" | "away_from" | "protecting") || "toward",
-            strength: s.strength || 3,
+            strength: Math.round(s.strength || 3),
             sourceDescription: s.source || "Extracted from document",
           },
         ],

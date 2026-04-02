@@ -463,7 +463,7 @@ export async function addCrossDocRelationships(
   );
 
   const toInsert: {
-    id: string; project_id: string;
+    id: string; rel_id: string; project_id: string;
     source_node_id: string; target_node_id: string;
     type: string; description: string | null;
   }[] = [];
@@ -476,8 +476,10 @@ export async function addCrossDocRelationships(
     const key = `${rel.sourceEntityId}|${rel.targetEntityId}|${rel.type}`;
     if (existingKeys.has(key)) continue;
 
+    const newId = uuidv4();
     toInsert.push({
-      id:             uuidv4(),
+      id:             newId,
+      rel_id:         newId,  // legacy NOT NULL column — mirrors uuid id
       project_id:     projectId,
       source_node_id: rel.sourceEntityId,
       target_node_id: rel.targetEntityId,
@@ -781,7 +783,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
         project_id: projectId,
         label: s.label,
         direction: s.direction,
-        strength: s.strength,
+        strength: Math.round(s.strength),
         source_description: s.sourceDescription,
         // Preserve reflect scores — null means unrated, not "clear existing value"
         relevance_score: s.relevanceScore ?? null,
