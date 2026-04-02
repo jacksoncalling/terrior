@@ -39,7 +39,8 @@ import {
   saveOntology,
   logSession,
 } from "@/lib/supabase";
-import type { GraphState, AbstractionLayer, ProjectBrief } from "@/types";
+import { seedHubNodes } from "@/lib/entity-types";
+import type { GraphState, AbstractionLayer, AttractorPreset, ProjectBrief } from "@/types";
 
 // Empty graph — starting point for a full re-extraction
 const EMPTY_GRAPH: GraphState = {
@@ -109,7 +110,12 @@ export async function POST(req: NextRequest) {
     // ── Sequential re-extraction with new abstraction layer ───────────────────
     // Each document uses the accumulated graph from all previous documents,
     // so entities can be connected across sources.
-    let currentGraph = structuredClone(EMPTY_GRAPH);
+    // Seed hub nodes first so assembleGraph can create belongs_to_hub relationships
+    // during extraction — without them, findHubByAttractorId always returns undefined
+    // and every entity ends up unconnected (Emergent zone).
+    const preset = (project?.metadata?.attractorPreset as AttractorPreset) ?? 'startup';
+    const hubNodes = seedHubNodes(preset);
+    let currentGraph: GraphState = { ...structuredClone(EMPTY_GRAPH), nodes: hubNodes };
     let totalUpdates = 0;
 
     for (let i = 0; i < documents.length; i++) {

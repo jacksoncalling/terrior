@@ -205,6 +205,8 @@ Or use the VS Code launch config (`terroir-dev`).
 - **Reflect scores dual-write:** `/api/reflect` writes immediately (server-stamped `reflected_at`). `saveOntology` (debounced 800ms) also carries scores. Both are idempotent — no conflict.
 - **Entity type UUID bug:** `entity_type_configs` upsert fails silently. Types rebuilt from graph nodes on load. Non-blocking.
 - **Brief in `projects.metadata`:** no dedicated table — jsonb read-modify-write via `updateProjectMetadata()`.
+- **Legacy NOT NULL mirror columns:** `rel_id`, `signal_id`, `tension_id`, `node_id` must be set in EVERY Supabase insert path — not just `saveOntology`. New insert functions won't have them and will crash silently on integration. See `~/.claude/learnings/2026-04-02-legacy-notnull-columns-all-insert-paths.md`
+- **Supabase ADD COLUMN doesn't backfill:** `DEFAULT` only applies to new rows. Every migration adding a flag to existing rows needs an explicit `UPDATE table SET col = true WHERE [condition]`. See `~/.claude/learnings/2026-04-02-supabase-add-column-backfill.md`
 
 **UI patterns**
 - **Edit-on-blur:** all inline editors (Inspector, ProjectBrief) update local state on change, persist to Supabase on blur.
