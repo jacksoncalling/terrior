@@ -18,7 +18,7 @@ Primary personas:
 
 ---
 
-## Current State — Updated 2026-03-30
+## Current State — Updated 2026-04-02
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
@@ -45,10 +45,10 @@ Primary personas:
 - **Gemini hub fallback** — if Gemini returns a hub slug that doesn't match any hub node, the entity gets no `belongs_to_hub` relationship (orphaned). Should fall back to emergent hub.
 
 ### What's next
-1. **Run Supabase migration** — `ALTER TABLE ontology_nodes ADD COLUMN IF NOT EXISTS is_hub BOOLEAN DEFAULT false;` — required for hub persistence
-2. **Test hub nodes on Vercel** — open Step Into More, verify migration seeds 7 hub nodes + creates `belongs_to_hub` relationships for 126 existing entities. Check hub filter, Inspector hub dropdown, and `get_hub_context` via chat.
+1. **Test topology enrichment** — reprocess docs → integration → Reflect tab → "Enrich" button → verify hypothesis card appears + signal labels are reframed
+2. **Run Supabase migration 005** if not yet applied: `ALTER TABLE ontology_nodes ADD COLUMN IF NOT EXISTS is_hub BOOLEAN DEFAULT false; UPDATE ontology_nodes SET is_hub = true WHERE type = 'hub';`
 3. **1-hour workshop demo script** — design the flow for the 2-man AI startup CEO session (15 docs + 1 hour conversation → show value)
-4. **Anthropic architecture program prep** — Terroir as the portfolio project. Hub architecture demonstrates taxonomy→ontology distinction, programmatic enforcement (Level 2+3), and context window scaling.
+4. **Anthropic architecture program prep** — Terroir as the portfolio project.
 
 ---
 
@@ -150,6 +150,7 @@ All tables scoped by `project_id`.
 | `src/app/api/reprocess/route.ts` | Re-extract all docs with new lens (maxDuration = 300) |
 | `src/app/api/reflect/route.ts` | PATCH — write reflection scores for a signal |
 | `src/app/api/signals/deduplicate/route.ts` | POST — Gemini dedup pass + Supabase merges for evaluative signals |
+| `src/app/api/topology-signals/route.ts` | POST — topology-aware signal enrichment: reachability labels + optimisation hypothesis |
 
 ### Components
 | File | Purpose |
@@ -174,6 +175,7 @@ All tables scoped by `project_id`.
 | `src/lib/tools.ts` | 10 graph tool definitions (incl. `get_hub_context` for on-demand subgraph retrieval) |
 | `src/lib/graph-state.ts` | Pure graph state mutation functions |
 | `src/lib/entity-types.ts` | Entity type management (has UUID bug) |
+| `src/lib/topology.ts` | Builds compact topology payload (hub density, cross-hub links, emergent count) for enrichment pass |
 | `src/lib/system-prompt.ts` | Dynamic system prompt builder (graph state → context) |
 | `src/lib/export.ts` | Project bundle export as JSON (graph + synthesis + brief) |
 | `src/lib/layout.ts` | Dagre auto-layout |
@@ -263,7 +265,8 @@ Bulk document extraction was silently returning 0 entities for 11/13 podcast tra
 | Phase 4 — Ontology scaffolding (attractor presets, emergent zone, nested ontologies) | Mar 27 | ✅ Complete |
 | Phase 5 — Graph clarity (tensions visible, signal dedup, filter-first canvas) | Mar 29 | ✅ Complete |
 | Phase 6 — Hub nodes (taxonomy → ontology, programmatic enforcement, context scaling) | Mar 30 | ✅ Complete (pending Supabase migration) |
-| Phase 7 — PoC validation + demo prep + Anthropic architecture program | TBD | 🟥 Next |
+| Phase 7 — Topology-aware signal enrichment (Enrich button + hypothesis card) | Apr 2 | ✅ Complete |
+| Phase 8 — PoC validation + demo prep + Anthropic architecture program | TBD | 🟥 Next |
 
 ---
 
