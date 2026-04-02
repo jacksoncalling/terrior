@@ -138,9 +138,22 @@ export const ENTERPRISE_ATTRACTORS: AttractorConfig[] = [
   EMERGENT_ATTRACTOR,
 ];
 
+// Individual preset — maps the ontology of a person rather than an organisation.
+// Belonging is the broader category (lineage, family, communities, affiliations);
+// Lineage is a node type *within* Belonging, not its own hub.
+export const INDIVIDUAL_ATTRACTORS: AttractorConfig[] = [
+  { id: "identity",  label: "Identity",  color: "#3b82f6", description: "Who the person understands themselves to be — role, self-concept, positioning" },
+  { id: "belonging", label: "Belonging", color: "#ec4899", description: "Where they come from and where they fit — lineage, family, communities, affiliations" },
+  { id: "projects",  label: "Projects",  color: "#f59e0b", description: "Active work, initiatives, goals, and commitments" },
+  { id: "skills",    label: "Skills",    color: "#10b981", description: "Capabilities, expertise, and developed practices" },
+  { id: "values",    label: "Values",    color: "#8b5cf6", description: "What the person protects, moves toward, and optimises for" },
+  EMERGENT_ATTRACTOR,
+];
+
 export const ATTRACTOR_PRESETS: Record<string, AttractorConfig[]> = {
   startup: STARTUP_ATTRACTORS,
   enterprise: ENTERPRISE_ATTRACTORS,
+  individual: INDIVIDUAL_ATTRACTORS,
 };
 
 export function getAttractorsForPreset(preset?: AttractorPreset): AttractorConfig[] {

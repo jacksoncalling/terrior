@@ -30,7 +30,7 @@ export interface EntityTypeConfig {
 // via `belongs_to_hub` relationships. The `attractor` field is a cached
 // reference to the primary hub (derived from relationships, not authoritative).
 
-export type AttractorPreset = 'startup' | 'enterprise' | 'custom';
+export type AttractorPreset = 'startup' | 'enterprise' | 'individual' | 'custom';
 
 export type NodeZone = 'emergent' | 'attracted' | 'integrated';
 

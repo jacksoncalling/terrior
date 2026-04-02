@@ -132,10 +132,11 @@ function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModa
             <label className="block text-xs font-medium text-stone-600 mb-1.5">
               Ontology scaffolding
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-2">
               {([
-                { value: 'startup' as const, label: 'Small team / Startup', desc: 'Domain, Capability, Toolchain, Customer, Method, Value' },
+                { value: 'startup'    as const, label: 'Small team / Startup',     desc: 'Domain, Capability, Toolchain, Customer, Method, Value' },
                 { value: 'enterprise' as const, label: 'Enterprise / Mittelstand', desc: 'Identity, Policy, Structure, People, Functions, Processes, Resources' },
+                { value: 'individual' as const, label: 'Individual',               desc: 'Identity, Belonging, Projects, Skills, Values' },
               ]).map((opt) => (
                 <button
                   key={opt.value}
