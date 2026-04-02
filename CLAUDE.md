@@ -22,7 +22,8 @@ Primary personas:
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
-- **Hub nodes as real entities (Phase 7 — 2026-03-30):** Attractor categories are now real hub nodes in the graph, not metadata tags. This is the shift from taxonomy to ontology — hubs are traversable, not just searchable.
+- **Topology-aware signal enrichment (Phase 7 — 2026-04-02):** New "Enrich" button in the Reflect tab triggers a Gemini pass that reads the full graph topology (hub density, cross-hub connections, tension clusters, emergent %) and rewrites signal labels with reachability framing. Returns an optimisation hypothesis card (amber) at the top of the Reflect tab — what the org appears to be structurally optimising for. Stored in `project.metadata.optimizationHypothesis`.
+- **Hub nodes as real entities (Phase 6 — 2026-03-30):** Attractor categories are now real hub nodes in the graph, not metadata tags. This is the shift from taxonomy to ontology — hubs are traversable, not just searchable.
   - Hub nodes seeded from preset on project creation (`is_hub=true`). Startup: Domain, Capability, Toolchain, Customer, Method, Value, Emergent. Enterprise: Identity, Policy, Structure, People, Functions, Processes, Resources, Emergent.
   - Every entity connects to a hub via `belongs_to_hub` relationship. `create_node` tool requires `hub_id` — code enforces, not just prompt.
   - New `get_hub_context` tool: Sonnet retrieves a specific hub's subgraph on demand (members, relationships, tensions).
@@ -43,6 +44,11 @@ Primary personas:
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal (caught silently).
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
 - **Gemini hub fallback** — if Gemini returns a hub slug that doesn't match any hub node, the entity gets no `belongs_to_hub` relationship (orphaned). Should fall back to emergent hub.
+- **`enrichState` stale after external signal change** — `enrichState` in `Chat.tsx` is local component state and doesn't reset when `graphState.evaluativeSignals` changes externally (e.g. after a reprocess or dedup). A user who enriches, then reprocesses, will see "Re-enrich" even though signals have changed. Fix: add a `useEffect` in `Chat.tsx` that resets `enrichState` to `"idle"` when signal count changes:
+  ```tsx
+  const signalCount = graphState.evaluativeSignals.length;
+  useEffect(() => { setEnrichState("idle"); }, [signalCount]);
+  ```
 
 ### What's next
 1. **Test topology enrichment** — reprocess docs → integration → Reflect tab → "Enrich" button → verify hypothesis card appears + signal labels are reframed
