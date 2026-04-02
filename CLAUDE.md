@@ -22,9 +22,10 @@ Primary personas:
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
+- **Individual ontology preset (2026-04-02):** New preset in project creation — Identity, Belonging, Projects, Skills, Values hubs. Belonging is the attractor hub (lineage, family, affiliations are node types within it). Layout changed to single-column list to accommodate 3 presets. Supabase migration 005 applied.
 - **Topology-aware signal enrichment (Phase 7 — 2026-04-02):** New "Enrich" button in the Reflect tab triggers a Gemini pass that reads the full graph topology (hub density, cross-hub connections, tension clusters, emergent %) and rewrites signal labels with reachability framing. Returns an optimisation hypothesis card (amber) at the top of the Reflect tab — what the org appears to be structurally optimising for. Stored in `project.metadata.optimizationHypothesis`.
 - **Hub nodes as real entities (Phase 6 — 2026-03-30):** Attractor categories are now real hub nodes in the graph, not metadata tags. This is the shift from taxonomy to ontology — hubs are traversable, not just searchable.
-  - Hub nodes seeded from preset on project creation (`is_hub=true`). Startup: Domain, Capability, Toolchain, Customer, Method, Value, Emergent. Enterprise: Identity, Policy, Structure, People, Functions, Processes, Resources, Emergent.
+  - Hub nodes seeded from preset on project creation (`is_hub=true`). Startup: Domain, Capability, Toolchain, Customer, Method, Value, Emergent. Enterprise: Identity, Policy, Structure, People, Functions, Processes, Resources, Emergent. Individual: Identity, Belonging, Projects, Skills, Values, Emergent.
   - Every entity connects to a hub via `belongs_to_hub` relationship. `create_node` tool requires `hub_id` — code enforces, not just prompt.
   - New `get_hub_context` tool: Sonnet retrieves a specific hub's subgraph on demand (members, relationships, tensions).
   - System prompt sends hub summaries (~200 tokens) instead of full graph dump. Scales to 500+ nodes without consuming context.
@@ -51,10 +52,9 @@ Primary personas:
   ```
 
 ### What's next
-1. **Test topology enrichment** — reprocess docs → integration → Reflect tab → "Enrich" button → verify hypothesis card appears + signal labels are reframed
-2. **Run Supabase migration 005** if not yet applied: `ALTER TABLE ontology_nodes ADD COLUMN IF NOT EXISTS is_hub BOOLEAN DEFAULT false; UPDATE ontology_nodes SET is_hub = true WHERE type = 'hub';`
+1. **Test Individual preset end-to-end** — create a personal project, ingest a document, verify hub seeding + entity extraction lands in the right hubs
+2. **Test topology enrichment** — reprocess docs → integration → Reflect tab → "Enrich" button → verify hypothesis card appears + signal labels are reframed
 3. **1-hour workshop demo script** — design the flow for the 2-man AI startup CEO session (15 docs + 1 hour conversation → show value)
-4. **Anthropic architecture program prep** — Terroir as the portfolio project.
 
 ---
 
