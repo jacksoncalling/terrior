@@ -291,12 +291,15 @@ export async function deleteDocument(documentId: string): Promise<void> {
 export async function getProjectEntitiesCompact(projectId: string): Promise<CompactEntity[]> {
   const { data, error } = await supabase
     .from('ontology_nodes')
-    .select('id, label, type, attractor, description')
+    .select('id, label, type, attractor, description, is_hub')
     .eq('project_id', projectId);
 
   if (error) throw new Error(`getProjectEntitiesCompact: ${error.message}`);
 
-  return (data ?? []).map((row) => ({
+  // Hub nodes are structural anchors — exclude them so Gemini never merges or
+  // reassigns them during the integration pass. Filter in code to handle NULL
+  // is_hub safely (rows created before migration 005).
+  return (data ?? []).filter((row) => row.is_hub !== true).map((row) => ({
     id:       row.id,
     label:    row.label ?? '',
     type:     row.type ?? 'concept',
