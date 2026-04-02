@@ -191,6 +191,12 @@ Respond with valid JSON ONLY — no markdown, no code blocks:
   ]
 }
 
+EVALUATIVE SIGNAL RULES:
+- Extract at most 5 signals per document. Prioritise the most significant — things that are clearly and strongly expressed, not every passing mention.
+- "label" must be a descriptive phrase of 5–12 words that makes the signal self-contained and understandable without the document. BAD: "Listening". GOOD: "Active organisational listening as foundation for agent performance". BAD: "Ethics". GOOD: "Ethical divergence between data aggregation and individual sovereignty".
+- "source" must quote or closely paraphrase the specific passage that revealed this signal (1–2 sentences max).
+- Do NOT extract generic organisational values (e.g. "transparency", "trust", "quality") unless they are specifically argued for in this document with clear stakes attached.
+
 DOCUMENT:
 ${text}`;
 }
@@ -917,4 +923,127 @@ export async function integrateEntities(
   );
 
   return { mergeGroups, newRelationships, reassignments };
+}
+
+// ── Topology-aware signal enrichment ─────────────────────────────────────────
+//
+// A single Gemini pass that receives the graph topology (hub density,
+// cross-hub connections, tension clusters, emergent count) alongside the
+// existing evaluative signals and project brief. Returns:
+//
+//   1. Enriched signal labels — self-contained 5–12 word phrases with
+//      reachability framing, grounded in the org's structural reality.
+//
+//   2. An optimisation hypothesis — what the org appears to be optimising
+//      for based on graph structure, not just document-stated values.
+//
+// Thinking disabled: same rationale as extraction — faster, consistent JSON.
+
+export interface EnrichedSignalUpdate {
+  id:        string;
+  label:     string;
+  direction: "toward" | "away_from" | "protecting";
+}
+
+export interface TopologyEnrichmentOutput {
+  enrichedSignals:        EnrichedSignalUpdate[];
+  optimizationHypothesis: string;
+}
+
+function buildTopologyEnrichmentPrompt(
+  payload: import("@/lib/topology").TopologyPayload
+): string {
+  const emergentPct = Math.round(
+    (payload.emergentCount / Math.max(payload.totalEntities, 1)) * 100
+  );
+
+  return `You are TERROIR's topology analysis engine. Your task is to enrich evaluative signals and surface an optimisation hypothesis for this organisation based on the graph structure.
+
+WHAT TERROIR IS:
+An organisational listening tool that builds a knowledge graph from documents. Entities belong to hub categories (Domain, Capability, etc.). The topology below describes which hubs are dense, which are thin, where tensions cluster, and how hubs connect — revealing structural reachability rather than just stated values.
+
+PROJECT CONTEXT:
+- Sector: ${payload.brief.sector ?? "not specified"}
+- Org size: ${payload.brief.orgSize ?? "not specified"}
+- Discovery goal: ${payload.brief.discoveryGoal ?? "not specified"}
+- Total entities: ${payload.totalEntities} | Relationships: ${payload.totalRelationships}
+- Isolated entities (0–1 connections): ${payload.emergentCount} (${emergentPct}% of graph)
+
+HUB TOPOLOGY:
+${JSON.stringify(payload.hubs, null, 2)}
+
+CROSS-HUB CONNECTIONS (strongest bridges first):
+${payload.crossHubConnections.length > 0
+    ? JSON.stringify(payload.crossHubConnections, null, 2)
+    : "None detected — hubs are structurally isolated from each other"}
+
+TOP UNRESOLVED TENSIONS:
+${payload.topTensions.length > 0
+    ? payload.topTensions.map((t, i) => `${i + 1}. ${t}`).join("\n")
+    : "None"}
+
+CURRENT EVALUATIVE SIGNALS (${payload.signals.length} total):
+${JSON.stringify(payload.signals, null, 2)}
+
+YOUR TASKS:
+
+TASK 1 — ENRICH SIGNAL LABELS:
+Rewrite each signal label as a self-contained descriptive phrase (5–12 words) that captures the reachability implication — what organisational future is being protected, approached, or avoided. Use the hub topology and tensions as structural context.
+
+Rules:
+- EVERY signal must appear in the output with its original ID.
+- Labels must be descriptive phrases, NOT single words or generic values.
+  BAD: "Ethics" / GOOD: "Ethical alignment as prerequisite for long-term client trust"
+  BAD: "Listening" / GOOD: "Organisational listening as foundation for agent knowledge transfer"
+- Ground labels in the org's actual sector and discovery goal.
+- Update direction if the topology reveals a different orientation than the original label implies.
+
+TASK 2 — OPTIMISATION HYPOTHESIS:
+Write 2–3 sentences describing what this organisation structurally appears to be optimising for — based on hub density, cross-hub bridges, tension concentration, and isolation rate. Do NOT simply restate what documents say; reason from the graph pattern.
+
+End with one sentence naming the most at-risk corridor: the organisational future most likely to become unreachable if current structural patterns continue.
+
+Respond with valid JSON only — no markdown, no code blocks:
+{
+  "enrichedSignals": [
+    { "id": "string", "label": "descriptive phrase 5–12 words", "direction": "toward|away_from|protecting" }
+  ],
+  "optimizationHypothesis": "2–3 sentence structural hypothesis ending with the most at-risk corridor."
+}`;
+}
+
+/**
+ * Runs the topology-aware signal enrichment pass via Gemini 2.5 Flash.
+ *
+ * @param payload  Compact topology summary from buildTopologyPayload()
+ * @returns        Enriched signal labels + optimisation hypothesis
+ */
+export async function enrichSignalsWithTopology(
+  payload: import("@/lib/topology").TopologyPayload
+): Promise<TopologyEnrichmentOutput> {
+  const prompt  = buildTopologyEnrichmentPrompt(payload);
+  const raw     = await callGemini(prompt, 16384, false, true); // no JSON mode, no thinking
+  const rawJson = stripJsonFences(raw);
+
+  let parsed: TopologyEnrichmentOutput | null = null;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    throw new Error("enrichSignalsWithTopology: failed to parse Gemini response as JSON");
+  }
+
+  if (!Array.isArray(parsed?.enrichedSignals) || !parsed?.optimizationHypothesis) {
+    throw new Error("enrichSignalsWithTopology: response missing required fields");
+  }
+
+  // Sanitise directions — fall back to "toward" if Gemini returns something unexpected
+  const validDirections = new Set(["toward", "away_from", "protecting"]);
+  parsed.enrichedSignals = parsed.enrichedSignals.map((s) => ({
+    ...s,
+    direction: validDirections.has(s.direction)
+      ? (s.direction as "toward" | "away_from" | "protecting")
+      : "toward",
+  }));
+
+  return parsed;
 }

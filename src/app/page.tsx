@@ -178,11 +178,13 @@ export default function Home() {
       .catch((err) => console.warn('countProjectDocuments failed (non-fatal):', err));
   }, [projectId]);
 
-  // ── Sync project brief from project.metadata whenever project record changes
+  // ── Sync project brief + optimisation hypothesis from project.metadata ──────
   useEffect(() => {
     if (project) {
       const brief = project.metadata?.brief as ProjectBrief | undefined;
       setProjectBrief(brief ?? null);
+      const hypothesis = project.metadata?.optimizationHypothesis as string | undefined;
+      setOptimizationHypothesis(hypothesis ?? null);
     }
   }, [project]);
 
@@ -584,6 +586,19 @@ export default function Home() {
   const handleSignalDedup = useCallback((updatedSignals: import("@/types").EvaluativeSignal[]) => {
     setGraphState((prev) => ({ ...prev, evaluativeSignals: updatedSignals }));
   }, []);
+
+  // ── Topology signal enrichment ────────────────────────────────────────────
+  // Stores the optimisation hypothesis returned by /api/topology-signals.
+  // Loaded from project.metadata on project switch (see useEffect below).
+  const [optimizationHypothesis, setOptimizationHypothesis] = useState<string | null>(null);
+
+  const handleEnrichSignals = useCallback(
+    (updatedSignals: import("@/types").EvaluativeSignal[], hypothesis: string) => {
+      setGraphState((prev) => ({ ...prev, evaluativeSignals: updatedSignals }));
+      setOptimizationHypothesis(hypothesis);
+    },
+    []
+  );
 
   // ── Sources graph-update handler ─────────────────────────────────────────
 
@@ -997,6 +1012,8 @@ export default function Home() {
           onSignalReflect={handleSignalReflect}
           onTensionResolve={handleTensionResolve}
           onSignalDedup={handleSignalDedup}
+          optimizationHypothesis={optimizationHypothesis}
+          onEnrichSignals={handleEnrichSignals}
         />
         {/* Bottom actions */}
         <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-3">

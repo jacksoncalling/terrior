@@ -42,6 +42,10 @@ interface ChatProps {
   onTensionResolve?: (tensionId: string) => void;
   /** Called after signal deduplication completes — updates graphState with merged signals. */
   onSignalDedup?: (updatedSignals: EvaluativeSignal[]) => void;
+  /** Optimisation hypothesis from the topology-signal pass — null until first enrichment. */
+  optimizationHypothesis?: string | null;
+  /** Called after topology enrichment completes — updates signals + hypothesis in page state. */
+  onEnrichSignals?: (updatedSignals: EvaluativeSignal[], hypothesis: string) => void;
 }
 
 // ── Direction icon map ────────────────────────────────────────────────────────
@@ -287,6 +291,8 @@ export default function Chat({
   onSignalReflect,
   onTensionResolve,
   onSignalDedup,
+  optimizationHypothesis,
+  onEnrichSignals,
 }: ChatProps) {
   // ── Panel mode ────────────────────────────────────────────────────────────
   // "sources" mode is triggered by the + menu, not a tab, but lives in the
@@ -305,6 +311,9 @@ export default function Chat({
   // ── Signal dedup state ───────────────────────────────────────────────────
   const [dedupState, setDedupState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [dedupSummary, setDedupSummary] = useState<string>("");
+
+  // ── Topology enrichment state ─────────────────────────────────────────────
+  const [enrichState, setEnrichState] = useState<"idle" | "running" | "done" | "error">("idle");
 
   // ── + menu state ──────────────────────────────────────────────────────────
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -408,6 +417,29 @@ export default function Chat({
     }
   };
 
+  // ── Topology enrichment handler ──────────────────────────────────────────
+  const handleEnrich = async () => {
+    if (!projectId || enrichState === "running") return;
+    setEnrichState("running");
+    try {
+      const res = await fetch("/api/topology-signals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Enrichment failed");
+      }
+      const { updatedSignals, optimizationHypothesis: hypothesis } = await res.json();
+      onEnrichSignals?.(updatedSignals, hypothesis);
+      setEnrichState("done");
+    } catch (err) {
+      console.error("[enrich]", err);
+      setEnrichState("error");
+    }
+  };
+
   // ── Tab button renderer ───────────────────────────────────────────────────
   // When in sources mode, the pre-sources tab stays visually active so the
   // user always knows where they came from and how to get back.
@@ -505,6 +537,18 @@ export default function Chat({
             </div>
           )}
 
+          {/* ── Optimisation hypothesis card ─────────────────────────────── */}
+          {optimizationHypothesis && (
+            <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5 space-y-1">
+              <p className="text-[10px] font-medium text-amber-700 uppercase tracking-wide">
+                Optimisation Hypothesis
+              </p>
+              <p className="text-xs text-stone-700 leading-relaxed">
+                {optimizationHypothesis}
+              </p>
+            </div>
+          )}
+
           {/* ── Evaluative signals section ───────────────────────────────── */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -518,19 +562,42 @@ export default function Chat({
                   </span>
                 )}
               </p>
-              {/* Dedup button — only shown when signal count > 20 */}
-              {graphState.evaluativeSignals.length > 20 && dedupState !== "running" && (
-                <button
-                  onClick={handleDedup}
-                  className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors border border-stone-200 rounded px-2 py-0.5 hover:bg-stone-50"
-                >
-                  Deduplicate
-                </button>
-              )}
-              {dedupState === "running" && (
-                <span className="text-[10px] text-stone-400 italic">Deduplicating…</span>
-              )}
+              {/* Enrich button — topology-aware signal enrichment pass */}
+              <div className="flex items-center gap-1.5">
+                {enrichState === "running" && (
+                  <span className="text-[10px] text-amber-500 italic">Enriching…</span>
+                )}
+                {enrichState !== "running" && graphState.evaluativeSignals.length > 0 && (
+                  <button
+                    onClick={handleEnrich}
+                    className="text-[10px] text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 rounded px-2 py-0.5 hover:bg-amber-50"
+                    title="Enrich signals using graph topology — surfaces reachability framing and optimisation hypothesis"
+                  >
+                    {enrichState === "done" ? "Re-enrich" : "Enrich"}
+                  </button>
+                )}
+                {enrichState === "error" && (
+                  <span className="text-[10px] text-red-400">Failed — try again</span>
+                )}
+              </div>
             </div>
+
+            {/* Dedup button row — only shown when signal count > 20 */}
+            {(graphState.evaluativeSignals.length > 20 || dedupState === "running") && (
+              <div className="flex justify-end mb-1">
+                {dedupState !== "running" && (
+                  <button
+                    onClick={handleDedup}
+                    className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors border border-stone-200 rounded px-2 py-0.5 hover:bg-stone-50"
+                  >
+                    Deduplicate
+                  </button>
+                )}
+                {dedupState === "running" && (
+                  <span className="text-[10px] text-stone-400 italic">Deduplicating…</span>
+                )}
+              </div>
+            )}
 
             {/* Dedup result banner */}
             {dedupState === "done" && dedupSummary && (
