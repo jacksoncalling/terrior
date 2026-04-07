@@ -39,22 +39,26 @@ Read `.claude/plans/` at session start if working on a named feature.
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
 - Three ontology presets (Enterprise, Startup, Individual) with hub-specific seeding
 - Hub nodes as real graph entities — taxonomy→ontology shift. Every entity connects via `belongs_to_hub`. `create_node` enforces `hub_id` in code. `get_hub_context` retrieves subgraph on demand. System prompt sends hub summaries (~200 tokens), scales to 500+ nodes.
-- Topology-aware signal enrichment — "Enrich" button in Reflect tab triggers Gemini pass over full graph topology, rewrites signal labels with reachability framing, returns optimisation hypothesis card
-- Emergent zone — nodes with 0–1 relationships get dashed borders + reduced opacity. Emergent hub as catch-all.
-- Nested ontologies — `parent_project_id` on projects, parent nodes read-only in child canvas
+- **Compact canvas mode** — graphs with 40+ nodes auto-switch to 16px colored circles (24px for hubs). Label on hover. Dramatically reduces DOM paint cost at scale.
+- **Click-to-highlight** — selecting a node glows it + direct neighbors, dims everything else to 0.15 opacity. Edges highlight too. Works in both compact and full-card modes.
+- **Canvas performance fixes** — O(1) hub color lookup (was O(N×M)), two-phase render split (base structure cached separately from highlight overlay). 1000-node graphs now load and scroll.
+- **Nested project adoption** — `adoptProject` + `unnestProject` functions, "Nest under..." modal + "Make independent" action on projects page. Existing `loadOntologyWithParent` handles merged graph loading.
+- Topology-aware signal enrichment — "Enrich" button in Reflect tab triggers Gemini pass over full graph topology
+- Emergent zone — nodes with 0–1 relationships get dashed borders + reduced opacity
 - Graph clarity — tensions in Reflect tab, signal dedup, filter-first canvas with neighbor inclusion
 - Share button, collapsible Inspector — working
-- **CCA Domain 2 tools audit applied** — `StructuredError` interface on `ToolResult` with `errorCategory` + `isRetryable`. All 5 error paths return structured metadata. Four tool descriptions improved to prevent wasted model loops.
+- **CCA Domain 2 tools audit applied** — `StructuredError` interface on `ToolResult` with `errorCategory` + `isRetryable`
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal (caught silently).
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
 - **`enrichState` stale after external signal change** — `enrichState` in `Chat.tsx` doesn't reset when signals change externally. Fix: add `useEffect` that resets to `"idle"` on signal count change.
+- **Pre-existing uncommitted changes** — `entity-types.ts` and `gemini.ts` have unstaged changes from a prior session. Review and commit or discard.
 
 ### What's next
-1. **Anthropic Architecture Certification prep** — continue CCA audit findings (zen_mcp server review pending)
-2. **Test Individual preset end-to-end** — create personal project, ingest doc, verify hub seeding + extraction
-3. **1-hour workshop demo script** — design flow for 2-man AI startup CEO session
+1. **Founder demo (~April 21)** — 1-hour session with 2-man AI startup founder. Test compact canvas + highlight + nested projects with real data. Facilitation prep is the priority.
+2. **Manual verification** — test adopt/unnest flow end-to-end on deployed Vercel instance. Verify parent nodes appear readonly in child canvas.
+3. **Anthropic Architecture Certification prep** — continue CCA audit findings (zen_mcp server review pending)
 
 ---
 
