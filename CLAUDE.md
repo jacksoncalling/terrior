@@ -18,43 +18,43 @@ Primary personas:
 
 ---
 
-## Current State — Updated 2026-04-02
+## Where things live
+
+| What | Where |
+|---|---|
+| Active feature plans | `.claude/plans/` |
+| Tool definitions | `src/lib/tools.ts` |
+| API routes (endpoints) | `src/app/api/` |
+| Domain logic | `src/lib/` |
+| Type definitions | `src/types/` |
+| Screenshots & bug captures | `docs/` |
+
+Read `.claude/plans/` at session start if working on a named feature.
+
+---
+
+## Current State — Updated 2026-04-07
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
-- **Individual ontology preset (2026-04-02):** New preset in project creation — Identity, Belonging, Projects, Skills, Values hubs. Belonging is the attractor hub (lineage, family, affiliations are node types within it). Layout changed to single-column list to accommodate 3 presets. Supabase migration 005 applied.
-- **Topology-aware signal enrichment (Phase 7 — 2026-04-02):** New "Enrich" button in the Reflect tab triggers a Gemini pass that reads the full graph topology (hub density, cross-hub connections, tension clusters, emergent %) and rewrites signal labels with reachability framing. Returns an optimisation hypothesis card (amber) at the top of the Reflect tab — what the org appears to be structurally optimising for. Stored in `project.metadata.optimizationHypothesis`.
-- **Hub nodes as real entities (Phase 6 — 2026-03-30):** Attractor categories are now real hub nodes in the graph, not metadata tags. This is the shift from taxonomy to ontology — hubs are traversable, not just searchable.
-  - Hub nodes seeded from preset on project creation (`is_hub=true`). Startup: Domain, Capability, Toolchain, Customer, Method, Value, Emergent. Enterprise: Identity, Policy, Structure, People, Functions, Processes, Resources, Emergent. Individual: Identity, Belonging, Projects, Skills, Values, Emergent.
-  - Every entity connects to a hub via `belongs_to_hub` relationship. `create_node` tool requires `hub_id` — code enforces, not just prompt.
-  - New `get_hub_context` tool: Sonnet retrieves a specific hub's subgraph on demand (members, relationships, tensions).
-  - System prompt sends hub summaries (~200 tokens) instead of full graph dump. Scales to 500+ nodes without consuming context.
-  - Multi-hub membership: a node can belong to multiple hubs with different relationship descriptions.
-  - Hub-to-hub relationships allowed (both explicit and implicit via shared members).
-  - Auto-migration: existing projects get hubs seeded + `belongs_to_hub` relationships created from cached `attractor` field on first load.
-  - Hub visual treatment: larger nodes with colored backgrounds, dotted `belongs_to_hub` edges, hub color inherited by member nodes.
-  - Inspector shows "Hub" dropdown (updates `belongs_to_hub` relationship, not just tag). Hub nodes show info panel instead of dropdown.
-  - TypePalette label changed to "Hubs". Filter by hub traverses relationships, not metadata.
-  - Export stats separate hub count from entity count, exclude hub edges from relationship count.
-- **Emergent zone** — nodes with 0–1 relationships get dashed borders + reduced opacity. "Emergent" filter chip with count badge. Emergent hub is always present as catch-all.
-- **Nested ontologies** — `parent_project_id` on projects. Parent nodes appear read-only in child canvas.
-- **Graph clarity features (Phase 6 — 2026-03-29):** Tensions in Reflect tab, signal dedup, filter-first canvas with neighbor inclusion.
-- Share button, Reflect tab, collapsible Inspector — all still working
+- Three ontology presets (Enterprise, Startup, Individual) with hub-specific seeding
+- Hub nodes as real graph entities — taxonomy→ontology shift. Every entity connects via `belongs_to_hub`. `create_node` enforces `hub_id` in code. `get_hub_context` retrieves subgraph on demand. System prompt sends hub summaries (~200 tokens), scales to 500+ nodes.
+- Topology-aware signal enrichment — "Enrich" button in Reflect tab triggers Gemini pass over full graph topology, rewrites signal labels with reachability framing, returns optimisation hypothesis card
+- Emergent zone — nodes with 0–1 relationships get dashed borders + reduced opacity. Emergent hub as catch-all.
+- Nested ontologies — `parent_project_id` on projects, parent nodes read-only in child canvas
+- Graph clarity — tensions in Reflect tab, signal dedup, filter-first canvas with neighbor inclusion
+- Share button, collapsible Inspector — working
+- **CCA Domain 2 tools audit applied** — `StructuredError` interface on `ToolResult` with `errorCategory` + `isRetryable`. All 5 error paths return structured metadata. Four tool descriptions improved to prevent wasted model loops.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal (caught silently).
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
-- **Gemini hub fallback** — if Gemini returns a hub slug that doesn't match any hub node, the entity gets no `belongs_to_hub` relationship (orphaned). Should fall back to emergent hub.
-- **`enrichState` stale after external signal change** — `enrichState` in `Chat.tsx` is local component state and doesn't reset when `graphState.evaluativeSignals` changes externally (e.g. after a reprocess or dedup). A user who enriches, then reprocesses, will see "Re-enrich" even though signals have changed. Fix: add a `useEffect` in `Chat.tsx` that resets `enrichState` to `"idle"` when signal count changes:
-  ```tsx
-  const signalCount = graphState.evaluativeSignals.length;
-  useEffect(() => { setEnrichState("idle"); }, [signalCount]);
-  ```
+- **`enrichState` stale after external signal change** — `enrichState` in `Chat.tsx` doesn't reset when signals change externally. Fix: add `useEffect` that resets to `"idle"` on signal count change.
 
 ### What's next
-1. **Test Individual preset end-to-end** — create a personal project, ingest a document, verify hub seeding + entity extraction lands in the right hubs
-2. **Test topology enrichment** — reprocess docs → integration → Reflect tab → "Enrich" button → verify hypothesis card appears + signal labels are reframed
-3. **1-hour workshop demo script** — design the flow for the 2-man AI startup CEO session (15 docs + 1 hour conversation → show value)
+1. **Anthropic Architecture Certification prep** — continue CCA audit findings (zen_mcp server review pending)
+2. **Test Individual preset end-to-end** — create personal project, ingest doc, verify hub seeding + extraction
+3. **1-hour workshop demo script** — design flow for 2-man AI startup CEO session
 
 ---
 
