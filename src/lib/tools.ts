@@ -47,7 +47,7 @@ export const toolDefinitions = [
   {
     name: "update_node",
     description:
-      "Update an existing node's label, type, description, or hub assignment when new information refines your understanding.",
+      "Update an existing node's label, type, description, or hub assignment when new information refines your understanding. Note: hub nodes can only have label and description updated — type changes and hub reassignment are not permitted for hub nodes.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -62,7 +62,7 @@ export const toolDefinitions = [
   },
   {
     name: "delete_node",
-    description: "Remove a node that was created in error or is no longer relevant. Cannot delete hub nodes.",
+    description: "Remove a node that was created in error or is no longer relevant. Cannot delete hub nodes — hub nodes are structural anchors of the ontology. If a hub needs to change, use update_node to modify its label or description.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -90,7 +90,7 @@ export const toolDefinitions = [
   },
   {
     name: "delete_relationship",
-    description: "Remove a relationship that was created in error.",
+    description: "Remove a relationship that was created in error. Cannot delete hub membership relationships (belongs_to_hub type) — use update_node with new_hub_id to reassign a node to a different hub instead.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -128,7 +128,7 @@ export const toolDefinitions = [
   },
   {
     name: "resolve_tension",
-    description: "Mark a tension as resolved after clarification.",
+    description: "Mark a tension as resolved after clarification. Use the tension ID returned by flag_tension, or retrieve existing tension IDs via get_hub_context which lists unresolved tensions for a hub.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -157,8 +157,17 @@ export const toolDefinitions = [
   },
 ];
 
+// Structured error metadata for orchestrator decision-making (retry, escalate, explain)
+interface StructuredError {
+  errorCategory: "validation" | "not_found" | "permission" | "transient";
+  isRetryable: boolean;
+  humanMessage: string;
+  technicalDetail?: string;
+}
+
 interface ToolResult {
   output: string;
+  error?: StructuredError;
   updates: GraphUpdate[];
   updatedGraph: GraphState;
 }
@@ -198,6 +207,12 @@ export function executeTool(
             .join(", ");
           return {
             output: `Error: hub_id "${hubId}" not found. Available hubs: ${availableHubs}`,
+            error: {
+              errorCategory: "validation",
+              isRetryable: true,
+              humanMessage: `The hub "${hubId}" does not exist. Please select from available hubs.`,
+              technicalDetail: `Available hub IDs: ${availableHubs}`,
+            },
             updates: [],
             updatedGraph: graphState,
           };
@@ -262,6 +277,11 @@ export function executeTool(
       if (node?.is_hub) {
         return {
           output: `Error: cannot delete hub node "${node.label}". Hub nodes are structural anchors.`,
+          error: {
+            errorCategory: "permission",
+            isRetryable: false,
+            humanMessage: `Hub nodes cannot be deleted. Use update_node to modify "${node.label}".`,
+          },
           updates: [],
           updatedGraph: graphState,
         };
@@ -278,7 +298,13 @@ export function executeTool(
       const target = graphState.nodes.find((n) => n.id === input.target_id);
       if (!source || !target) {
         return {
-          output: `Error: source or target node not found. Available nodes: ${graphState.nodes.map((n) => `${n.id} ("${n.label}")`).join(", ")}`,
+          output: `Error: source or target node not found.`,
+          error: {
+            errorCategory: "not_found",
+            isRetryable: true,
+            humanMessage: "One or both nodes could not be found. Verify node IDs before creating a relationship.",
+            technicalDetail: `Available nodes: ${graphState.nodes.map((n) => `${n.id} ("${n.label}")`).join(", ")}`,
+          },
           updates: [],
           updatedGraph: graphState,
         };
@@ -301,7 +327,12 @@ export function executeTool(
       const rel = graphState.relationships.find((r) => r.id === input.id);
       if (rel?.type === HUB_RELATIONSHIP_TYPE) {
         return {
-          output: `Error: cannot delete hub membership relationship. Use update_node with new_hub_id to reassign hubs.`,
+          output: `Error: cannot delete hub membership relationship.`,
+          error: {
+            errorCategory: "permission",
+            isRetryable: false,
+            humanMessage: "Hub membership relationships cannot be deleted directly. Use update_node with new_hub_id to reassign the node to a different hub.",
+          },
           updates: [],
           updatedGraph: graphState,
         };
@@ -318,6 +349,11 @@ export function executeTool(
       if (!hub) {
         return {
           output: `Error: hub "${input.hub_id}" not found.`,
+          error: {
+            errorCategory: "not_found",
+            isRetryable: true,
+            humanMessage: `No hub found with ID "${input.hub_id}". Check available hub IDs in your context.`,
+          },
           updates: [],
           updatedGraph: graphState,
         };
