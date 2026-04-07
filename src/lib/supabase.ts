@@ -143,6 +143,63 @@ export async function createProject(input: {
   return data;
 }
 
+/**
+ * Adopt an existing project as a child of another (set parent_project_id).
+ * Validates: both projects exist, child has no parent yet, no circular reference.
+ * This is a metadata-only update — no data is copied between projects.
+ */
+export async function adoptProject(
+  childProjectId: string,
+  parentProjectId: string
+): Promise<void> {
+  if (childProjectId === parentProjectId) {
+    throw new Error("adoptProject: a project cannot be its own parent");
+  }
+
+  // Fetch both projects to validate
+  const [child, parent] = await Promise.all([
+    getProject(childProjectId),
+    getProject(parentProjectId),
+  ]);
+
+  if (!child) throw new Error("adoptProject: child project not found");
+  if (!parent) throw new Error("adoptProject: parent project not found");
+  if (child.parent_project_id) {
+    throw new Error("adoptProject: child already has a parent — unnest it first");
+  }
+
+  // Prevent circular reference: walk up from parent to ensure child isn't an ancestor
+  let current = parent;
+  while (current.parent_project_id) {
+    if (current.parent_project_id === childProjectId) {
+      throw new Error("adoptProject: circular reference — child is an ancestor of parent");
+    }
+    const ancestor = await getProject(current.parent_project_id);
+    if (!ancestor) break;
+    current = ancestor;
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .update({ parent_project_id: parentProjectId, updated_at: new Date().toISOString() })
+    .eq("id", childProjectId);
+
+  if (error) throw new Error(`adoptProject: ${error.message}`);
+}
+
+/**
+ * Remove a project from its parent (set parent_project_id to null).
+ * The project keeps all its own nodes and relationships — nothing is deleted.
+ */
+export async function unnestProject(projectId: string): Promise<void> {
+  const { error } = await supabase
+    .from("projects")
+    .update({ parent_project_id: null, updated_at: new Date().toISOString() })
+    .eq("id", projectId);
+
+  if (error) throw new Error(`unnestProject: ${error.message}`);
+}
+
 export async function updateProjectPhase(id: string, phase: ProjectPhase): Promise<void> {
   const { error } = await supabase
     .from('projects')

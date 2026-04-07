@@ -16,11 +16,13 @@ interface OntologyNodeData {
   hasTension: boolean;
   selected?: boolean;
   readonly?: boolean;
-  hubColor?: string; // color inherited from the hub this node belongs to
+  hubColor?: string;
+  highlighted?: boolean;
+  dimmed?: boolean;
 }
 
 function OntologyNodeComponent({ data }: NodeProps) {
-  const { label, type, attractor, is_hub, entityTypes, attractors, zone, hasTension, readonly, hubColor } =
+  const { label, type, attractor, is_hub, entityTypes, attractors, zone, hasTension, readonly, hubColor, highlighted, dimmed } =
     data as unknown as OntologyNodeData;
 
   // Attractor color is the primary visual indicator
@@ -40,10 +42,12 @@ function OntologyNodeComponent({ data }: NodeProps) {
   if (isHub) {
     return (
       <div
-        className="rounded-xl border-2 shadow-md min-w-[180px] max-w-[220px] transition-all"
+        className="rounded-xl border-2 shadow-md min-w-[180px] max-w-[220px] transition-all duration-150"
         style={{
           borderColor: attractorColor,
           backgroundColor: `${attractorColor}10`,
+          opacity: dimmed ? 0.15 : 1,
+          boxShadow: highlighted ? `0 0 12px 3px ${attractorColor}40` : undefined,
         }}
       >
         <Handle
@@ -79,10 +83,15 @@ function OntologyNodeComponent({ data }: NodeProps) {
   // Regular node treatment
   return (
     <div
-      className={`rounded-lg border-2 bg-white shadow-sm min-w-[140px] max-w-[200px] transition-opacity ${
+      className={`rounded-lg border-2 bg-white shadow-sm min-w-[140px] max-w-[200px] transition-all duration-150 ${
         hasTension ? "border-red-400" : isEmergent ? "border-dashed border-stone-300" : "border-stone-200"
-      } ${isEmergent ? "opacity-60" : ""} ${isReadonly ? "opacity-50" : ""}`}
-      style={{ borderTopColor: attractorColor, borderTopWidth: "3px" }}
+      } ${dimmed ? "" : isEmergent ? "opacity-60" : ""} ${dimmed ? "" : isReadonly ? "opacity-50" : ""}`}
+      style={{
+        borderTopColor: attractorColor,
+        borderTopWidth: "3px",
+        opacity: dimmed ? 0.15 : undefined,
+        boxShadow: highlighted ? `0 0 10px 2px ${attractorColor}40` : undefined,
+      }}
     >
       <Handle
         type="target"

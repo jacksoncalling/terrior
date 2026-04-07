@@ -19,6 +19,7 @@ function OntologyEdgeComponent({
   data,
   markerEnd,
   selected,
+  style,
 }: EdgeProps) {
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -29,7 +30,15 @@ function OntologyEdgeComponent({
     targetPosition,
   });
 
-  const label = (data as Record<string, unknown>)?.label as string || "";
+  const edgeData = data as Record<string, unknown> | undefined;
+  const label = (edgeData?.label as string) || "";
+  const isHighlighted = edgeData?.highlighted === true;
+
+  // Use inline style from graphStateToFlow (carries highlight/dimmed opacity)
+  const edgeStyle = style ?? {
+    stroke: selected || isHighlighted ? "#1c1917" : "#d6d3d1",
+    strokeWidth: selected || isHighlighted ? 2 : 1.5,
+  };
 
   return (
     <>
@@ -37,10 +46,7 @@ function OntologyEdgeComponent({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
-        style={{
-          stroke: selected ? "#1c1917" : "#d6d3d1",
-          strokeWidth: selected ? 2 : 1.5,
-        }}
+        style={edgeStyle}
       />
       {label && (
         <EdgeLabelRenderer>
@@ -49,6 +55,8 @@ function OntologyEdgeComponent({
               position: "absolute",
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               pointerEvents: "all",
+              opacity: edgeStyle?.opacity ?? 1,
+              transition: "opacity 150ms",
             }}
             className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] text-stone-500 backdrop-blur-sm border border-stone-100"
           >

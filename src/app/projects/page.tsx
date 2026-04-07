@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Project, ProjectPhase, AttractorPreset } from '@/types';
-import { getProjects, createProject } from '@/lib/supabase';
+import { getProjects, createProject, adoptProject, unnestProject } from '@/lib/supabase';
 import { useProject } from '@/lib/project-context';
 import { ATTRACTOR_PRESETS } from '@/lib/entity-types';
 
@@ -205,17 +205,85 @@ function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModa
   );
 }
 
+// ── Nest under modal ────────────────────────────────────────────────────────
+
+interface NestModalProps {
+  project: Project;
+  eligibleParents: Project[];
+  onClose: () => void;
+  onNest: (childId: string, parentId: string) => Promise<void>;
+}
+
+function NestModal({ project, eligibleParents, onClose, onNest }: NestModalProps) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleNest = async (parentId: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await onNest(project.id, parentId);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to nest project');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-stone-800">
+            Nest "{project.name}" under…
+          </h2>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-lg leading-none">
+            ×
+          </button>
+        </div>
+
+        {eligibleParents.length === 0 ? (
+          <p className="text-xs text-stone-400 py-4">No eligible parent projects.</p>
+        ) : (
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {eligibleParents.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => handleNest(p.id)}
+                disabled={saving}
+                className="w-full text-left px-3 py-2.5 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-all disabled:opacity-40"
+              >
+                <span className="text-xs font-medium text-stone-700">{p.name}</span>
+                {p.sector && (
+                  <span className="text-[10px] text-stone-400 ml-2">{p.sector}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {error && (
+          <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg mt-3">{error}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Project card ─────────────────────────────────────────────────────────────
 
 interface ProjectCardProps {
   project: Project;
   onSelect: (project: Project) => void;
   onAddSubProject?: (parentId: string) => void;
+  onNestUnder?: (project: Project) => void;
+  onUnnest?: (projectId: string) => void;
   isChild?: boolean;
   parentName?: string;
 }
 
-function ProjectCard({ project, onSelect, onAddSubProject, isChild, parentName }: ProjectCardProps) {
+function ProjectCard({ project, onSelect, onAddSubProject, onNestUnder, onUnnest, isChild, parentName }: ProjectCardProps) {
   const updatedAt = new Date(project.updated_at);
   const relativeTime = formatRelativeTime(updatedAt);
   const preset = (project.metadata as Record<string, unknown>)?.attractorPreset as string | undefined;
@@ -252,14 +320,33 @@ function ProjectCard({ project, onSelect, onAddSubProject, isChild, parentName }
         </div>
       </button>
 
-      {!isChild && onAddSubProject && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onAddSubProject(project.id); }}
-          className="mt-3 text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
-        >
-          + Add sub-project
-        </button>
-      )}
+      {/* Card actions */}
+      <div className="mt-3 flex items-center gap-3">
+        {!isChild && onAddSubProject && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAddSubProject(project.id); }}
+            className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
+          >
+            + Add sub-project
+          </button>
+        )}
+        {!isChild && !project.parent_project_id && onNestUnder && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onNestUnder(project); }}
+            className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
+          >
+            Nest under…
+          </button>
+        )}
+        {isChild && onUnnest && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onUnnest(project.id); }}
+            className="text-[10px] text-stone-400 hover:text-red-500 transition-colors"
+          >
+            Make independent
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -288,6 +375,7 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [newProjectParentId, setNewProjectParentId] = useState<string | undefined>();
+  const [nestTarget, setNestTarget] = useState<Project | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -321,6 +409,27 @@ export default function ProjectsPage() {
       router.push('/');
     },
     [setProjectId, router]
+  );
+
+  const handleNest = useCallback(
+    async (childId: string, parentId: string) => {
+      await adoptProject(childId, parentId);
+      // NestModal calls onClose() after this succeeds — no need to clear nestTarget here
+      await load();
+    },
+    [load]
+  );
+
+  const handleUnnest = useCallback(
+    async (projectId: string) => {
+      try {
+        await unnestProject(projectId);
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to unnest project');
+      }
+    },
+    [load]
   );
 
   return (
@@ -401,6 +510,8 @@ export default function ProjectsPage() {
                         setNewProjectParentId(parentId);
                         setShowModal(true);
                       }}
+                      onNestUnder={(p) => setNestTarget(p)}
+                      onUnnest={handleUnnest}
                     />
                     {childrenByParent[project.id]?.map((child) => (
                       <ProjectCard
@@ -409,6 +520,7 @@ export default function ProjectsPage() {
                         onSelect={handleSelect}
                         isChild
                         parentName={project.name}
+                        onUnnest={handleUnnest}
                       />
                     ))}
                   </div>
@@ -424,6 +536,18 @@ export default function ProjectsPage() {
           onClose={() => { setShowModal(false); setNewProjectParentId(undefined); }}
           onCreated={handleCreated}
           parentProjectId={newProjectParentId}
+        />
+      )}
+
+      {nestTarget && (
+        <NestModal
+          project={nestTarget}
+          eligibleParents={projects.filter((p) =>
+            // Eligible: no parent of its own, not the target itself, not already a child of the target
+            !p.parent_project_id && p.id !== nestTarget.id
+          )}
+          onClose={() => setNestTarget(null)}
+          onNest={handleNest}
         />
       )}
     </div>

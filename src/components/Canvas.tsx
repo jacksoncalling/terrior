@@ -20,11 +20,15 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import OntologyNode from "./OntologyNode";
+import CompactNode from "./CompactNode";
 import OntologyEdge from "./OntologyEdge";
 import type { GraphState, GraphNode, EntityTypeConfig, AttractorConfig, NodeZone } from "@/types";
 import { HUB_RELATIONSHIP_TYPE } from "@/types";
 import { computeGraphZones } from "@/lib/entity-types";
 import { autoLayout } from "@/lib/layout";
+
+/** Node count threshold — above this, render compact circles instead of full cards */
+const COMPACT_MODE_THRESHOLD = 40;
 
 interface CanvasProps {
   graphState: GraphState;
@@ -46,13 +50,14 @@ interface CanvasProps {
   totalNodeCount?: number;
 }
 
-const nodeTypes = { ontology: OntologyNode };
+const nodeTypes = { ontology: OntologyNode, compact: CompactNode };
 const edgeTypes = { ontology: OntologyEdge };
 
 function graphStateToFlow(
   graphState: GraphState,
   attractors?: AttractorConfig[],
-  zones?: Map<string, NodeZone>
+  zones?: Map<string, NodeZone>,
+  selectedNodeId?: string | null
 ): { nodes: Node[]; edges: Edge[] } {
   const tensionNodeIds = new Set(
     graphState.tensions
@@ -63,22 +68,46 @@ function graphStateToFlow(
   // Compute zones locally if not provided
   const nodeZones = zones ?? computeGraphZones(graphState.nodes, graphState.relationships);
 
+  // Build an index of nodes by ID for O(1) lookups (avoids O(N×M) at scale)
+  const nodeById = new Map<string, GraphNode>();
+  for (const node of graphState.nodes) {
+    nodeById.set(node.id, node);
+  }
+
   // Build a map of node → primary hub color for visual inheritance
   const nodeHubColorMap = new Map<string, string>();
   for (const rel of graphState.relationships) {
     if (rel.type === HUB_RELATIONSHIP_TYPE) {
-      const hub = graphState.nodes.find((n) => n.id === rel.targetId && n.is_hub);
-      if (hub && !nodeHubColorMap.has(rel.sourceId)) {
+      const hub = nodeById.get(rel.targetId);
+      if (hub?.is_hub && !nodeHubColorMap.has(rel.sourceId)) {
         nodeHubColorMap.set(rel.sourceId, hub.properties?.color ?? "#78716c");
       }
     }
   }
 
+  // --- Click-to-highlight: compute neighbor set for selected node ---
+  const neighborIds = new Set<string>();
+  const highlightedEdgeIds = new Set<string>();
+  if (selectedNodeId) {
+    neighborIds.add(selectedNodeId);
+    for (const rel of graphState.relationships) {
+      if (rel.sourceId === selectedNodeId || rel.targetId === selectedNodeId) {
+        neighborIds.add(rel.sourceId);
+        neighborIds.add(rel.targetId);
+        highlightedEdgeIds.add(rel.id);
+      }
+    }
+  }
+  const hasSelection = !!selectedNodeId;
+
+  // --- Compact mode: use small circles above threshold ---
+  const useCompact = graphState.nodes.length >= COMPACT_MODE_THRESHOLD;
+
   const nodes: Node[] = graphState.nodes.map((node) => ({
     id: node.id,
-    type: "ontology",
+    type: useCompact ? "compact" : "ontology",
     position: node.position,
-    draggable: !node.readonly && !node.is_hub, // Hub nodes are not draggable by default
+    draggable: !node.readonly && !node.is_hub,
     data: {
       label: node.label,
       type: node.type,
@@ -93,25 +122,44 @@ function graphStateToFlow(
       hubColor: node.is_hub
         ? (node.properties?.color ?? "#78716c")
         : nodeHubColorMap.get(node.id),
+      // Highlight state: only applied when a node is selected
+      highlighted: hasSelection && neighborIds.has(node.id),
+      dimmed: hasSelection && !neighborIds.has(node.id),
     },
   }));
 
   const edges: Edge[] = graphState.relationships.map((rel) => {
     const isHubEdge = rel.type === HUB_RELATIONSHIP_TYPE;
+    const isHighlighted = highlightedEdgeIds.has(rel.id);
+    const isDimmed = hasSelection && !isHighlighted;
+
+    // In compact mode with no selection, hide all edge labels (highlight pass shows them selectively)
+    const showLabel = isHubEdge ? false : (useCompact ? isHighlighted : true);
+
     return {
       id: rel.id,
       source: rel.sourceId,
       target: rel.targetId,
       type: "ontology",
       data: {
-        label: isHubEdge ? "" : rel.type, // Don't label hub edges
+        label: showLabel ? rel.type : "",
+        rawLabel: isHubEdge ? "" : rel.type, // Preserved for highlight pass to restore
         description: rel.description,
         isHubEdge,
+        highlighted: isHighlighted,
+        dimmed: isDimmed,
       },
-      style: isHubEdge ? { strokeDasharray: "4 4", stroke: "#d6d3d1", strokeWidth: 1 } : undefined,
+      style: isHubEdge
+        ? { strokeDasharray: "4 4", stroke: "#d6d3d1", strokeWidth: 1, opacity: isDimmed ? 0.1 : 1 }
+        : {
+            stroke: isHighlighted ? "#1c1917" : "#d6d3d1",
+            strokeWidth: isHighlighted ? 2 : 1.5,
+            opacity: isDimmed ? 0.1 : 1,
+            transition: "opacity 150ms",
+          },
       markerEnd: isHubEdge
-        ? undefined // No arrow on hub edges
-        : { type: MarkerType.ArrowClosed, color: "#d6d3d1" },
+        ? undefined
+        : { type: MarkerType.ArrowClosed, color: isHighlighted ? "#1c1917" : "#d6d3d1" },
     };
   });
 
@@ -148,10 +196,68 @@ export default function Canvas({
   const [newNodeType, setNewNodeType] = useState("process");
   const [newEdgeType, setNewEdgeType] = useState("related_to");
 
-  const { nodes: flowNodes, edges: flowEdges } = useMemo(
-    () => graphStateToFlow(graphState, attractors, graphZones),
+  // Two-phase computation: base structure (expensive, changes with graphState)
+  // then highlight overlay (cheap, changes with selectedNodeId)
+  const { nodes: baseNodes, edges: baseEdges } = useMemo(
+    () => graphStateToFlow(graphState, attractors, graphZones, null),
     [graphState, attractors, graphZones]
   );
+
+  // Lightweight highlight pass — only recomputes neighbor set + opacity overrides
+  const { nodes: flowNodes, edges: flowEdges } = useMemo(() => {
+    if (!selectedNodeId) return { nodes: baseNodes, edges: baseEdges };
+
+    const neighborIds = new Set<string>([selectedNodeId]);
+    const highlightedEdgeIds = new Set<string>();
+    for (const rel of graphState.relationships) {
+      if (rel.sourceId === selectedNodeId || rel.targetId === selectedNodeId) {
+        neighborIds.add(rel.sourceId);
+        neighborIds.add(rel.targetId);
+        highlightedEdgeIds.add(rel.id);
+      }
+    }
+
+    const nodes = baseNodes.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        highlighted: neighborIds.has(node.id),
+        dimmed: !neighborIds.has(node.id),
+      },
+    }));
+
+    const edges = baseEdges.map((edge) => {
+      const isHighlighted = highlightedEdgeIds.has(edge.id);
+      const isDimmed = !isHighlighted;
+      const isHubEdge = (edge.data as Record<string, unknown>)?.isHubEdge === true;
+      const useCompact = graphState.nodes.length >= COMPACT_MODE_THRESHOLD;
+      const rawLabel = ((edge.data as Record<string, unknown>)?.rawLabel as string) ?? "";
+      const showLabel = isHubEdge ? false : (useCompact ? isHighlighted : true);
+
+      return {
+        ...edge,
+        data: {
+          ...edge.data,
+          label: showLabel ? rawLabel : "",
+          highlighted: isHighlighted,
+          dimmed: isDimmed,
+        },
+        style: isHubEdge
+          ? { strokeDasharray: "4 4", stroke: "#d6d3d1", strokeWidth: 1, opacity: isDimmed ? 0.1 : 1 }
+          : {
+              stroke: isHighlighted ? "#1c1917" : "#d6d3d1",
+              strokeWidth: isHighlighted ? 2 : 1.5,
+              opacity: isDimmed ? 0.1 : 1,
+              transition: "opacity 150ms",
+            },
+        markerEnd: isHubEdge
+          ? undefined
+          : { type: MarkerType.ArrowClosed, color: isHighlighted ? "#1c1917" : "#d6d3d1" },
+      };
+    });
+
+    return { nodes, edges };
+  }, [baseNodes, baseEdges, selectedNodeId, graphState.relationships, graphState.nodes.length]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(flowEdges);
