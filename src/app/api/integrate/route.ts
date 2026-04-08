@@ -24,7 +24,7 @@
 export const maxDuration = 300; // Gemini integration call can be slow for large graphs
 
 import { NextRequest, NextResponse } from "next/server";
-import { integrateEntities } from "@/lib/gemini";
+import { integrateEntities, normaliseRelType } from "@/lib/gemini";
 import {
   getProject,
   getProjectEntitiesCompact,
@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
       ...r,
       sourceEntityId: remapId(r.sourceEntityId),
       targetEntityId: remapId(r.targetEntityId),
+      type: normaliseRelType(r.type),
     }));
 
     const remappedReassignments = reassignments.map((r) => ({

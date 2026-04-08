@@ -28,7 +28,7 @@ import type {
 } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { HUB_RELATIONSHIP_TYPE } from "@/types";
-import { ensureTypeExists, getAttractorsForPreset, getHubNodes, findHubByAttractorId } from "./entity-types";
+import { ensureTypeExists, getAttractorsForPreset, getHubNodes, getHubMembers, findHubByAttractorId } from "./entity-types";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
 const GEMINI_MODEL   = "gemini-2.5-flash";
@@ -50,12 +50,122 @@ export interface GeminiExtractionResult {
 //
 // Backwards compatible: no layer = original "extract comprehensively" behaviour.
 
+// ── Canonical relationship vocabulary ────────────────────────────────────────
+//
+// 17 types + relates_to fallback. Small enough for consistency, large enough
+// for organisational ontology. Relationship TYPES are always English.
+// Relationship DESCRIPTIONS preserve source language.
+
+const CANONICAL_REL_TYPES = [
+  'enables',         // X makes Y possible
+  'depends_on',      // X needs Y (soft dependency)
+  'requires',        // X cannot function without Y (hard prerequisite)
+  'part_of',         // X is contained in Y
+  'type_of',         // X is a specialisation of Y
+  'implements',      // X is a concrete realisation of Y (method→practice, concept→feature)
+  'informs',         // X provides input/context to Y
+  'challenges',      // X creates tension with Y
+  'addresses',       // X responds to or mitigates Y
+  'produces',        // X generates Y as output
+  'uses',            // X employs Y as a tool/method
+  'guides',          // X shapes or directs Y
+  'contrasts_with',  // X is in opposition to Y
+  'evolves_into',    // X transforms into Y over time
+  'exemplifies',     // X is a concrete instance of Y
+  'supports',        // X reinforces or strengthens Y
+  'threatens',       // X puts Y at risk
+] as const;
+
+const CANONICAL_REL_LIST = CANONICAL_REL_TYPES.join(', ');
+
+// Synonym map — normalises freeform Gemini output to canonical types.
+// Covers English variants, German verbs, and legacy multi-word types.
+const REL_SYNONYMS: Record<string, string> = {
+  // → challenges
+  'hinders': 'challenges',
+  'blocks': 'challenges',
+  'inhibits': 'challenges',
+  // → enables
+  'drives': 'enables',
+  'facilitates': 'enables',
+  'fosters': 'enables',
+  // → depends_on
+  'is_required_for': 'depends_on',
+  'prerequisite_for': 'depends_on',
+  // → type_of
+  'is_a_form_of': 'type_of',
+  'is_a_type_of': 'type_of',
+  'is_a': 'type_of',
+  // → implements
+  'is_an_implementation_of': 'implements',
+  'is_a_method_for': 'implements',
+  'is_a_practice_for': 'implements',
+  // → supports
+  'contributes_to': 'supports',
+  'enhances': 'supports',
+  'strengthens': 'supports',
+  // → part_of
+  'is_a_part_of': 'part_of',
+  'is_a_component_of': 'part_of',
+  'includes': 'part_of',
+  // → produces
+  'creates': 'produces',
+  'generates': 'produces',
+  'is_an_output_of': 'produces',
+  // → informs
+  'influences': 'informs',
+  'feeds_into': 'informs',
+  // → guides
+  'governs': 'guides',
+  'shapes': 'guides',
+  // → addresses
+  'mitigates': 'addresses',
+  'addressed_by': 'addresses',
+  'mitigated_by': 'addresses',
+  // → uses
+  'utilizes': 'uses',
+  'leverages': 'uses',
+  // → exemplifies
+  'demonstrated_by': 'exemplifies',
+  'illustrated_by': 'exemplifies',
+  // → contrasts_with
+  'is_opposed_to': 'contrasts_with',
+  'is_distinct_from': 'contrasts_with',
+  // German verbs that might leak through
+  'ermöglicht': 'enables',
+  'erfordert': 'requires',
+  'unterstützt': 'supports',
+  'bedroht': 'threatens',
+  'verwendet': 'uses',
+  'erzeugt': 'produces',
+};
+
+/** Normalise a relationship type to canonical form. Exported for use in integration routes. */
+export function normaliseRelType(raw: string): string {
+  const lower = raw.toLowerCase().replace(/\s+/g, '_');
+  return REL_SYNONYMS[lower] ?? lower;
+}
+
+// ── Entity budget ───────────────────────────────────────────────────────────
+//
+// Dynamic target based on document length. Prevents over-extraction on
+// long documents and under-extraction on short ones.
+
+function estimateEntityBudget(textLength: number): { min: number; max: number } {
+  const words = Math.ceil(textLength / 5); // rough word count
+  if (words < 1000) return { min: 8, max: 20 };
+  if (words < 3000) return { min: 15, max: 35 };
+  if (words < 8000) return { min: 20, max: 50 };
+  return { min: 25, max: 60 };
+}
+
 function buildExtractionPrompt(
   text: string,
   graphState: GraphState,
   abstractionLayer?: AbstractionLayer,
   projectBrief?: ProjectBrief
 ): string {
+  const budget = estimateEntityBudget(text.length);
   // Build the existing-graph context block (dedup guard)
   const existingContext =
     graphState.nodes.length > 0
@@ -142,13 +252,21 @@ Extract COMPREHENSIVELY — capture every meaningful entity and relationship.`;
   let hubInstructions: string;
 
   if (hubNodes.length > 0) {
-    // Use actual hub nodes from the graph
+    // Use actual hub nodes from the graph, enriched with existing member labels
+    // so Gemini can learn classification patterns from prior extractions
     const hubList = hubNodes
-      .map((h) => `  - "${h.properties?.attractor_id ?? h.label.toLowerCase()}" (hub: "${h.label}") — ${h.description}`)
+      .map((h) => {
+        const slug = h.properties?.attractor_id ?? h.label.toLowerCase();
+        const members = getHubMembers(h.id, graphState);
+        const memberSuffix = members.length > 0
+          ? `. Already contains: ${members.slice(-5).map((m) => m.label).join(", ")}`
+          : "";
+        return `  - "${slug}" (hub: "${h.label}") — ${h.description}${memberSuffix}`;
+      })
       .join("\n");
     hubInstructions = `
 HUB CATEGORIES (structural scaffolding — these are real nodes in the graph):
-Each entity MUST be assigned a "hub" from this list. The hub indicates which structural category the entity belongs to. If unsure, use "emergent".
+Each entity MUST be assigned a "hub" from this list. Choose the BEST-FITTING hub based on the entity's primary role in the organisation. "emergent" is reserved for entities that genuinely don't fit any category — it signals novelty, not uncertainty. If you can make a reasonable case for a hub, use it.
 ${hubList}
 
 The "type" field is a separate freeform descriptive tag (e.g. "concept", "role", "workflow"). Both fields are required.`;
@@ -161,7 +279,7 @@ The "type" field is a separate freeform descriptive tag (e.g. "concept", "role",
       .join("\n");
     hubInstructions = `
 HUB CATEGORIES (structural scaffolding):
-Each entity MUST be assigned a "hub" from this list. The hub indicates where the entity fits in the ontological structure. If unsure, use "emergent".
+Each entity MUST be assigned a "hub" from this list. Choose the BEST-FITTING hub based on the entity's primary role in the organisation. "emergent" is reserved for entities that genuinely don't fit any category — it signals novelty, not uncertainty. If you can make a reasonable case for a hub, use it.
 ${attractorList}
 
 The "type" field is a separate freeform descriptive tag (e.g. "concept", "role", "workflow"). Both fields are required.`;
@@ -171,6 +289,20 @@ The "type" field is a separate freeform descriptive tag (e.g. "concept", "role",
 
 ${focusInstructions}
 ${hubInstructions}
+
+GRANULARITY RULES:
+- Extract at the CONCEPT level, not the MENTION level. If a document mentions Slack, Teams, and Email as communication channels, create ONE entity "Communication Stack" with the specific tools listed in the description — not three separate entities.
+- Each entity should represent a meaningful unit of organisational knowledge that someone would want to navigate to, ask about, or track over time. If it is just an example or instance of something, it belongs in a parent entity's description, not as its own node.
+- TARGET: extract between ${budget.min} and ${budget.max} entities for this document. If you are producing more, you are too granular. Quality over quantity.
+- Prefer FEWER entities with RICHER descriptions over many thin entities.
+- When in doubt, ask: "Would someone search for this entity by name?" If no, fold it into a parent entity's description.
+
+RELATIONSHIP TYPES — use ONLY from this canonical list:
+${CANONICAL_REL_LIST}
+Choose the closest match. Use lowercase only. If none fit, use "relates_to" as a last resort — this should be rare (<10% of edges).
+The "description" field on the relationship is where nuance goes — the type is for traversal, the description is for understanding.
+
+LANGUAGE: Entity labels and descriptions may be in German or English — preserve the original language of the source material. Relationship TYPES must always be English (from the canonical list above). Relationship DESCRIPTIONS can be in the source language.
 
 CRITICAL: Do NOT create duplicate entities. Check the existing graph context below.
 ${existingContext}${projectContext}
@@ -273,15 +405,22 @@ function assembleGraph(
     col++;
     if (col >= 4) { col = 0; row++; }
 
-    // Resolve hub: Gemini returns "hub" field (or legacy "attractor")
+    // Resolve hub: Gemini returns "hub" field (or legacy "attractor").
+    // Fall back to emergent hub if the slug doesn't match any hub node,
+    // preventing orphaned nodes with no belongs_to_hub relationship.
     const hubSlug = entity.hub || entity.attractor || "emergent";
-    const hubNode = findHubByAttractorId(hubSlug, currentGraph);
+    let hubNode = findHubByAttractorId(hubSlug, currentGraph);
+    if (!hubNode && hubSlug !== "emergent") {
+      hubNode = findHubByAttractorId("emergent", currentGraph);
+    }
 
+    // Cache the resolved attractor — if we fell back to emergent, reflect that
+    const resolvedAttractor = hubNode?.properties?.attractor_id ?? hubSlug;
     const node: GraphNode = {
       id,
       label: entity.label,
       type: entity.type || "concept",
-      attractor: hubSlug, // cached for backwards compat
+      attractor: resolvedAttractor,
       description: entity.description || "",
       position,
     };
@@ -321,7 +460,7 @@ function assembleGraph(
       id: uuidv4(),
       sourceId,
       targetId,
-      type: rel.type || "related_to",
+      type: normaliseRelType(rel.type || "relates_to"),
       description: rel.description,
     };
 
@@ -728,8 +867,8 @@ Identify the most important relationships between entities that are NOT already 
 For each new relationship output:
 - sourceEntityId: valid entity ID from the list above
 - targetEntityId: valid entity ID from the list above
-- type: short verb phrase (e.g. "enables", "depends_on", "challenges", "informs")
-- description: optional one sentence
+- type: use ONLY from this canonical list: ${CANONICAL_REL_LIST}. Use "relates_to" only as a last resort (<10% of edges). Always lowercase English.
+- description: optional one sentence (may be in the source language)
 
 ### Phase 3: Attractor Reassignment
 Now that you can see all entities together, identify any entities whose attractor was assigned incorrectly in per-document isolation. Only reassign where you are confident.
