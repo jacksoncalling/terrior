@@ -976,7 +976,7 @@ export default function Home() {
   })();
 
   return (
-    <div className="flex h-screen bg-stone-50">
+    <div className="flex h-screen bg-stone-50 overflow-hidden">
       {/* ── Phase 2: Scoping modal (renders above everything) ─────────────── */}
       <ScopingModal
         isOpen={scopingOpen}
@@ -992,7 +992,7 @@ export default function Home() {
       />
 
       {/* Chat panel */}
-      <div className="w-[360px] shrink-0 border-r border-stone-200 bg-white flex flex-col">
+      <div className="w-[360px] shrink-0 border-r border-stone-200 bg-white flex flex-col min-h-0">
         <Chat
           messages={messages}
           onSend={handleSend}
@@ -1075,7 +1075,7 @@ export default function Home() {
       </div>
 
       {/* Canvas panel */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Project name bar */}
         {project && (
           <div className="px-4 py-1.5 bg-white border-b border-stone-100 flex items-center gap-2">

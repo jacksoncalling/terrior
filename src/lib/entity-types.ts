@@ -114,27 +114,27 @@ const EMERGENT_ATTRACTOR: AttractorConfig = {
   id: "emergent",
   label: "Emergent",
   color: "#78716c", // stone
-  description: "Present but not yet placed — the new shelf",
+  description: "Genuinely novel entities that don't fit any existing hub. Signals structural novelty — use only when no other hub applies, not as a default for uncertainty.",
 };
 
 export const STARTUP_ATTRACTORS: AttractorConfig[] = [
-  { id: "domain", label: "Domain", color: "#3b82f6", description: "Subject matter expertise and knowledge areas" },
-  { id: "capability", label: "Capability", color: "#10b981", description: "What the team can do or build" },
-  { id: "toolchain", label: "Toolchain", color: "#f59e0b", description: "Technical stack, platforms, and integrations" },
-  { id: "customer", label: "Customer", color: "#ec4899", description: "Who is served and how" },
-  { id: "method", label: "Method", color: "#8b5cf6", description: "How work is done and delivered" },
-  { id: "value", label: "Value", color: "#14b8a6", description: "What the team optimizes for" },
+  { id: "domain", label: "Domain", color: "#3b82f6", description: "Subject matter expertise, disciplines, and knowledge areas. If it's something you'd study, research, or apprentice in, it's Domain." },
+  { id: "capability", label: "Capability", color: "#10b981", description: "What the team can do or build — skills, competencies, deliverables. If it describes an ability or output the team produces, it's Capability." },
+  { id: "toolchain", label: "Toolchain", color: "#f59e0b", description: "Technical stack, platforms, APIs, and integrations. If it's software, infrastructure, or a service the team uses, it's Toolchain." },
+  { id: "customer", label: "Customer", color: "#ec4899", description: "Who is served — segments, personas, partners, stakeholders. If it's a person or group the product/service is built for, it's Customer." },
+  { id: "method", label: "Method", color: "#8b5cf6", description: "How work is done — processes, frameworks, rituals, delivery patterns. If it describes a way of working or a repeatable approach, it's Method." },
+  { id: "value", label: "Value", color: "#14b8a6", description: "What the team optimizes for — principles, priorities, trade-offs, beliefs. If it's something the team protects or moves toward, it's Value." },
   EMERGENT_ATTRACTOR,
 ];
 
 export const ENTERPRISE_ATTRACTORS: AttractorConfig[] = [
-  { id: "identity", label: "Identity", color: "#3b82f6", description: "Purpose, values, brand — who the org understands itself to be" },
-  { id: "policy", label: "Policy", color: "#ef4444", description: "Rules, strategies, programmes, commitments" },
-  { id: "structure", label: "Structure", color: "#f59e0b", description: "Formal architecture — roles, reporting, organs" },
-  { id: "people", label: "People", color: "#ec4899", description: "Individuals, groups, teams, culture, leadership" },
-  { id: "functions", label: "Functions", color: "#8b5cf6", description: "Specialist roles, competencies, capabilities" },
-  { id: "processes", label: "Processes", color: "#10b981", description: "Workflows, procedures, routines, rhythms" },
-  { id: "resources", label: "Resources", color: "#14b8a6", description: "Physical, digital, financial, informational assets" },
+  { id: "identity", label: "Identity", color: "#3b82f6", description: "Purpose, values, brand, mission — who the org understands itself to be. If it answers 'who are we?', it's Identity." },
+  { id: "policy", label: "Policy", color: "#ef4444", description: "Rules, strategies, programmes, mandates, compliance requirements. If it governs what must or must not happen, it's Policy." },
+  { id: "structure", label: "Structure", color: "#f59e0b", description: "Formal architecture — departments, reporting lines, org charts, governance bodies. If it defines how the org is shaped, it's Structure." },
+  { id: "people", label: "People", color: "#ec4899", description: "Named individuals, teams, leadership, cultural groups. If it's a person or a group of people, it's People." },
+  { id: "functions", label: "Functions", color: "#8b5cf6", description: "Specialist capabilities, competency areas, professional disciplines. If it describes what a part of the org is skilled at, it's Functions." },
+  { id: "processes", label: "Processes", color: "#10b981", description: "Workflows, procedures, routines, operational rhythms. If it describes how work flows from input to output, it's Processes." },
+  { id: "resources", label: "Resources", color: "#14b8a6", description: "Physical, digital, financial, or informational assets. If the org owns, maintains, or depends on it as an asset, it's Resources." },
   EMERGENT_ATTRACTOR,
 ];
 
@@ -142,11 +142,11 @@ export const ENTERPRISE_ATTRACTORS: AttractorConfig[] = [
 // Belonging is the broader category (lineage, family, communities, affiliations);
 // Lineage is a node type *within* Belonging, not its own hub.
 export const INDIVIDUAL_ATTRACTORS: AttractorConfig[] = [
-  { id: "identity",  label: "Identity",  color: "#3b82f6", description: "Who the person understands themselves to be — role, self-concept, positioning" },
-  { id: "belonging", label: "Belonging", color: "#ec4899", description: "Where they come from and where they fit — lineage, family, communities, affiliations" },
-  { id: "projects",  label: "Projects",  color: "#f59e0b", description: "Active work, initiatives, goals, and commitments" },
-  { id: "skills",    label: "Skills",    color: "#10b981", description: "Capabilities, expertise, and developed practices" },
-  { id: "values",    label: "Values",    color: "#8b5cf6", description: "What the person protects, moves toward, and optimises for" },
+  { id: "identity",  label: "Identity",  color: "#3b82f6", description: "Who the person understands themselves to be — role, self-concept, positioning. If it answers 'who am I?', it's Identity." },
+  { id: "belonging", label: "Belonging", color: "#ec4899", description: "Where they come from and where they fit — lineage, family, communities, affiliations. If it's a group or origin the person identifies with, it's Belonging." },
+  { id: "projects",  label: "Projects",  color: "#f59e0b", description: "Active work, initiatives, goals, and commitments. If the person is actively building or pursuing it, it's Projects." },
+  { id: "skills",    label: "Skills",    color: "#10b981", description: "Capabilities, expertise, and developed practices. If it's something the person has learned to do well, it's Skills." },
+  { id: "values",    label: "Values",    color: "#8b5cf6", description: "What the person protects, moves toward, and optimises for. If it's a principle or priority they'd defend, it's Values." },
   EMERGENT_ATTRACTOR,
 ];
 

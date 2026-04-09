@@ -33,32 +33,31 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-07
+## Current State — Updated 2026-04-09
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
 - Three ontology presets (Enterprise, Startup, Individual) with hub-specific seeding
-- Hub nodes as real graph entities — taxonomy→ontology shift. Every entity connects via `belongs_to_hub`. `create_node` enforces `hub_id` in code. `get_hub_context` retrieves subgraph on demand. System prompt sends hub summaries (~200 tokens), scales to 500+ nodes.
-- **Compact canvas mode** — graphs with 40+ nodes auto-switch to 16px colored circles (24px for hubs). Label on hover. Dramatically reduces DOM paint cost at scale.
-- **Click-to-highlight** — selecting a node glows it + direct neighbors, dims everything else to 0.15 opacity. Edges highlight too. Works in both compact and full-card modes.
-- **Canvas performance fixes** — O(1) hub color lookup (was O(N×M)), two-phase render split (base structure cached separately from highlight overlay). 1000-node graphs now load and scroll.
-- **Nested project adoption** — `adoptProject` + `unnestProject` functions, "Nest under..." modal + "Make independent" action on projects page. Existing `loadOntologyWithParent` handles merged graph loading.
-- Topology-aware signal enrichment — "Enrich" button in Reflect tab triggers Gemini pass over full graph topology
-- Emergent zone — nodes with 0–1 relationships get dashed borders + reduced opacity
-- Graph clarity — tensions in Reflect tab, signal dedup, filter-first canvas with neighbor inclusion
-- Share button, collapsible Inspector — working
-- **CCA Domain 2 tools audit applied** — `StructuredError` interface on `ToolResult` with `errorCategory` + `isRetryable`
+- Hub nodes as real graph entities — taxonomy→ontology shift. Every entity connects via `belongs_to_hub`.
+- **Compact canvas mode** — graphs with 40+ nodes auto-switch to 16px colored circles (24px for hubs). Dramatically reduces DOM paint cost at scale.
+- **Force-directed layout** — compact mode uses d3-force (Obsidian-style organic globe) instead of dagre. Hub edges excluded from simulation to prevent star distortion. Dagre retained for card mode (<40 nodes).
+- **Click-to-highlight** — selecting a node glows it + direct neighbors, dims everything else. Selected node shows its label below the circle. Edge labels hidden in compact mode to prevent hotspot clutter.
+- **Viewport stability** — fitView only fires on explicit Auto-layout click, not on node selection. `overflow-hidden` + `min-h-0` on flex containers prevents page overflow/scroll-to-bottom.
+- **ScorePicker CSS circles** — evaluative signal intensity/relevance dots use fixed-size styled divs instead of Unicode glyphs (no more jitter on hover).
+- **Canvas performance** — O(1) hub color lookup, two-phase render split. 1000-node graphs load and scroll.
+- **Nested project adoption** — `adoptProject` + `unnestProject` functions, modal + action on projects page.
+- Topology-aware signal enrichment, emergent zone, graph clarity features, share button, collapsible Inspector — all working.
 
 ### Known bugs
-- **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal (caught silently).
+- **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
-- **`enrichState` stale after external signal change** — `enrichState` in `Chat.tsx` doesn't reset when signals change externally. Fix: add `useEffect` that resets to `"idle"` on signal count change.
-- **Pre-existing uncommitted changes** — `entity-types.ts` and `gemini.ts` have unstaged changes from a prior session. Review and commit or discard.
+- **`enrichState` stale after external signal change** — needs `useEffect` reset on signal count change.
+- **Graph density in hotspots** — force layout clusters highly-connected nodes tightly. Needs journey-mapped UX definition for how progressive disclosure should work (zoom levels, hover behavior, label visibility).
 
 ### What's next
-1. **Founder demo (~April 21)** — 1-hour session with 2-man AI startup founder. Test compact canvas + highlight + nested projects with real data. Facilitation prep is the priority.
-2. **Manual verification** — test adopt/unnest flow end-to-end on deployed Vercel instance. Verify parent nodes appear readonly in child canvas.
-3. **Anthropic Architecture Certification prep** — continue CCA audit findings (zen_mcp server review pending)
+1. **`/feature-journey` on graph interaction** — define the complete UX for exploring the knowledge graph (zoom, click, highlight, read) before more implementation. Skill created this session.
+2. **Founder demo (~April 21)** — test compact canvas + highlight + nested projects with real data.
+3. **Manual verification** — test adopt/unnest flow end-to-end on deployed Vercel.
 
 ---
 
@@ -73,7 +72,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 | AI — Scoping | Claude Haiku (scoping dialogue only) |
 | Database | Supabase (postgres + realtime) |
 | Embeddings | Gemini Embedding API (gemini-embedding-001, 768d) |
-| Layout | Dagre (hierarchical auto-layout) |
+| Layout | Dagre (hierarchical, card mode) + d3-force (organic globe, compact mode) |
 | Hosting | Vercel |
 
 ---

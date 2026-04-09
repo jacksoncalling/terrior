@@ -74,18 +74,20 @@ function ScorePicker({
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-[10px] text-stone-400 w-16 shrink-0">{label}</span>
-      <div className="flex gap-0.5">
+      <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             onClick={() => onChange(n)}
             onMouseEnter={() => setHovered(n)}
             onMouseLeave={() => setHovered(null)}
-            className="text-[11px] leading-none transition-colors"
-            style={{ color: n <= display ? "#78716c" : "#d6d3d1" }}
+            className="w-4 h-4 flex items-center justify-center"
             aria-label={`${label} ${n} of 5`}
           >
-            {n <= display ? "●" : "○"}
+            <div
+              className="w-2 h-2 rounded-full transition-colors duration-100"
+              style={{ backgroundColor: n <= display ? "#78716c" : "#d6d3d1" }}
+            />
           </button>
         ))}
       </div>
@@ -320,11 +322,20 @@ export default function Chat({
   const plusMenuRef = useRef<HTMLDivElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages — only if user is already near the bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (!container) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distanceFromBottom < 120) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, isLoading]);
 
   // Auto-resize chat textarea
@@ -643,7 +654,7 @@ export default function Chat({
       {mode === "chat" && (
         <>
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3">
             {messages.length === 0 && (
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-[280px] text-center">

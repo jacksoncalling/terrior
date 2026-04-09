@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -15,6 +15,7 @@ import {
   type OnNodesChange,
   type OnEdgesChange,
   type NodeMouseHandler,
+  type ReactFlowInstance,
   MarkerType,
   Panel,
 } from "@xyflow/react";
@@ -223,6 +224,7 @@ export default function Canvas({
         ...node.data,
         highlighted: neighborIds.has(node.id),
         dimmed: !neighborIds.has(node.id),
+        selected: node.id === selectedNodeId,
       },
     }));
 
@@ -232,7 +234,9 @@ export default function Canvas({
       const isHubEdge = (edge.data as Record<string, unknown>)?.isHubEdge === true;
       const useCompact = graphState.nodes.length >= COMPACT_MODE_THRESHOLD;
       const rawLabel = ((edge.data as Record<string, unknown>)?.rawLabel as string) ?? "";
-      const showLabel = isHubEdge ? false : (useCompact ? isHighlighted : true);
+      // In compact mode, hide all edge labels — they overlap in dense clusters.
+      // Relationship types are visible in the Inspector when an edge is clicked.
+      const showLabel = isHubEdge ? false : (useCompact ? false : true);
 
       return {
         ...edge,
@@ -261,11 +265,21 @@ export default function Canvas({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(flowEdges);
+  const rfInstance = useRef<ReactFlowInstance | null>(null);
+  const fitViewPending = useRef(false);
 
   // Sync React Flow state with graphState when it changes externally
   useMemo(() => {
     setNodes(flowNodes);
     setEdges(flowEdges);
+    // If a fitView was requested (after auto-layout), schedule it now
+    if (fitViewPending.current && rfInstance.current) {
+      const timer = setTimeout(() => {
+        rfInstance.current?.fitView({ padding: 0.15, duration: 300 });
+        fitViewPending.current = false;
+      }, 50);
+      return () => clearTimeout(timer);
+    }
   }, [flowNodes, flowEdges, setNodes, setEdges]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
@@ -377,6 +391,7 @@ export default function Canvas({
         onPaneClick={handlePaneClick}
         onDoubleClick={handleDoubleClick}
         onConnect={handleConnect}
+        onInit={(instance) => { rfInstance.current = instance; }}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -465,7 +480,7 @@ export default function Canvas({
             </button>
             {!isEmpty && (
               <button
-                onClick={onAutoLayout}
+                onClick={() => { fitViewPending.current = true; onAutoLayout(); }}
                 className="rounded-lg bg-white/90 px-3 py-1.5 text-xs text-stone-600 shadow-sm backdrop-blur-sm border border-stone-100 hover:bg-white transition-colors"
               >
                 Auto-layout

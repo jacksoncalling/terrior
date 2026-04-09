@@ -44,6 +44,7 @@ function CompactNodeComponent({ data }: NodeProps) {
     attractors,
     zone,
     hasTension,
+    selected,
     readonly,
     hubColor,
     highlighted,
@@ -69,7 +70,7 @@ function CompactNodeComponent({ data }: NodeProps) {
 
   return (
     <div
-      className="transition-opacity duration-150"
+      className="transition-opacity duration-150 flex flex-col items-center"
       style={{ opacity }}
       title={label}
     >
@@ -97,6 +98,24 @@ function CompactNodeComponent({ data }: NodeProps) {
             : undefined,
         }}
       />
+
+      {/* Show label below circle only for the selected (clicked) node */}
+      {selected && (
+        <div
+          className="absolute whitespace-nowrap text-center pointer-events-none select-none"
+          style={{
+            top: size + 4,
+            fontSize: isHub ? 11 : 10,
+            fontWeight: 600,
+            color: "#1c1917",
+            maxWidth: 140,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {label}
+        </div>
+      )}
 
       <Handle
         type="source"
