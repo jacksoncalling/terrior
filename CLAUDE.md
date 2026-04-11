@@ -228,6 +228,9 @@ Or use the VS Code launch config (`terroir-dev`).
 - **Paste-text bypasses ingest:** enters pipeline at classify phase, skips `/api/ingest`. Same downstream flow.
 - **Supabase migrations:** always paste the SQL directly into the Supabase SQL Editor — never reference the file path.
 
+**Extraction prompts**
+- **Prompt language constraint vs preservation:** "Preserve source language" lets models mix languages when the surrounding context is bilingual. Use an explicit LANGUAGE CONSISTENCY block that constrains ALL output to the detected source language. See `~/.claude/learnings/2026-04-12-prompt-language-constraint-not-preservation.md`
+
 **Hub nodes & ontology structure**
 - **Taxonomy vs ontology (hub enforcement):** Categories/attractors are real hub nodes, not metadata tags. `create_node` requires `hub_id` (tool schema) + API validates it exists (code). Prompts guide *which* hub; code enforces *a hub is chosen*. See `~/.claude/learnings/2026-03-30-taxonomy-vs-ontology-enforcement.md`
 - **Context window scaling:** System prompt sends hub summaries (~200 tokens), not full graph. `get_hub_context` tool retrieves detail on demand. Hub nodes provide natural retrieval boundaries. See `~/.claude/learnings/2026-03-30-context-window-scaling-hub-summaries.md`
