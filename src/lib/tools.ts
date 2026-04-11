@@ -1,4 +1,4 @@
-import type { GraphState, GraphUpdate } from "@/types";
+import type { GraphState, GraphUpdate, EvaluativeSignal } from "@/types";
 import { HUB_RELATIONSHIP_TYPE } from "@/types";
 import {
   addNode,
@@ -139,7 +139,7 @@ export const toolDefinitions = [
   },
   {
     name: "set_evaluative_signal",
-    description: "Capture what the organisation values, fears, or is moving toward. Detected through the natural language of conversation.",
+    description: "Capture what the organisation values, fears, or is moving toward. Detected through the natural language of conversation. When possible, link signals to the nodes they evaluate and classify their temporal horizon.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -151,6 +151,16 @@ export const toolDefinitions = [
         },
         strength: { type: "number", description: "Signal strength 1 (weak) to 5 (very strong)" },
         source_description: { type: "string", description: "What in the conversation revealed this signal" },
+        temporal_horizon: {
+          type: "string",
+          enum: ["operational", "tactical", "strategic", "foundational"],
+          description: "Time horizon: operational (days-weeks), tactical (weeks-months), strategic (months-years), foundational (ongoing/slow-moving). Omit if unclear.",
+        },
+        related_node_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "IDs of nodes this signal evaluates. Check hub context for relevant node IDs.",
+        },
       },
       required: ["label", "direction", "strength", "source_description"],
     },
@@ -431,7 +441,9 @@ export function executeTool(
         input.label as string,
         input.direction as "toward" | "away_from" | "protecting",
         input.strength as number,
-        input.source_description as string
+        input.source_description as string,
+        input.temporal_horizon as EvaluativeSignal["temporalHorizon"] | undefined,
+        input.related_node_ids as string[] | undefined
       );
       return {
         output: `Evaluative signal set: "${signal.label}" (${signal.direction}, strength ${signal.strength})`,

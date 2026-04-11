@@ -71,6 +71,13 @@ export interface TensionMarker {
   status: "unresolved" | "resolved";
 }
 
+/**
+ * Temporal horizons for evaluative signals — from Jabe Bloom's temporality model.
+ * Different levels of an organisation operate at different time scales and require
+ * different vocabularies. Agents filter signals by horizon to match their operating context.
+ */
+export type TemporalHorizon = "operational" | "tactical" | "strategic" | "foundational";
+
 export interface EvaluativeSignal {
   id: string;
   label: string;
@@ -78,6 +85,12 @@ export interface EvaluativeSignal {
   /** Extraction-time confidence/salience score (1–5), set by AI */
   strength: number;
   sourceDescription: string;
+  // ── Temporal context ─────────────────────────────────────────────────────
+  /** Time horizon this signal operates at (null = not yet classified) */
+  temporalHorizon?: TemporalHorizon | null;
+  // ── Graph connections — IDs of nodes this signal evaluates ────────────────
+  /** Node IDs linked via signal_node_links junction table */
+  relatedNodeIds?: string[];
   // ── Reflect tab scores — set by the user, nullable until rated ────────────
   /** How relevant is this signal to the current work? (1–5, null = unrated) */
   relevanceScore?: number | null;

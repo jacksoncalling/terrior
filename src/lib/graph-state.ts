@@ -277,11 +277,20 @@ export function setEvaluativeSignal(
   label: string,
   direction: EvaluativeSignal["direction"],
   strength: number,
-  sourceDescription: string
+  sourceDescription: string,
+  temporalHorizon?: EvaluativeSignal["temporalHorizon"],
+  relatedNodeIds?: string[]
 ): { state: GraphState; signal: EvaluativeSignal } {
   const existing = state.evaluativeSignals.find((s) => s.label === label);
   if (existing) {
-    const updated = { ...existing, direction, strength, sourceDescription };
+    const updated = {
+      ...existing,
+      direction,
+      strength,
+      sourceDescription,
+      ...(temporalHorizon !== undefined ? { temporalHorizon } : {}),
+      ...(relatedNodeIds !== undefined ? { relatedNodeIds } : {}),
+    };
     return {
       state: {
         ...state,
@@ -298,6 +307,8 @@ export function setEvaluativeSignal(
     direction,
     strength,
     sourceDescription,
+    ...(temporalHorizon !== undefined ? { temporalHorizon } : {}),
+    ...(relatedNodeIds && relatedNodeIds.length > 0 ? { relatedNodeIds } : {}),
   };
   return {
     state: {

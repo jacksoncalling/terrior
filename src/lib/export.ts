@@ -153,7 +153,7 @@ export function buildProjectBundle(input: BuildBundleInput): ProjectBundle {
     discovery_goal: projectBrief?.discoveryGoal ?? null,
     extraction_lens: projectBrief?.abstractionLayer ?? null,
     key_themes: projectBrief?.keyThemes ?? [],
-    attractor_preset: attractorPreset ?? (projectBrief as unknown as Record<string, unknown>)?.attractorPreset as string ?? null,
+    attractor_preset: attractorPreset ?? null,
     graph_summary: {
       entities: entityCount,
       hubs: hubCount,

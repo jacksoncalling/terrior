@@ -326,7 +326,7 @@ Respond with valid JSON ONLY — no markdown, no code blocks:
     { "description": "string", "related_labels": ["string"] }
   ],
   "evaluative_signals": [
-    { "label": "string", "direction": "toward|away_from|protecting", "strength": 1, "source": "string" }
+    { "label": "string", "direction": "toward|away_from|protecting", "strength": 1, "temporal_horizon": "operational|tactical|strategic|foundational", "related_entity_labels": ["string"], "source": "string" }
   ]
 }
 
@@ -335,6 +335,8 @@ EVALUATIVE SIGNAL RULES:
 - "label" must be a descriptive phrase of 5–12 words that makes the signal self-contained and understandable without the document. BAD: "Listening". GOOD: "Active organisational listening as foundation for agent performance". BAD: "Ethics". GOOD: "Ethical divergence between data aggregation and individual sovereignty".
 - "source" must quote or closely paraphrase the specific passage that revealed this signal (1–2 sentences max).
 - Do NOT extract generic organisational values (e.g. "transparency", "trust", "quality") unless they are specifically argued for in this document with clear stakes attached.
+- "temporal_horizon" classifies the time scale this signal operates at: "operational" (days-weeks, sprint-level), "tactical" (weeks-months, quarterly), "strategic" (months-years, directional), "foundational" (ongoing, slow-moving values/identity).
+- "related_entity_labels" should list the labels of entities (from this extraction) that this signal evaluates or relates to. This connects signals to the graph.
 
 DOCUMENT:
 ${text}`;
@@ -387,7 +389,7 @@ function assembleGraph(
     entities?: { label: string; type: string; hub?: string; attractor?: string; description: string }[];
     relationships?: { source_label: string; target_label: string; type: string; description?: string }[];
     tensions?: { description: string; related_labels: string[] }[];
-    evaluative_signals?: { label: string; direction: string; strength: number; source: string }[];
+    evaluative_signals?: { label: string; direction: string; strength: number; source: string; temporal_horizon?: string; related_entity_labels?: string[] }[];
   },
   graphState: GraphState
 ): GeminiExtractionResult {
@@ -504,6 +506,11 @@ function assembleGraph(
       (e) => e.label.toLowerCase() === s.label.toLowerCase()
     );
     if (!existing) {
+      // Resolve related entity labels to node IDs
+      const relatedNodeIds = (s.related_entity_labels ?? [])
+        .map((label: string) => labelToId[label?.toLowerCase()])
+        .filter(Boolean) as string[];
+
       currentGraph = {
         ...currentGraph,
         evaluativeSignals: [
@@ -514,6 +521,8 @@ function assembleGraph(
             direction: (s.direction as "toward" | "away_from" | "protecting") || "toward",
             strength: Math.round(s.strength || 3),
             sourceDescription: s.source || "Extracted from document",
+            temporalHorizon: s.temporal_horizon as "operational" | "tactical" | "strategic" | "foundational" | undefined,
+            ...(relatedNodeIds.length > 0 ? { relatedNodeIds } : {}),
           },
         ],
       };

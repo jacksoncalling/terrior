@@ -37,7 +37,7 @@ Respond with valid JSON in this exact format:
     { "description": "string", "related_labels": ["string"] }
   ],
   "evaluative_signals": [
-    { "label": "string", "direction": "toward|away_from|protecting", "strength": 1-5, "source": "string" }
+    { "label": "string", "direction": "toward|away_from|protecting", "strength": 1-5, "temporal_horizon": "operational|tactical|strategic|foundational", "related_entity_labels": ["string"], "source": "string" }
   ]
 }`;
 
@@ -172,6 +172,11 @@ export async function extractFromNarrative(
       (e) => e.label.toLowerCase() === s.label?.toLowerCase()
     );
     if (!existing) {
+      // Resolve related entity labels to node IDs (if provided)
+      const relatedNodeIds = (s.related_entity_labels ?? [])
+        .map((label: string) => labelToId[label?.toLowerCase()])
+        .filter(Boolean) as string[];
+
       currentGraph = {
         ...currentGraph,
         evaluativeSignals: [
@@ -182,6 +187,8 @@ export async function extractFromNarrative(
             direction: s.direction || "toward",
             strength: s.strength || 3,
             sourceDescription: s.source || "Extracted from narrative",
+            temporalHorizon: s.temporal_horizon as "operational" | "tactical" | "strategic" | "foundational" | undefined,
+            ...(relatedNodeIds.length > 0 ? { relatedNodeIds } : {}),
           },
         ],
       };

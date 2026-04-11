@@ -712,12 +712,34 @@ export async function loadOntology(projectId: string): Promise<GraphState> {
     status: row.status,
   }));
 
+  // ── Load signal-to-node links (junction table) ──────────────────────────
+  // Falls back gracefully if the table doesn't exist yet (pre-migration).
+  let signalNodeMap: Record<string, string[]> = {};
+  try {
+    const { data: linkData } = await supabase
+      .from('signal_node_links')
+      .select('signal_id, node_id')
+      .in('signal_id', (signalsRes.data ?? []).map((s) => s.id));
+    if (linkData) {
+      for (const link of linkData) {
+        if (!signalNodeMap[link.signal_id]) signalNodeMap[link.signal_id] = [];
+        signalNodeMap[link.signal_id].push(link.node_id);
+      }
+    }
+  } catch {
+    // Table doesn't exist yet — signals load without node links
+  }
+
   const evaluativeSignals: EvaluativeSignal[] = (signalsRes.data ?? []).map((row) => ({
     id: row.id,
     label: row.label,
     direction: row.direction,
     strength: row.strength,
     sourceDescription: row.source_description ?? '',
+    // Temporal horizon — nullable until classified
+    temporalHorizon: row.temporal_horizon ?? null,
+    // Graph connections — from junction table
+    relatedNodeIds: signalNodeMap[row.id] ?? [],
     // Reflect tab scores — nullable until the user rates the signal
     relevanceScore: row.relevance_score ?? null,
     intensityScore: row.intensity_score ?? null,
@@ -845,6 +867,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
         direction: s.direction,
         strength: Math.round(s.strength),
         source_description: s.sourceDescription,
+        temporal_horizon: s.temporalHorizon ?? null,
         // Preserve reflect scores — null means unrated, not "clear existing value"
         relevance_score: s.relevanceScore ?? null,
         intensity_score: s.intensityScore ?? null,
@@ -854,6 +877,33 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
       { onConflict: 'id', ignoreDuplicates: false }
     );
     if (error) throw new Error(`saveOntology signals: ${error.message}`);
+
+    // ── Sync signal-to-node links (junction table) ───────────────────────
+    // Replace-all strategy: delete ALL existing links for current signals,
+    // then re-insert only those that still have links. This ensures signals
+    // that lost their links get cleaned up too.
+    // Falls back gracefully if the table doesn't exist yet (pre-migration).
+    try {
+      const allSignalIds = state.evaluativeSignals.map((s) => s.id);
+      if (allSignalIds.length > 0) {
+        await supabase
+          .from('signal_node_links')
+          .delete()
+          .in('signal_id', allSignalIds);
+      }
+
+      const links = state.evaluativeSignals.flatMap((s) =>
+        (s.relatedNodeIds ?? []).map((nodeId) => ({
+          signal_id: s.id,
+          node_id: nodeId,
+        }))
+      );
+      if (links.length > 0) {
+        await supabase.from('signal_node_links').insert(links);
+      }
+    } catch {
+      // Table doesn't exist yet — skip silently
+    }
   }
 
   // ── Upsert entity type configs ────────────────────────────────────────────
