@@ -33,31 +33,30 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-09
+## Current State — Updated 2026-04-12
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
 - Three ontology presets (Enterprise, Startup, Individual) with hub-specific seeding
 - Hub nodes as real graph entities — taxonomy→ontology shift. Every entity connects via `belongs_to_hub`.
-- **Compact canvas mode** — graphs with 40+ nodes auto-switch to 16px colored circles (24px for hubs). Dramatically reduces DOM paint cost at scale.
-- **Force-directed layout** — compact mode uses d3-force (Obsidian-style organic globe) instead of dagre. Hub edges excluded from simulation to prevent star distortion. Dagre retained for card mode (<40 nodes).
-- **Click-to-highlight** — selecting a node glows it + direct neighbors, dims everything else. Selected node shows its label below the circle. Edge labels hidden in compact mode to prevent hotspot clutter.
-- **Viewport stability** — fitView only fires on explicit Auto-layout click, not on node selection. `overflow-hidden` + `min-h-0` on flex containers prevents page overflow/scroll-to-bottom.
-- **ScorePicker CSS circles** — evaluative signal intensity/relevance dots use fixed-size styled divs instead of Unicode glyphs (no more jitter on hover).
-- **Canvas performance** — O(1) hub color lookup, two-phase render split. 1000-node graphs load and scroll.
-- **Nested project adoption** — `adoptProject` + `unnestProject` functions, modal + action on projects page.
-- Topology-aware signal enrichment, emergent zone, graph clarity features, share button, collapsible Inspector — all working.
+- **Language-consistent extraction** — Gemini + Sonnet prompts now enforce single-language output matching the source document. No more mixed German/English types.
+- **Hub preset enforcement** — extraction prompt requires exact hub slugs; unmatched values remap to emergent with console warning. Code-level fallback in `assembleGraph`.
+- **Type case normalization** — `.toLowerCase()` on all entity type creation paths (Gemini, Sonnet, chat tools). Prevents `Aspiration`/`aspiration` splits.
+- **Enriched JSON export (v1.1)** — `meta` block with project brief, discovery goal, key themes, attractor preset, graph summary with attractor distribution. Agent-oriented header for system prompt injection.
+- **Temporal horizons on evaluative signals** — `TemporalHorizon` type (operational/tactical/strategic/foundational) from Jabe Bloom's temporality model. Extraction prompts classify signals by time scale.
+- **Signal-to-node linking** — `relatedNodeIds` on `EvaluativeSignal`, backed by `signal_node_links` junction table. Extraction prompts propose links; `loadOntology`/`saveOntology` sync them. Graceful fallback pre-migration.
+- Compact canvas mode, force-directed layout, click-to-highlight, viewport stability, topology-aware enrichment, nested project adoption — all working.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
 - **`enrichState` stale after external signal change** — needs `useEffect` reset on signal count change.
-- **Graph density in hotspots** — force layout clusters highly-connected nodes tightly. Needs journey-mapped UX definition for how progressive disclosure should work (zoom levels, hover behavior, label visibility).
+- **Graph density in hotspots** — force layout clusters highly-connected nodes tightly. Needs journey-mapped UX definition.
 
 ### What's next
-1. **`/feature-journey` on graph interaction** — define the complete UX for exploring the knowledge graph (zoom, click, highlight, read) before more implementation. Skill created this session.
-2. **Founder demo (~April 21)** — test compact canvas + highlight + nested projects with real data.
-3. **Manual verification** — test adopt/unnest flow end-to-end on deployed Vercel.
+1. **Founder demo (~April 21)** — test extraction fixes with real documents (English + German), verify hub enforcement + type normalization, demo enriched export.
+2. **Bottom-up hub experiment** — revised spec ready at `.claude/designs/TERROIR_bottom_up_hub_experiment.md`. Needs staging tables, experiment tools, clustering route. Run after 10+ documents.
+3. **Signal UI for temporal horizons** — display `temporalHorizon` badge + node links in the Reflect tab's SignalCard component.
 
 ---
 
