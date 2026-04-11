@@ -222,7 +222,7 @@ export function executeTool(
       const { state, node } = addNode(
         graphState,
         input.label as string,
-        input.type as string,
+        (input.type as string).toLowerCase(), // normalize casing to prevent duplicates
         input.description as string,
         getAutoPosition(),
         input.properties as Record<string, string> | undefined,
@@ -258,7 +258,7 @@ export function executeTool(
       const updates: Partial<{ label: string; description: string; type: string }> = {};
       if (input.label) updates.label = input.label as string;
       if (input.description) updates.description = input.description as string;
-      if (input.type) updates.type = input.type as string;
+      if (input.type) updates.type = (input.type as string).toLowerCase(); // normalize casing
 
       const state = updateNode(
         graphState,

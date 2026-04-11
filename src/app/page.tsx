@@ -525,6 +525,7 @@ export default function Home() {
       projectBrief,
       synthesisResult,
       documentCount,
+      attractorPreset: (project?.metadata as Record<string, unknown>)?.attractorPreset as string ?? null,
     });
     downloadProjectBundle(bundle);
   }, [project, graphState, projectBrief, synthesisResult, documentCount]);

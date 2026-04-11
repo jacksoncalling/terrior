@@ -266,9 +266,10 @@ Extract COMPREHENSIVELY — capture every meaningful entity and relationship.`;
       .join("\n");
     hubInstructions = `
 HUB CATEGORIES (structural scaffolding — these are real nodes in the graph):
-Each entity MUST be assigned a "hub" from this list. Choose the BEST-FITTING hub based on the entity's primary role in the organisation. "emergent" is reserved for entities that genuinely don't fit any category — it signals novelty, not uncertainty. If you can make a reasonable case for a hub, use it.
+Each entity MUST be assigned a "hub" from this list using the EXACT slug value shown. Do NOT invent new hub categories. Choose the BEST-FITTING hub based on the entity's primary role in the organisation. Use "emergent" ONLY for entities that genuinely don't fit any category — it signals novelty, not uncertainty. If you can make a reasonable case for a hub, use it.
 ${hubList}
 
+The "hub" field MUST be one of the exact slug values listed above. Any other value will be remapped to "emergent".
 The "type" field is a separate freeform descriptive tag (e.g. "concept", "role", "workflow"). Both fields are required.`;
   } else {
     // Fallback: use preset config (for projects without seeded hubs yet)
@@ -279,9 +280,10 @@ The "type" field is a separate freeform descriptive tag (e.g. "concept", "role",
       .join("\n");
     hubInstructions = `
 HUB CATEGORIES (structural scaffolding):
-Each entity MUST be assigned a "hub" from this list. Choose the BEST-FITTING hub based on the entity's primary role in the organisation. "emergent" is reserved for entities that genuinely don't fit any category — it signals novelty, not uncertainty. If you can make a reasonable case for a hub, use it.
+Each entity MUST be assigned a "hub" from this list using the EXACT slug value shown. Do NOT invent new hub categories. Choose the BEST-FITTING hub based on the entity's primary role in the organisation. Use "emergent" ONLY for entities that genuinely don't fit any category — it signals novelty, not uncertainty. If you can make a reasonable case for a hub, use it.
 ${attractorList}
 
+The "hub" field MUST be one of the exact slug values listed above. Any other value will be remapped to "emergent".
 The "type" field is a separate freeform descriptive tag (e.g. "concept", "role", "workflow"). Both fields are required.`;
   }
 
@@ -302,7 +304,12 @@ ${CANONICAL_REL_LIST}
 Choose the closest match. Use lowercase only. If none fit, use "relates_to" as a last resort — this should be rare (<10% of edges).
 The "description" field on the relationship is where nuance goes — the type is for traversal, the description is for understanding.
 
-LANGUAGE: Entity labels and descriptions may be in German or English — preserve the original language of the source material. Relationship TYPES must always be English (from the canonical list above). Relationship DESCRIPTIONS can be in the source language.
+LANGUAGE CONSISTENCY (critical — do not mix languages):
+- Detect the primary language of the source document.
+- ALL entity labels, types, and descriptions MUST be in that same language. If the document is in German, output German. If in English, output English. Do NOT mix languages.
+- Relationship TYPES must always be English (from the canonical list above).
+- Relationship DESCRIPTIONS should match the source document language.
+- Hub values are always English slugs (from the list above) — these are structural IDs, not labels.
 
 CRITICAL: Do NOT create duplicate entities. Check the existing graph context below.
 ${existingContext}${projectContext}
@@ -411,15 +418,16 @@ function assembleGraph(
     const hubSlug = entity.hub || entity.attractor || "emergent";
     let hubNode = findHubByAttractorId(hubSlug, currentGraph);
     if (!hubNode && hubSlug !== "emergent") {
+      console.warn(`[gemini] Hub slug "${hubSlug}" not found for entity "${entity.label}" — remapping to emergent`);
       hubNode = findHubByAttractorId("emergent", currentGraph);
     }
 
     // Cache the resolved attractor — if we fell back to emergent, reflect that
-    const resolvedAttractor = hubNode?.properties?.attractor_id ?? hubSlug;
+    const resolvedAttractor = hubNode?.properties?.attractor_id ?? (hubNode ? hubSlug : "emergent");
     const node: GraphNode = {
       id,
       label: entity.label,
-      type: entity.type || "concept",
+      type: (entity.type || "concept").toLowerCase(), // normalize casing to prevent duplicates like Aspiration/aspiration
       attractor: resolvedAttractor,
       description: entity.description || "",
       position,

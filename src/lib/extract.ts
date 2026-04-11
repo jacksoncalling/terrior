@@ -20,6 +20,11 @@ Follow the Cutler workflow:
 
 IMPORTANT: Extract COMPREHENSIVELY. Capture every meaningful entity and relationship, not just the main topic.
 
+LANGUAGE CONSISTENCY (critical — do not mix languages):
+- Detect the primary language of the source text.
+- ALL entity labels, types, and descriptions MUST be in that same language. If the text is in German, output German. If in English, output English. Do NOT mix languages.
+- Relationship types and descriptions should match the source language.
+
 Respond with valid JSON in this exact format:
 {
   "entities": [
@@ -100,7 +105,7 @@ export async function extractFromNarrative(
     const node: GraphNode = {
       id,
       label: entity.label,
-      type: entity.type || "concept",
+      type: (entity.type || "concept").toLowerCase(), // normalize casing to prevent duplicates like Aspiration/aspiration
       description: entity.description || "",
       position,
     };
