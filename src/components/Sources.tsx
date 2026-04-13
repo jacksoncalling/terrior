@@ -24,6 +24,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { GraphState, GraphUpdate, ProjectBrief, DocumentClassification, ClassificationVerdict, IntegrationResult } from "@/types";
 import { autoLayout } from "@/lib/layout";
+import { getProjectDocumentHeaders } from "@/lib/supabase";
 
 interface SourceFile {
   id: string;
@@ -73,6 +74,33 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
   useEffect(() => {
     latestGraphRef.current = graphState;
   }, [graphState]);
+
+  // ── Restore document history from Supabase on mount / project switch ─────
+  // Sources.tsx starts with an empty `files` list every session. This effect
+  // fetches lightweight headers (id + title, no content) for documents that
+  // were uploaded in previous sessions and hydrates them as "done" entries so
+  // the user can always see what has been processed. Only runs when the file
+  // list is empty to avoid overwriting an active upload session.
+  useEffect(() => {
+    if (!projectId || files.length > 0) return;
+
+    getProjectDocumentHeaders(projectId)
+      .then((headers) => {
+        if (headers.length === 0) return;
+        const restored: SourceFile[] = headers.map((h) => ({
+          id: uuidv4(),         // local UI id — not the Supabase document id
+          documentId: h.id,     // Supabase id — used by removeFile for deletion
+          name: h.title,
+          size: 0,              // content not fetched; size unknown
+          status: "done",
+        }));
+        setFiles(restored);
+      })
+      .catch((err) =>
+        console.warn("[Sources] Failed to restore document history (non-fatal):", err)
+      );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]); // intentionally exclude `files` — only run on project change
 
   const updateFile = useCallback((id: string, updates: Partial<SourceFile>) => {
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
@@ -761,7 +789,7 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                       }`}
                     >
                       {statusLabel(f)}
-                      {f.status !== "error" && f.status !== "skipped" && (
+                      {f.status !== "error" && f.status !== "skipped" && f.size > 0 && (
                         <span className="text-stone-300"> · {formatSize(f.size)}</span>
                       )}
                     </p>

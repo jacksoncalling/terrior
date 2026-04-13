@@ -606,8 +606,16 @@ export default function Home() {
   const handleGraphUpdate = useCallback(
     (updatedGraph: GraphState, updates: GraphUpdate[]) => {
       setGraphState(updatedGraph);
-      // Keep documentCount in sync — each successful Sources upload = +1 doc
-      setDocumentCount((prev) => prev + 1);
+
+      // Re-fetch the accurate document count from Supabase rather than
+      // incrementing blindly. This handles both new uploads and integration
+      // passes (which also call onGraphUpdate with empty updates — a naive
+      // increment would inflate the count incorrectly).
+      if (projectId) {
+        countProjectDocuments(projectId)
+          .then(setDocumentCount)
+          .catch((err) => console.warn('countProjectDocuments refresh failed (non-fatal):', err));
+      }
 
       const entityCount = updates.filter((u) => u.type === "node_created").length;
       const relCount    = updates.filter((u) => u.type === "relationship_created").length;
@@ -624,7 +632,7 @@ export default function Home() {
         setGraphUpdatesMap((prev) => ({ ...prev, [msg.id]: updates }));
       }
     },
-    []
+    [projectId]
   );
 
   // ── Phase 2: Synthesis handler ────────────────────────────────────────────

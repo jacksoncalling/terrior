@@ -479,7 +479,10 @@ export default function Chat({
   };
 
   return (
-    <div className="flex h-full flex-col">
+    // flex-1 + min-h-0: Chat takes remaining space in the parent flex column,
+    // leaving the bottom action bar visible. h-full would consume 100% of the
+    // parent height and push the bar off-screen.
+    <div className="flex flex-1 flex-col min-h-0">
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
         <div>

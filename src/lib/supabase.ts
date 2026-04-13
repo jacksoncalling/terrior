@@ -254,6 +254,29 @@ export async function countProjectDocuments(projectId: string): Promise<number> 
 }
 
 /**
+ * Fetches lightweight document headers (no content) for a project.
+ * Used by the Sources panel to restore the uploaded-documents list across
+ * sessions without pulling full document content into the browser.
+ */
+export async function getProjectDocumentHeaders(
+  projectId: string
+): Promise<{ id: string; title: string; created_at: string }[]> {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('id, title, created_at')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw new Error(`getProjectDocumentHeaders: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title ?? 'Untitled',
+    created_at: row.created_at ?? '',
+  }));
+}
+
+/**
  * Fetches all documents for a project, ordered by creation date.
  * Used by the synthesis route to load full document content into Haiku's
  * context window and by the reprocess route to rebuild the graph.
