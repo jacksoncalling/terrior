@@ -19,6 +19,7 @@ interface InspectorProps {
   onBriefUpdate?: (updates: Partial<ProjectBrief>) => void;
   onStartScoping?: () => void;
   onReprocess?: () => void;
+  projectId?: string;
 }
 
 export default function Inspector({
@@ -35,6 +36,7 @@ export default function Inspector({
   onStartScoping,
   onReprocess,
   attractors = [],
+  projectId,
 }: InspectorProps) {
   const selectedNode = selectedNodeId
     ? graphState.nodes.find((n) => n.id === selectedNodeId)
@@ -47,6 +49,12 @@ export default function Inspector({
   const [editDescription, setEditDescription] = useState("");
   const [editType, setEditType] = useState("");
   const [editAttractor, setEditAttractor] = useState("");
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ ok: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    setSyncStatus(null);
+  }, [projectId]);
 
   useEffect(() => {
     if (selectedNode) {
@@ -139,6 +147,48 @@ export default function Inspector({
 
             {/* Evaluative signals live in the Reflect tab (Chat panel) */}
           </div>
+
+          {/* ── Filesystem sync ──────────────────────────────────────────── */}
+          {projectId && (
+            <div className="pt-3 border-t border-stone-100 space-y-2">
+              <button
+                onClick={async () => {
+                  setSyncLoading(true);
+                  setSyncStatus(null);
+                  try {
+                    const res = await fetch("/api/export-to-files", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ projectId }),
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                      const { filesWritten, projectSlug } = data.result;
+                      setSyncStatus({
+                        ok: true,
+                        message: `Exported ${filesWritten.length} files to exports/${projectSlug}`,
+                      });
+                    } else {
+                      setSyncStatus({ ok: false, message: data.error ?? "Export failed" });
+                    }
+                  } catch (err) {
+                    setSyncStatus({ ok: false, message: err instanceof Error ? err.message : "Export failed" });
+                  } finally {
+                    setSyncLoading(false);
+                  }
+                }}
+                disabled={syncLoading}
+                className="w-full rounded-xl border border-stone-200 py-2 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-50"
+              >
+                {syncLoading ? "Syncing…" : "Sync to filesystem"}
+              </button>
+              {syncStatus && (
+                <p className={`text-[11px] leading-snug ${syncStatus.ok ? "text-green-600" : "text-red-500"}`}>
+                  {syncStatus.message}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

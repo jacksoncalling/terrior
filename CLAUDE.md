@@ -205,6 +205,15 @@ Or use the VS Code launch config (`terroir-dev`).
 
 ## Patterns & Gotchas
 
+**Filesystem export**
+- `POST /api/export-to-files` writes a markdown folder projection of a project to disk. Triggered from the Inspector "Sync to filesystem" button.
+- Default output: `<repo-root>/exports/<project-slug>/`. Override with env var:
+  ```
+  TERROIR_EXPORT_ROOT=/absolute/path/to/exports
+  ```
+- Output shape: `README.md`, `hubs/`, `nodes/`, `signals/`, `tensions/`, `_meta/export.json`. The JSON mirror is lossless; markdown files are for human/agent legibility.
+- Second export of the same project cleanly overwrites the first (wipe-then-write). Known limitation: concurrent exports of the same project will race — acceptable for v1.
+
 **Architecture**
 - **Three-agent division:** Gemini = all document work (extract + classify + synthesise). Sonnet = chat + graph tools. Haiku = scoping dialogue only. Never cross these boundaries.
 - **Abstraction layer is explicit:** three presets fed to Gemini — never default to "extract everything". Set in ProjectBrief, passed to every Gemini extraction call.

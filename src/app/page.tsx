@@ -1172,6 +1172,7 @@ export default function Home() {
               onStartScoping={() => setScopingOpen(true)}
               onReprocess={handleReprocess}
               attractors={activeAttractors}
+              projectId={projectId ?? undefined}
             />
           </div>
         )}
