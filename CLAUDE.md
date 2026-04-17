@@ -33,30 +33,31 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-12
+## Current State — Updated 2026-04-17
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
 - Three ontology presets (Enterprise, Startup, Individual) with hub-specific seeding
 - Hub nodes as real graph entities — taxonomy→ontology shift. Every entity connects via `belongs_to_hub`.
-- **Language-consistent extraction** — Gemini + Sonnet prompts now enforce single-language output matching the source document. No more mixed German/English types.
-- **Hub preset enforcement** — extraction prompt requires exact hub slugs; unmatched values remap to emergent with console warning. Code-level fallback in `assembleGraph`.
-- **Type case normalization** — `.toLowerCase()` on all entity type creation paths (Gemini, Sonnet, chat tools). Prevents `Aspiration`/`aspiration` splits.
-- **Enriched JSON export (v1.1)** — `meta` block with project brief, discovery goal, key themes, attractor preset, graph summary with attractor distribution. Agent-oriented header for system prompt injection.
-- **Temporal horizons on evaluative signals** — `TemporalHorizon` type (operational/tactical/strategic/foundational) from Jabe Bloom's temporality model. Extraction prompts classify signals by time scale.
-- **Signal-to-node linking** — `relatedNodeIds` on `EvaluativeSignal`, backed by `signal_node_links` junction table. Extraction prompts propose links; `loadOntology`/`saveOntology` sync them. Graceful fallback pre-migration.
-- Compact canvas mode, force-directed layout, click-to-highlight, viewport stability, topology-aware enrichment, nested project adoption — all working.
+- **Language-consistent extraction** — Gemini + Sonnet prompts enforce single-language output matching the source document.
+- **Hub preset enforcement** — extraction prompt requires exact hub slugs; unmatched values remap to emergent with console warning.
+- **Type case normalization** — `.toLowerCase()` on all entity type creation paths.
+- **Enriched JSON export (v1.1)** — `meta` block with project brief, discovery goal, key themes, attractor preset, graph summary.
+- **Temporal horizons on evaluative signals** — `TemporalHorizon` type from Jabe Bloom's model. Extraction prompts classify by time scale.
+- **Signal-to-node linking** — `relatedNodeIds` on `EvaluativeSignal`, backed by `signal_node_links` junction table.
+- **Filesystem export** — `POST /api/export-to-files` writes a markdown folder projection to disk (`hubs/`, `nodes/`, `signals/`, `tensions/`, `_meta/export.json`). Triggered from Inspector "Sync to filesystem" button. Local dev only (Vercel guard). Set `TERROIR_EXPORT_ROOT` to override output path.
+- **Public read endpoint** — `GET /api/export?projectId=xxx` returns the full project bundle as JSON, live from Supabase. CORS open. Any agent (Mistral, Claude Code, curl) reads the graph with one HTTP request — no local server, no credentials.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
 - **`enrichState` stale after external signal change** — needs `useEffect` reset on signal count change.
-- **Graph density in hotspots** — force layout clusters highly-connected nodes tightly. Needs journey-mapped UX definition.
+- **Graph density in hotspots** — force layout clusters highly-connected nodes tightly.
 
 ### What's next
-1. **Founder demo (~April 21)** — test extraction fixes with real documents (English + German), verify hub enforcement + type normalization, demo enriched export.
-2. **Bottom-up hub experiment** — revised spec ready at `.claude/designs/TERROIR_bottom_up_hub_experiment.md`. Needs staging tables, experiment tools, clustering route. Run after 10+ documents.
-3. **Signal UI for temporal horizons** — display `temporalHorizon` badge + node links in the Reflect tab's SignalCard component.
+1. **eoniq demo (April 21)** — create eoniq project in Terroir, run workshop with Matthias, share `GET /api/export?projectId=<eoniq-id>` URL with his dev for Mistral agent.
+2. **Canal PoC setup for Matthias** — add Matthias + dev Telegram user IDs to `ALLOWED_USER_IDS`, implement persistent per-user project routing (survives Render restarts), wire to eoniq project.
+3. **Bottom-up hub experiment** — spec at `.claude/designs/TERROIR_bottom_up_hub_experiment.md`. Run after 10+ documents ingested.
 
 ---
 
