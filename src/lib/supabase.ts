@@ -758,6 +758,9 @@ export async function loadOntology(projectId: string): Promise<GraphState> {
     label: row.label,
     direction: row.direction,
     strength: row.strength,
+    intensity: row.strength, // strength is the DB column; intensity is the semantic alias
+    thresholdProximity: row.threshold_proximity ?? null,
+    atCostOf: row.at_cost_of ?? null,
     sourceDescription: row.source_description ?? '',
     // Temporal horizon — nullable until classified
     temporalHorizon: row.temporal_horizon ?? null,
@@ -888,8 +891,10 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
         project_id: projectId,
         label: s.label,
         direction: s.direction,
-        strength: Math.round(s.strength),
+        strength: Math.round(s.intensity ?? s.strength),
         source_description: s.sourceDescription,
+        threshold_proximity: s.thresholdProximity ?? null,
+        at_cost_of: s.atCostOf ?? null,
         temporal_horizon: s.temporalHorizon ?? null,
         // Preserve reflect scores — null means unrated, not "clear existing value"
         relevance_score: s.relevanceScore ?? null,

@@ -326,17 +326,115 @@ Respond with valid JSON ONLY — no markdown, no code blocks:
     { "description": "string", "related_labels": ["string"] }
   ],
   "evaluative_signals": [
-    { "label": "string", "direction": "toward|away_from|protecting", "strength": 1, "temporal_horizon": "operational|tactical|strategic|foundational", "related_entity_labels": ["string"], "source": "string" }
+    {
+      "label": "string",
+      "direction": "toward|away_from|protecting",
+      "intensity": 1,
+      "threshold_proximity": 1,
+      "at_cost_of": "string",
+      "temporal_horizon": "operational|tactical|strategic|foundational",
+      "related_entity_labels": ["string"],
+      "source": "string"
+    }
   ]
 }
 
-EVALUATIVE SIGNAL RULES:
-- Extract at most 5 signals per document. Prioritise the most significant — things that are clearly and strongly expressed, not every passing mention.
-- "label" must be a descriptive phrase of 5–12 words that makes the signal self-contained and understandable without the document. BAD: "Listening". GOOD: "Active organisational listening as foundation for agent performance". BAD: "Ethics". GOOD: "Ethical divergence between data aggregation and individual sovereignty".
-- "source" must quote or closely paraphrase the specific passage that revealed this signal (1–2 sentences max).
-- Do NOT extract generic organisational values (e.g. "transparency", "trust", "quality") unless they are specifically argued for in this document with clear stakes attached.
-- "temporal_horizon" classifies the time scale this signal operates at: "operational" (days-weeks, sprint-level), "tactical" (weeks-months, quarterly), "strategic" (months-years, directional), "foundational" (ongoing, slow-moving values/identity).
-- "related_entity_labels" should list the labels of entities (from this extraction) that this signal evaluates or relates to. This connects signals to the graph.
+GRADIENT SIGNAL RULES:
+
+What counts as a gradient signal:
+A gradient is a directional pressure in the organisation's evaluative field. It has a direction (toward / away from / protecting), a magnitude (how strongly expressed), a threshold it is approaching (stability, collapse, or transition), and a cost (what is being traded off or given up). If a candidate cannot answer all four, it is not a gradient — it is an aspirational phrase. Do not extract it.
+
+Hard limits:
+- Extract AT MOST 2 gradients per document. Many documents should return ZERO — that is correct. A document with no real stakes has no gradients.
+- A gradient must name what is at risk, at whose cost, or under what pressure. A statement of values without stakes is not a gradient.
+
+Exclusions (do NOT extract):
+- Mission-statement phrasing ("we value quality", "we believe in transparency")
+- Organisational virtues stated without friction or trade-off
+- Aspirational language without a threshold or cost ("we aim to be the best", "we are customer-first")
+- Anything that could be copied unchanged onto another organisation's website
+- Generic industry values ("data-driven", "agile", "innovative")
+
+Required for every gradient:
+- "label" — a directional statement, 6–15 words, in one of these grammars:
+    · "Moving toward X, at the cost of Y"
+    · "Protecting X from erosion by Y"
+    · "Pulling away from X, opening exposure to Y"
+    · "Holding the line on X under pressure from Y"
+  The label must be self-contained: a reader who hasn't seen the document should understand both what is moving and what is being traded off.
+- "direction" — toward | away_from | protecting
+- "intensity" — 1 (faintly expressed) to 5 (repeatedly and forcefully expressed with multiple reinforcing passages)
+- "threshold_proximity" — 1 (stable, far from any tipping point) to 5 (on the edge, one event away from flipping). If no threshold can be located, set to 1.
+- "at_cost_of" — a short phrase naming what is given up, risked, or eroded by this gradient's direction. Required. If nothing is at cost, it is not a gradient.
+- "temporal_horizon" — operational (days-weeks) | tactical (weeks-months) | strategic (months-years) | foundational (ongoing identity)
+- "related_entity_labels" — the entities from this extraction that this gradient pulls on. At least one.
+- "source" — the specific passage (1–2 sentences max) that revealed this gradient. Must be quoted or closely paraphrased from the document.
+
+Test each candidate with these three questions. If any answer is "no," do not extract:
+1. Can I name what is being moved toward or protected?
+2. Can I name what is being given up as a consequence?
+3. Can I name a threshold — even roughly — that this gradient is approaching or sitting against?
+
+GOLD-STANDARD EXAMPLES (from a 2-person AI logistics startup context — adapt grammar and domain to the actual document):
+
+Example 1 — Cost ceiling gradient:
+{
+  "label": "Moving toward deeper fleet integration, at the cost of onboarding speed",
+  "direction": "toward",
+  "intensity": 4,
+  "threshold_proximity": 3,
+  "at_cost_of": "rapid pilot-to-production timelines; fleet managers tolerate 2 weeks of friction but not 2 months",
+  "temporal_horizon": "tactical",
+  "related_entity_labels": ["Fleet Integration Layer", "Pilot Onboarding Flow"],
+  "source": "Operations lead said they could absorb two weeks of onboarding friction; beyond that the internal case for staying with the current tooling wins by default."
+}
+
+Example 2 — Sacred value gradient:
+{
+  "label": "Protecting driver data sovereignty from erosion by cloud-hosted location services",
+  "direction": "protecting",
+  "intensity": 5,
+  "threshold_proximity": 5,
+  "at_cost_of": "performance gains from centralised model training and any cloud-native analytics",
+  "temporal_horizon": "foundational",
+  "related_entity_labels": ["Driver Location Data", "On-Prem Deployment"],
+  "source": "Any cloud-hosted driver location data will kill the deal regardless of performance gains — stated three separate times, once with a hand slap on the table."
+}
+
+Example 3 — Trust erosion gradient:
+{
+  "label": "Pulling away from automated dispatch, opening exposure to shipper trust collapse",
+  "direction": "away_from",
+  "intensity": 3,
+  "threshold_proximity": 4,
+  "at_cost_of": "efficiency gains from full automation; decision support with explainable handoff is the fallback",
+  "temporal_horizon": "strategic",
+  "related_entity_labels": ["Automated Dispatch", "Shipper Trust"],
+  "source": "Shipper trust in AI-generated dispatch erodes after a single wrong routing call. It isn't cumulative — one strike and the dispatcher is cut out of the decision loop."
+}
+
+Example 4 — Permission gradient:
+{
+  "label": "Holding the line on fleet-manager autonomy under pressure from procurement oversight",
+  "direction": "protecting",
+  "intensity": 4,
+  "threshold_proximity": 3,
+  "at_cost_of": "speed of adoption above €15k/month — larger commitments drop into a 6-week legal cycle",
+  "temporal_horizon": "tactical",
+  "related_entity_labels": ["Fleet Manager Role", "Procurement Review Process"],
+  "source": "Fleet managers can authorise new tooling up to €15k/month without procurement; anything above triggers a six-week review that kills momentum."
+}
+
+Counter-example — DO NOT extract this (declared value without stakes):
+{ "label": "Commitment to data-driven decision making" }
+Reason: no direction, no cost, no threshold, no stakes. Mission-statement phrase, not a gradient.
+
+Counter-example — DO NOT extract this (concern without cost):
+{ "label": "Ethical AI practices are important to the team" }
+Reason: no trade-off named. Protecting ethical practices from what? At the cost of what? Without answers, it is aspiration, not gradient.
+
+Final check:
+Before writing any gradient, re-read your candidate against the three test questions above. If you cannot answer all three from the source passage, leave it out. An empty evaluative_signals array is a valid and often correct answer.
 
 DOCUMENT:
 ${text}`;
@@ -389,7 +487,7 @@ function assembleGraph(
     entities?: { label: string; type: string; hub?: string; attractor?: string; description: string }[];
     relationships?: { source_label: string; target_label: string; type: string; description?: string }[];
     tensions?: { description: string; related_labels: string[] }[];
-    evaluative_signals?: { label: string; direction: string; strength: number; source: string; temporal_horizon?: string; related_entity_labels?: string[] }[];
+    evaluative_signals?: { label: string; direction: string; strength?: number; intensity?: number; threshold_proximity?: number; at_cost_of?: string; source: string; temporal_horizon?: string; related_entity_labels?: string[] }[];
   },
   graphState: GraphState
 ): GeminiExtractionResult {
@@ -511,6 +609,8 @@ function assembleGraph(
         .map((label: string) => labelToId[label?.toLowerCase()])
         .filter(Boolean) as string[];
 
+      // Normalise intensity: new extractions supply `intensity`; legacy extractions supply `strength`.
+      const resolvedIntensity = Math.round(s.intensity ?? s.strength ?? 3);
       currentGraph = {
         ...currentGraph,
         evaluativeSignals: [
@@ -519,7 +619,10 @@ function assembleGraph(
             id: uuidv4(),
             label: s.label,
             direction: (s.direction as "toward" | "away_from" | "protecting") || "toward",
-            strength: Math.round(s.strength || 3),
+            strength: resolvedIntensity,
+            intensity: resolvedIntensity,
+            thresholdProximity: s.threshold_proximity ?? null,
+            atCostOf: s.at_cost_of ?? null,
             sourceDescription: s.source || "Extracted from document",
             temporalHorizon: s.temporal_horizon as "operational" | "tactical" | "strategic" | "foundational" | undefined,
             ...(relatedNodeIds.length > 0 ? { relatedNodeIds } : {}),

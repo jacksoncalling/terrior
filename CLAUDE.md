@@ -33,7 +33,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-18
+## Current State — Updated 2026-04-18 (session 2)
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
@@ -51,6 +51,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Jagged border = emergent + high-intensity** — three-state border on both node types: integrated (solid), emergent+low (dotted grey), emergent+high-intensity (jagged clip-path). Threshold: `JAGGED_INTENSITY_THRESHOLD = 10`. Tension red border still wins priority.
 - **Session Delta narration** — `POST /api/session-delta` diffs the last two `graph_snapshots` and asks Sonnet to describe changes in plain prose. Collapsible card at top of Reflect tab. Requires `graph_snapshots` migration (see below).
 - **Graph snapshots** — one snapshot per integration run (fire-and-forget at end of `POST /api/integrate`). Stored in `graph_snapshots` table. `007_graph_snapshots.sql` ✅ run.
+- **Gradient Signal Extraction** — evaluative signal prompt replaced with gradient model: directional pressure with magnitude (`intensity`), `threshold_proximity` (how close to flipping), and `at_cost_of` (what is traded off). Per-doc cap 5 → 2; zero is a valid answer. Old `strength` column kept for backwards compat; `intensity` is the semantic alias. `008_gradient_signal_fields.sql` ✅ run. Gold examples use logistics-startup placeholders — **swap with real eoniq passages post-demo**.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
@@ -126,7 +127,7 @@ All tables scoped by `project_id`.
 | `ontology_nodes` | Graph nodes (label, type, attractor, is_hub, description, position). Hub nodes have `is_hub=true`. |
 | `ontology_relationships` | Edges between nodes. Includes `belongs_to_hub` type for hub membership. |
 | `tension_markers` | Unresolved/resolved tensions flagged by Claude |
-| `evaluative_signals` | What the org values/fears. Cols: `label`, `direction`, `strength`, `relevance_score`, `intensity_score`, `reflected_at`, `user_note` |
+| `evaluative_signals` | Gradient signals. Cols: `label`, `direction`, `strength` (intensity alias), `threshold_proximity`, `at_cost_of`, `relevance_score`, `intensity_score`, `reflected_at`, `user_note` |
 | `entity_type_configs` | Color + label per entity type (has UUID bug — see above) |
 | `documents` | Uploaded/pasted source documents |
 | `document_chunks` | Chunked content for vector search |
@@ -141,6 +142,7 @@ All tables scoped by `project_id`.
 - `005_hub_nodes.sql` — adds `is_hub` BOOLEAN to `ontology_nodes`, index on `(project_id) WHERE is_hub = true` ⬜ pending
 - `006_embedding_768d.sql` — resizes `document_chunks.embedding` from vector(384) to vector(768), truncates old chunks, recreates search RPCs ✅ run
 - `007_graph_snapshots.sql` — creates `graph_snapshots` table (id, project_id, snapshot_json jsonb, trigger text, created_at) + index on (project_id, created_at DESC) ✅ run
+- `008_gradient_signal_fields.sql` — adds `threshold_proximity` (integer, nullable) and `at_cost_of` (text, nullable) to `evaluative_signals` ✅ run
 
 ---
 

@@ -82,8 +82,14 @@ export interface EvaluativeSignal {
   id: string;
   label: string;
   direction: "toward" | "away_from" | "protecting";
-  /** Extraction-time confidence/salience score (1–5), set by AI */
+  /** Extraction-time salience score (1–5). Legacy column name in DB is `strength`. */
   strength: number;
+  /** Gradient intensity — how forcefully this gradient is expressed (1–5). Alias for strength; new extractions write this directly. */
+  intensity?: number;
+  /** How close this gradient is to flipping, breaking, or crossing a threshold (1–5, null = not yet assessed) */
+  thresholdProximity?: number | null;
+  /** What is given up, risked, or eroded by this gradient's direction */
+  atCostOf?: string | null;
   sourceDescription: string;
   // ── Temporal context ─────────────────────────────────────────────────────
   /** Time horizon this signal operates at (null = not yet classified) */
