@@ -1,0 +1,226 @@
+{
+  "common": {
+    "tryAgain": "Try again",
+    "cancel": "Cancel",
+    "save": "Save",
+    "selectProjectFirst": "Select a project first",
+    "refresh": "Refresh"
+  },
+  "chat": {
+    "title": "TERROIR",
+    "subtitle": "Organisational listening",
+    "tabs": {
+      "chat": "Chat",
+      "synthesis": "Synthesis",
+      "reflect": "Reflect"
+    },
+    "input": {
+      "placeholder": "Describe the organisation...",
+      "pasteLabel": "Paste narrative or transcript",
+      "pastePlaceholder": "Paste a narrative, interview transcript, or meeting notes...",
+      "extractButton": "Extract entities & relationships",
+      "extractingButton": "Extracting..."
+    },
+    "plusMenu": {
+      "upload": "Upload documents",
+      "paste": "Paste text"
+    },
+    "emptyState": "Tell me about the organisation you're working with. Who are they, what do they do, and what are you trying to help them build?"
+  },
+  "sources": {
+    "modes": {
+      "upload": "Upload files",
+      "paste": "Paste text"
+    },
+    "upload": {
+      "dropzone": "Drop files or click to upload",
+      "dropping": "Drop to upload",
+      "fileTypes": "PDF · DOCX · TXT · MD · JSON · max 4 MB"
+    },
+    "paste": {
+      "titlePlaceholder": "Document title (e.g. Confluence: Team Processes)",
+      "contentPlaceholder": "Paste document content here — wiki pages, Confluence exports, meeting notes, interview transcripts...",
+      "addButton": "Add document"
+    },
+    "summary": {
+      "extract": "extract",
+      "caution": "caution",
+      "skip": "skip",
+      "extractButton": "Extract {count} documents",
+      "hint": "Click a verdict badge to override · SKIP docs won't be extracted",
+      "extracting": "Extracting…"
+    },
+    "integration": {
+      "title": "Cross-document integration",
+      "description": "{count} entities extracted — merge duplicates, connect across documents, correct attractors.",
+      "runButton": "Run integration",
+      "running": "Integrating across documents…",
+      "done": "Integration complete",
+      "runAgain": "Run again",
+      "failed": "Integration failed — check console for details."
+    },
+    "checklist": {
+      "title": "What to upload",
+      "highValue": "Start with these (highest value):",
+      "skipTitle": "Skip these (auto-filtered anyway):",
+      "skipContent": "Legal boilerplate, cookie policies, T&C, marketing brochures, compliance templates",
+      "exportTitle": "Exporting from common sources:",
+      "item1": "Process docs — how work actually gets done, handoffs, workflows",
+      "item2": "Org charts & role descriptions — who does what, reporting lines",
+      "item3": "Meeting notes & transcripts — where real language lives",
+      "item4": "Strategy docs — goals, priorities, decision records"
+    },
+    "emptyLine1": "Upload documents or paste text to extract entities and relationships onto the canvas.",
+    "emptyLine2": "Files are classified first — legal boilerplate and noise are filtered out automatically.",
+    "status": {
+      "queued": "Queued",
+      "uploading": "Uploading…",
+      "classifying": "Classifying…",
+      "extracting": "Extracting…",
+      "skipped": "Skipped",
+      "switchToPaste": "Switch to Paste Text →"
+    }
+  },
+  "reflect": {
+    "delta": {
+      "title": "Session Delta",
+      "describing": "Describing changes…",
+      "noSnapshots": "Run a Sources integration to enable",
+      "prompt": "Describe changes since last integration",
+      "failed": "Failed — try again",
+      "refresh": "Refresh"
+    },
+    "tensions": {
+      "title": "Tensions",
+      "unresolved": "{count} unresolved",
+      "markResolved": "Mark resolved"
+    },
+    "hypothesis": "Optimisation Hypothesis",
+    "signals": {
+      "title": "Evaluative Signals",
+      "rated": "{rated} of {total} rated",
+      "enrich": "Enrich",
+      "reenrich": "Re-enrich",
+      "enriching": "Enriching…",
+      "enrichFailed": "Failed — try again",
+      "dedup": "Deduplicate",
+      "deduplicating": "Deduplicating…",
+      "noDuplicates": "No duplicates found",
+      "dedupFailed": "Deduplication failed — try again",
+      "emptyState": "No evaluative signals yet. Use the + button to upload documents or paste text, or describe the organisation in Chat to surface what it values and fears.",
+      "relevance": "Relevance",
+      "intensity": "Intensity",
+      "addNote": "+ note",
+      "notePlaceholder": "Add a note..."
+    }
+  },
+  "inspector": {
+    "title": "Inspector",
+    "setupPrompt": "Set up your project to guide AI extraction and enable cross-source synthesis.",
+    "setupButton": "Set up project",
+    "graphSummary": "Graph Summary",
+    "entitiesRels": "{nodes} entities · {rels} relationships",
+    "unresolvedTension": "{count} unresolved tension",
+    "unresolvedTensions": "{count} unresolved tensions",
+    "syncButton": "Sync to filesystem",
+    "syncing": "Syncing…",
+    "node": {
+      "title": "Node",
+      "label": "Label",
+      "hub": "Hub",
+      "type": "Type",
+      "description": "Description",
+      "connections": "Connections",
+      "tensions": "Tensions",
+      "hubNode": "Hub Node",
+      "hubNodeDesc": "Structural anchor — entities connect to this hub. Rename via the label field above."
+    },
+    "edge": {
+      "title": "Relationship",
+      "type": "Type",
+      "description": "Description"
+    }
+  },
+  "scoping": {
+    "title": "Project Scoping",
+    "subtitle": "Haiku will ask 4–5 questions to configure your project brief",
+    "readyTitle": "Ready to set up your project",
+    "readyDesc": "A short conversation will produce a project brief that guides how the AI extracts and synthesises your documents.",
+    "begin": "Begin",
+    "beginMessage": "Hello, let's set up this project.",
+    "answerPlaceholder": "Your answer…",
+    "briefReady": "Brief ready",
+    "sector": "Sector",
+    "goal": "Goal",
+    "saveBrief": "Save to project"
+  },
+  "typepalette": {
+    "hubs": "Hubs",
+    "all": "All",
+    "emergent": "Emergent"
+  },
+  "brief": {
+    "title": "Project Brief",
+    "rescope": "Re-scope",
+    "orgSize": "Org size",
+    "orgSizePlaceholder": "e.g. 50–200",
+    "sector": "Sector",
+    "sectorPlaceholder": "e.g. aviation",
+    "discoveryGoal": "Discovery goal",
+    "discoveryGoalPlaceholder": "What are you trying to understand?",
+    "extractionLens": "Extraction lens",
+    "keyThemes": "Key themes",
+    "keyThemesPlaceholder": "Comma-separated themes",
+    "reprocessing": "Rebuilding graph…",
+    "reprocessNoDocs": "Re-process sources (no documents yet)",
+    "reprocess": "Re-process {count} source",
+    "reprocessPlural": "Re-process {count} sources",
+    "layers": {
+      "domain_objects": {
+        "label": "Domain Objects",
+        "description": "What exists — teams, tools, systems, roles"
+      },
+      "interaction_patterns": {
+        "label": "Interaction Patterns",
+        "description": "How work moves — workflows, handoffs, dependencies"
+      },
+      "concerns_themes": {
+        "label": "Concerns & Themes",
+        "description": "What matters — values, tensions, priorities"
+      }
+    }
+  },
+  "projects": {
+    "title": "TERROIR",
+    "subtitle": "Organisational Listening",
+    "newProject": "+ New Project",
+    "loading": "Loading projects…",
+    "retry": "Retry",
+    "noProjects": "No projects yet",
+    "noProjectsDesc": "Create your first project to get started.",
+    "newProjectModal": {
+      "title": "New Project",
+      "name": "Project name",
+      "sector": "Sector",
+      "sectorOptional": "(optional)",
+      "description": "Description",
+      "cancel": "Cancel",
+      "create": "Create project",
+      "creating": "Creating…"
+    }
+  },
+  "topbar": {
+    "share": "Share ↗",
+    "copied": "Copied!",
+    "en": "EN",
+    "de": "DE"
+  },
+  "bottombar": {
+    "resetAll": "Reset all",
+    "import": "Import",
+    "export": "Export",
+    "bundle": "Bundle ↓",
+    "allProjects": "← All Projects",
+    "compare": "Compare →"
+  }
+}

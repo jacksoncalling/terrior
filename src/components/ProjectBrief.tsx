@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 /**
  * ProjectBrief — inline-editable project brief panel.
  *
@@ -18,28 +20,12 @@
 import { useState, useEffect } from "react";
 import type { ProjectBrief, AbstractionLayer } from "@/types";
 
-// ── Abstraction layer descriptors ─────────────────────────────────────────────
+// ── Abstraction layer value list ──────────────────────────────────────────────
 
-const LAYER_OPTIONS: {
-  value: AbstractionLayer;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "domain_objects",
-    label: "Domain Objects",
-    description: "What exists — teams, tools, systems, roles",
-  },
-  {
-    value: "interaction_patterns",
-    label: "Interaction Patterns",
-    description: "How work moves — workflows, handoffs, dependencies",
-  },
-  {
-    value: "concerns_themes",
-    label: "Concerns & Themes",
-    description: "What matters — values, tensions, priorities",
-  },
+const LAYER_VALUES: AbstractionLayer[] = [
+  "domain_objects",
+  "interaction_patterns",
+  "concerns_themes",
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -63,6 +49,7 @@ export default function ProjectBriefPanel({
   onStartScoping,
   onReprocess,
 }: ProjectBriefProps) {
+  const t = useTranslations();
   // Local state mirrors brief fields for controlled inputs
   const [orgSize, setOrgSize] = useState(brief.orgSize ?? "");
   const [sector, setSector] = useState(brief.sector ?? "");
@@ -83,12 +70,10 @@ export default function ProjectBriefPanel({
 
   const handleReprocessClick = () => {
     if (documentCount === 0 || isReprocessing) return;
-    const layerLabel = LAYER_OPTIONS.find(
-      (o) => o.value === brief.abstractionLayer
-    )?.label ?? brief.abstractionLayer;
+    const layerLabel = t(`brief.layers.${brief.abstractionLayer}.label` as Parameters<typeof t>[0]);
 
     const confirmed = window.confirm(
-      `Re-process ${documentCount} document${documentCount === 1 ? "" : "s"} using the "${layerLabel}" lens?\n\nA snapshot of the current graph will be downloaded first. The graph will then be rebuilt from scratch — this cannot be undone.`
+      `Re-process ${documentCount} document${documentCount === 1 ? "" : "s"} using the "${layerLabel}" lens?\n\nA snapshot will be downloaded first. The graph will then be rebuilt from scratch — this cannot be undone.`
     );
     if (confirmed) onReprocess();
   };
@@ -111,13 +96,13 @@ export default function ProjectBriefPanel({
       {/* Section header + re-scope link */}
       <div className="flex items-center justify-between">
         <h4 className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">
-          Project Brief
+          {t("brief.title")}
         </h4>
         <button
           onClick={onStartScoping}
           className="text-[10px] text-stone-400 hover:text-stone-700 underline underline-offset-2 transition-colors"
         >
-          Re-scope
+          {t("brief.rescope")}
         </button>
       </div>
 
@@ -130,7 +115,7 @@ export default function ProjectBriefPanel({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
-            Org size
+            {t("brief.orgSize")}
           </label>
           <input
             value={orgSize}
@@ -139,13 +124,13 @@ export default function ProjectBriefPanel({
               if (orgSize !== (brief.orgSize ?? ""))
                 onBriefUpdate({ orgSize: orgSize || undefined });
             }}
-            placeholder="e.g. 50–200"
+            placeholder={t("brief.orgSizePlaceholder")}
             className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1 text-xs text-stone-700 placeholder:text-stone-300 focus:border-stone-400 focus:outline-none"
           />
         </div>
         <div>
           <label className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
-            Sector
+            {t("brief.sector")}
           </label>
           <input
             value={sector}
@@ -154,7 +139,7 @@ export default function ProjectBriefPanel({
               if (sector !== (brief.sector ?? ""))
                 onBriefUpdate({ sector: sector || undefined });
             }}
-            placeholder="e.g. aviation"
+            placeholder={t("brief.sectorPlaceholder")}
             className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1 text-xs text-stone-700 placeholder:text-stone-300 focus:border-stone-400 focus:outline-none"
           />
         </div>
@@ -163,7 +148,7 @@ export default function ProjectBriefPanel({
       {/* Discovery goal */}
       <div>
         <label className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
-          Discovery goal
+          {t("brief.discoveryGoal")}
         </label>
         <textarea
           value={discoveryGoal}
@@ -172,7 +157,7 @@ export default function ProjectBriefPanel({
             if (discoveryGoal !== (brief.discoveryGoal ?? ""))
               onBriefUpdate({ discoveryGoal: discoveryGoal || undefined });
           }}
-          placeholder="What are you trying to understand?"
+          placeholder={t("brief.discoveryGoalPlaceholder")}
           rows={2}
           className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1 text-xs text-stone-600 placeholder:text-stone-300 resize-none focus:border-stone-400 focus:outline-none"
         />
@@ -181,16 +166,16 @@ export default function ProjectBriefPanel({
       {/* Extraction lens — three radio cards */}
       <div>
         <label className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
-          Extraction lens
+          {t("brief.extractionLens")}
         </label>
         <div className="mt-1 space-y-1">
-          {LAYER_OPTIONS.map((opt) => {
-            const active = brief.abstractionLayer === opt.value;
+          {LAYER_VALUES.map((value) => {
+            const active = brief.abstractionLayer === value;
             return (
               <button
-                key={opt.value}
+                key={value}
                 onClick={() => {
-                  if (!active) onBriefUpdate({ abstractionLayer: opt.value });
+                  if (!active) onBriefUpdate({ abstractionLayer: value });
                 }}
                 className={`w-full text-left rounded px-2.5 py-2 transition-colors ${
                   active
@@ -198,13 +183,13 @@ export default function ProjectBriefPanel({
                     : "bg-stone-50 text-stone-600 hover:bg-stone-100"
                 }`}
               >
-                <div className="text-[11px] font-medium">{opt.label}</div>
+                <div className="text-[11px] font-medium">{t(`brief.layers.${value}.label` as Parameters<typeof t>[0])}</div>
                 <div
                   className={`text-[10px] mt-0.5 ${
                     active ? "text-stone-300" : "text-stone-400"
                   }`}
                 >
-                  {opt.description}
+                  {t(`brief.layers.${value}.description` as Parameters<typeof t>[0])}
                 </div>
               </button>
             );
@@ -215,13 +200,13 @@ export default function ProjectBriefPanel({
       {/* Key themes — comma-separated with tag display */}
       <div>
         <label className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
-          Key themes
+          {t("brief.keyThemes")}
         </label>
         <input
           value={themesInput}
           onChange={(e) => setThemesInput(e.target.value)}
           onBlur={handleThemesBlur}
-          placeholder="Comma-separated themes"
+          placeholder={t("brief.keyThemesPlaceholder")}
           className="mt-0.5 w-full rounded border border-stone-200 px-2 py-1 text-xs text-stone-700 placeholder:text-stone-300 focus:border-stone-400 focus:outline-none"
         />
         {(brief.keyThemes ?? []).length > 0 && (
@@ -246,10 +231,12 @@ export default function ProjectBriefPanel({
           className="w-full rounded px-2 py-1.5 text-[10px] font-medium transition-colors bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isReprocessing
-            ? "Rebuilding graph…"
+            ? t("brief.reprocessing")
             : documentCount === 0
-            ? "Re-process sources (no documents yet)"
-            : `Re-process ${documentCount} source${documentCount === 1 ? "" : "s"}`}
+            ? t("brief.reprocessNoDocs")
+            : documentCount === 1
+            ? t("brief.reprocess", { count: documentCount })
+            : t("brief.reprocessPlural", { count: documentCount })}
         </button>
         {brief.generatedAt && (
           <p className="mt-1 text-[9px] text-stone-300 text-center">

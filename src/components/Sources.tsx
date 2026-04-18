@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 /**
  * Sources — document upload, classification & extraction panel.
  *
@@ -53,6 +55,7 @@ const ACCEPTED_EXTS = ["pdf", "docx", "doc", "txt", "md", "json"];
 const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB — Vercel serverless body limit
 
 export default function Sources({ projectId, graphState, onGraphUpdate, projectBrief }: SourcesProps) {
+  const t = useTranslations();
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isClassifying, setIsClassifying] = useState(false);
@@ -472,13 +475,13 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
   };
 
   const statusLabel = (f: SourceFile): string => {
-    if (f.status === "queued")       return "Queued";
-    if (f.status === "uploading")    return "Uploading…";
-    if (f.status === "classifying")  return "Classifying…";
+    if (f.status === "queued")       return t("sources.status.queued");
+    if (f.status === "uploading")    return t("sources.status.uploading");
+    if (f.status === "classifying")  return t("sources.status.classifying");
     if (f.status === "classified")   return f.classification?.genre ?? "Classified";
-    if (f.status === "extracting")   return "Extracting…";
+    if (f.status === "extracting")   return t("sources.status.extracting");
     if (f.status === "done")         return `${f.entityCount ?? 0} entities · ${f.relCount ?? 0} rels`;
-    if (f.status === "skipped")      return f.classification?.reason ?? "Skipped";
+    if (f.status === "skipped")      return f.classification?.reason ?? t("sources.status.skipped");
     return f.error ?? "Error";
   };
 
@@ -511,7 +514,7 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
               : "bg-stone-100 text-stone-500 hover:bg-stone-200"
           }`}
         >
-          Upload files
+          {t("sources.modes.upload")}
         </button>
         <button
           onClick={() => setInputMode("paste")}
@@ -521,7 +524,7 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
               : "bg-stone-100 text-stone-500 hover:bg-stone-200"
           }`}
         >
-          Paste text
+          {t("sources.modes.paste")}
         </button>
       </div>
 
@@ -547,11 +550,11 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
           </svg>
           <p className="text-xs font-medium text-stone-500">
-            {isDragging ? "Drop to upload" : "Drop files or click to upload"}
+            {isDragging ? t("sources.upload.dropping") : t("sources.upload.dropzone")}
           </p>
-          <p className="text-[10px] text-stone-400">PDF · DOCX · TXT · MD · JSON · max 4 MB</p>
+          <p className="text-[10px] text-stone-400">{t("sources.upload.fileTypes")}</p>
           {!projectId && (
-            <p className="text-[10px] text-red-400 mt-1">Select a project first</p>
+            <p className="text-[10px] text-red-400 mt-1">{t("common.selectProjectFirst")}</p>
           )}
           <input
             ref={fileInputRef}
@@ -571,14 +574,14 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
             type="text"
             value={pasteTitle}
             onChange={(e) => setPasteTitle(e.target.value)}
-            placeholder="Document title (e.g. Confluence: Team Processes)"
+            placeholder={t("sources.paste.titlePlaceholder")}
             disabled={!projectId}
             className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[11px] text-stone-700 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none disabled:opacity-60"
           />
           <textarea
             value={pasteContent}
             onChange={(e) => setPasteContent(e.target.value)}
-            placeholder="Paste document content here — wiki pages, Confluence exports, meeting notes, interview transcripts..."
+            placeholder={t("sources.paste.contentPlaceholder")}
             rows={5}
             disabled={!projectId}
             className="w-full resize-none rounded-lg border border-stone-200 bg-white px-3 py-2 text-[11px] text-stone-700 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none disabled:opacity-60"
@@ -588,10 +591,10 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
             disabled={!projectId || !pasteContent.trim()}
             className="w-full rounded-lg bg-stone-800 py-1.5 text-[10px] font-medium text-white hover:bg-stone-700 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
           >
-            Add document
+            {t("sources.paste.addButton")}
           </button>
           {!projectId && (
-            <p className="text-[10px] text-red-400">Select a project first</p>
+            <p className="text-[10px] text-red-400">{t("common.selectProjectFirst")}</p>
           )}
         </div>
       )}
@@ -601,26 +604,26 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
         <div className="mx-4 mb-3 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2.5">
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-stone-500">
-              <span className="text-emerald-600 font-medium">{extractCount} extract</span>
-              {cautionCount > 0 && <> · <span className="text-amber-600 font-medium">{cautionCount} caution</span></>}
-              {skipCount > 0 && <> · <span className="text-stone-400">{skipCount} skip</span></>}
+              <span className="text-emerald-600 font-medium">{extractCount} {t("sources.summary.extract")}</span>
+              {cautionCount > 0 && <> · <span className="text-amber-600 font-medium">{cautionCount} {t("sources.summary.caution")}</span></>}
+              {skipCount > 0 && <> · <span className="text-stone-400">{skipCount} {t("sources.summary.skip")}</span></>}
             </p>
             {!isExtracting && (extractCount + cautionCount) > 0 && (
               <button
                 onClick={extractApproved}
                 className="text-[10px] font-medium text-white bg-stone-800 hover:bg-stone-700 px-3 py-1 rounded-md transition-colors"
               >
-                Extract {extractCount + cautionCount} documents
+                {t("sources.summary.extractButton", { count: extractCount + cautionCount })}
               </button>
             )}
             {isExtracting && (
               <span className="text-[10px] text-blue-500 animate-pulse font-medium">
-                Extracting…
+                {t("sources.summary.extracting")}
               </span>
             )}
           </div>
           <p className="text-[9px] text-stone-400 mt-1">
-            Click a verdict badge to override · SKIP docs won&apos;t be extracted
+            {t("sources.summary.hint")}
           </p>
         </div>
       )}
@@ -631,27 +634,27 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
           {integrationState === "idle" && (
             <>
               <p className="text-[10px] text-violet-700 font-medium mb-1">
-                Cross-document integration
+                {t("sources.integration.title")}
               </p>
               <p className="text-[10px] text-violet-500 mb-2">
-                {graphState.nodes.length} entities extracted — merge duplicates, connect across documents, correct attractors.
+                {t("sources.integration.description", { count: graphState.nodes.length })}
               </p>
               <button
                 onClick={runIntegration}
                 className="text-[10px] font-medium text-white bg-violet-600 hover:bg-violet-700 px-3 py-1 rounded-md transition-colors"
               >
-                Run integration
+                {t("sources.integration.runButton")}
               </button>
             </>
           )}
           {integrationState === "running" && (
             <p className="text-[10px] text-violet-500 animate-pulse font-medium">
-              Integrating across documents…
+              {t("sources.integration.running")}
             </p>
           )}
           {integrationState === "done" && integrationResult && (
             <>
-              <p className="text-[10px] text-violet-700 font-medium mb-1">Integration complete</p>
+              <p className="text-[10px] text-violet-700 font-medium mb-1">{t("sources.integration.done")}</p>
               <p className="text-[10px] text-violet-500">
                 Merged {integrationResult.entitiesMerged} entities into {integrationResult.mergeGroupCount} groups
                 {integrationResult.relationshipsAdded > 0 && ` · +${integrationResult.relationshipsAdded} cross-doc relationships`}
@@ -661,18 +664,18 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                 onClick={() => { setIntegrationState("idle"); setIntegrationResult(null); }}
                 className="mt-1.5 text-[9px] text-violet-400 underline underline-offset-2 hover:text-violet-600"
               >
-                Run again
+                {t("sources.integration.runAgain")}
               </button>
             </>
           )}
           {integrationState === "error" && (
             <>
-              <p className="text-[10px] text-red-500 font-medium">Integration failed — check console for details.</p>
+              <p className="text-[10px] text-red-500 font-medium">{t("sources.integration.failed")}</p>
               <button
                 onClick={() => setIntegrationState("idle")}
                 className="mt-1 text-[9px] text-stone-400 underline underline-offset-2 hover:text-stone-600"
               >
-                Try again
+                {t("common.tryAgain")}
               </button>
             </>
           )}
@@ -689,41 +692,41 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                 onClick={() => setChecklistOpen(!checklistOpen)}
                 className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-medium text-stone-600 hover:bg-stone-100 transition-colors"
               >
-                <span>What to upload</span>
+                <span>{t("sources.checklist.title")}</span>
                 <span className={`text-stone-400 transition-transform ${checklistOpen ? "rotate-180" : ""}`}>▾</span>
               </button>
               {checklistOpen && (
                 <div className="px-3 pb-3 text-[10px] text-stone-500 leading-relaxed space-y-2.5">
                   {/* Priority list */}
                   <div>
-                    <p className="font-medium text-stone-600 mb-1">Start with these (highest value):</p>
+                    <p className="font-medium text-stone-600 mb-1">{t("sources.checklist.highValue")}</p>
                     <ul className="space-y-0.5 ml-2">
                       <li className="flex items-start gap-1.5">
                         <span className="text-emerald-500 mt-px shrink-0">1.</span>
-                        <span><strong>Process docs</strong> — how work actually gets done, handoffs, workflows</span>
+                        <span>{t("sources.checklist.item1")}</span>
                       </li>
                       <li className="flex items-start gap-1.5">
                         <span className="text-emerald-500 mt-px shrink-0">2.</span>
-                        <span><strong>Org charts & role descriptions</strong> — who does what, reporting lines</span>
+                        <span>{t("sources.checklist.item2")}</span>
                       </li>
                       <li className="flex items-start gap-1.5">
                         <span className="text-emerald-500 mt-px shrink-0">3.</span>
-                        <span><strong>Meeting notes & transcripts</strong> — where real language lives</span>
+                        <span>{t("sources.checklist.item3")}</span>
                       </li>
                       <li className="flex items-start gap-1.5">
                         <span className="text-emerald-500 mt-px shrink-0">4.</span>
-                        <span><strong>Strategy docs</strong> — goals, priorities, decision records</span>
+                        <span>{t("sources.checklist.item4")}</span>
                       </li>
                     </ul>
                   </div>
                   {/* Skip list */}
                   <div>
-                    <p className="font-medium text-stone-600 mb-1">Skip these (auto-filtered anyway):</p>
-                    <p className="text-stone-400 ml-2">Legal boilerplate, cookie policies, T&C, marketing brochures, compliance templates</p>
+                    <p className="font-medium text-stone-600 mb-1">{t("sources.checklist.skipTitle")}</p>
+                    <p className="text-stone-400 ml-2">{t("sources.checklist.skipContent")}</p>
                   </div>
                   {/* Source tips */}
                   <div className="border-t border-stone-100 pt-2">
-                    <p className="font-medium text-stone-600 mb-1">Exporting from common sources:</p>
+                    <p className="font-medium text-stone-600 mb-1">{t("sources.checklist.exportTitle")}</p>
                     <ul className="space-y-0.5 ml-2 text-stone-400">
                       <li><strong className="text-stone-500">Confluence</strong> — Space settings → Export → HTML or PDF</li>
                       <li><strong className="text-stone-500">SharePoint</strong> — Select files → Download (or use &quot;Paste text&quot;)</li>
@@ -738,10 +741,10 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
             {/* Empty state text */}
             <div className="flex flex-col items-center gap-2 px-4">
               <p className="text-center text-[10px] text-stone-400 leading-relaxed">
-                Upload documents or paste text to extract entities and relationships onto the canvas.
+                {t("sources.emptyLine1")}
               </p>
               <p className="text-center text-[10px] text-stone-300">
-                Files are classified first — legal boilerplate and noise are filtered out automatically.
+                {t("sources.emptyLine2")}
               </p>
             </div>
           </div>
@@ -798,7 +801,7 @@ export default function Sources({ projectId, graphState, onGraphUpdate, projectB
                         onClick={() => setInputMode("paste")}
                         className="text-[9px] text-stone-400 underline underline-offset-2 hover:text-stone-600 mt-0.5"
                       >
-                        Switch to Paste Text →
+                        {t("sources.status.switchToPaste")}
                       </button>
                     )}
                   </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import ChatMessage from "./ChatMessage";
 import Sources from "./Sources";
 import SynthesisResults from "./SynthesisResults";
@@ -59,14 +60,16 @@ const DIRECTION_ICON: Record<string, string> = {
 // Renders a row of 5 clickable dots. Filled dots = selected score and below.
 // Hover preview: hovering dot N temporarily shows N filled dots.
 function ScorePicker({
-  label,
+  labelKey,
   value,
   onChange,
 }: {
-  label: string;
+  labelKey: string;
   value: number | null | undefined;
   onChange: (score: number) => void;
 }) {
+  const t = useTranslations();
+  const label = t(labelKey as Parameters<typeof t>[0]);
   const [hovered, setHovered] = useState<number | null>(null);
   // Display: use hover preview while hovering, otherwise show saved value
   const display = hovered ?? value ?? 0;
@@ -119,6 +122,7 @@ function SignalCard({
   projectId: string | null;
   onReflect: (updates: Partial<Pick<EvaluativeSignal, "relevanceScore" | "intensityScore" | "reflectedAt" | "userNote">>) => void;
 }) {
+  const t = useTranslations();
   const [noteOpen, setNoteOpen] = useState(!!signal.userNote);
   const [noteValue, setNoteValue] = useState(signal.userNote ?? "");
 
@@ -203,12 +207,12 @@ function SignalCard({
       {/* Score pickers */}
       <div className="space-y-1 pl-5">
         <ScorePicker
-          label="Relevance"
+          labelKey="reflect.signals.relevance"
           value={signal.relevanceScore}
           onChange={(score) => saveScore("relevanceScore", score)}
         />
         <ScorePicker
-          label="Intensity"
+          labelKey="reflect.signals.intensity"
           value={signal.intensityScore}
           onChange={(score) => saveScore("intensityScore", score)}
         />
@@ -223,7 +227,7 @@ function SignalCard({
             onChange={(e) => setNoteValue(e.target.value)}
             onBlur={saveNote}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-            placeholder="Add a note..."
+            placeholder={t("reflect.signals.notePlaceholder")}
             className="w-full rounded border border-stone-200 bg-white px-2 py-1 text-[11px] text-stone-600 placeholder:text-stone-300 focus:border-stone-400 focus:outline-none"
           />
         ) : (
@@ -231,7 +235,7 @@ function SignalCard({
             onClick={() => setNoteOpen(true)}
             className="text-[10px] text-stone-300 hover:text-stone-500 transition-colors"
           >
-            + note
+            {t("reflect.signals.addNote")}
           </button>
         )}
       </div>
@@ -250,6 +254,7 @@ function TensionCard({
   nodes: import("@/types").GraphNode[];
   onResolve?: (tensionId: string) => void;
 }) {
+  const t = useTranslations();
   const linkedLabels = tension.relatedNodeIds
     .map((id) => nodes.find((n) => n.id === id)?.label)
     .filter(Boolean) as string[];
@@ -267,7 +272,7 @@ function TensionCard({
           onClick={() => onResolve(tension.id)}
           className="text-[10px] text-stone-500 hover:text-stone-700 transition-colors border border-stone-200 rounded px-2 py-0.5 hover:bg-white"
         >
-          Mark resolved
+          {t("reflect.tensions.markResolved")}
         </button>
       )}
     </div>
@@ -296,6 +301,8 @@ export default function Chat({
   optimizationHypothesis,
   onEnrichSignals,
 }: ChatProps) {
+  const t = useTranslations();
+
   // ── Panel mode ────────────────────────────────────────────────────────────
   // "sources" mode is triggered by the + menu, not a tab, but lives in the
   // mode union so Sources stays always-mounted for file-state preservation.
@@ -519,14 +526,14 @@ export default function Chat({
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
         <div>
-          <h2 className="text-sm font-semibold text-stone-800">TERROIR</h2>
-          <p className="text-[10px] text-stone-500">Organisational listening</p>
+          <h2 className="text-sm font-semibold text-stone-800">{t("chat.title")}</h2>
+          <p className="text-[10px] text-stone-500">{t("chat.subtitle")}</p>
         </div>
         {/* Three tabs — Extract promoted to + menu in the input area */}
         <div className="flex gap-1">
-          {tabBtn("Chat",      "chat")}
-          {tabBtn("Synthesis", "synthesis")}
-          {tabBtn("Reflect",   "reflect")}
+          {tabBtn(t("chat.tabs.chat"),      "chat")}
+          {tabBtn(t("chat.tabs.synthesis"), "synthesis")}
+          {tabBtn(t("chat.tabs.reflect"),   "reflect")}
         </div>
       </div>
 
@@ -574,18 +581,18 @@ export default function Chat({
               className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-stone-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">
-                Session Delta
+                {t("reflect.delta.title")}
               </span>
               <span className="text-[10px] text-stone-400">
                 {deltaState === "running"
-                  ? "Describing changes…"
+                  ? t("reflect.delta.describing")
                   : deltaState === "no_snapshots"
-                    ? "Run a Sources integration to enable"
+                    ? t("reflect.delta.noSnapshots")
                     : deltaState === "done"
                       ? (deltaOpen ? "▲" : "▼")
                       : deltaState === "error"
-                        ? "Failed — try again"
-                        : "Describe changes since last integration"}
+                        ? t("reflect.delta.failed")
+                        : t("reflect.delta.prompt")}
               </span>
             </button>
             {deltaOpen && deltaState === "done" && deltaNarration && (
@@ -597,7 +604,7 @@ export default function Chat({
                   onClick={handleSessionDelta}
                   className="mt-2 text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
                 >
-                  Refresh
+                  {t("reflect.delta.refresh")}
                 </button>
               </div>
             )}
@@ -607,9 +614,9 @@ export default function Chat({
           {unresolvedTensionCount > 0 && (
             <div>
               <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-2">
-                Tensions
+                {t("reflect.tensions.title")}
                 <span className="ml-1.5 normal-case font-normal text-red-500">
-                  — {unresolvedTensionCount} unresolved
+                  — {t("reflect.tensions.unresolved", { count: unresolvedTensionCount })}
                 </span>
               </p>
               <div className="space-y-2">
@@ -631,7 +638,7 @@ export default function Chat({
           {optimizationHypothesis && (
             <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5 space-y-1">
               <p className="text-[10px] font-medium text-amber-700 uppercase tracking-wide">
-                Optimisation Hypothesis
+                {t("reflect.hypothesis")}
               </p>
               <p className="text-xs text-stone-700 leading-relaxed">
                 {optimizationHypothesis}
@@ -643,19 +650,22 @@ export default function Chat({
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
-                Evaluative Signals
+                {t("reflect.signals.title")}
                 {graphState.evaluativeSignals.length > 0 && (
                   <span className="ml-1.5 normal-case font-normal">
-                    — {graphState.evaluativeSignals.filter(
-                      (s) => s.relevanceScore != null || s.intensityScore != null
-                    ).length} of {graphState.evaluativeSignals.length} rated
+                    — {t("reflect.signals.rated", {
+                      rated: graphState.evaluativeSignals.filter(
+                        (s) => s.relevanceScore != null || s.intensityScore != null
+                      ).length,
+                      total: graphState.evaluativeSignals.length,
+                    })}
                   </span>
                 )}
               </p>
               {/* Enrich button — topology-aware signal enrichment pass */}
               <div className="flex items-center gap-1.5">
                 {enrichState === "running" && (
-                  <span className="text-[10px] text-amber-500 italic">Enriching…</span>
+                  <span className="text-[10px] text-amber-500 italic">{t("reflect.signals.enriching")}</span>
                 )}
                 {enrichState !== "running" && graphState.evaluativeSignals.length > 0 && (
                   <button
@@ -663,11 +673,11 @@ export default function Chat({
                     className="text-[10px] text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 rounded px-2 py-0.5 hover:bg-amber-50"
                     title="Enrich signals using graph topology — surfaces reachability framing and optimisation hypothesis"
                   >
-                    {enrichState === "done" ? "Re-enrich" : "Enrich"}
+                    {enrichState === "done" ? t("reflect.signals.reenrich") : t("reflect.signals.enrich")}
                   </button>
                 )}
                 {enrichState === "error" && (
-                  <span className="text-[10px] text-red-400">Failed — try again</span>
+                  <span className="text-[10px] text-red-400">{t("reflect.signals.enrichFailed")}</span>
                 )}
               </div>
             </div>
@@ -680,11 +690,11 @@ export default function Chat({
                     onClick={handleDedup}
                     className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors border border-stone-200 rounded px-2 py-0.5 hover:bg-stone-50"
                   >
-                    Deduplicate
+                    {t("reflect.signals.dedup")}
                   </button>
                 )}
                 {dedupState === "running" && (
-                  <span className="text-[10px] text-stone-400 italic">Deduplicating…</span>
+                  <span className="text-[10px] text-stone-400 italic">{t("reflect.signals.deduplicating")}</span>
                 )}
               </div>
             )}
@@ -698,7 +708,7 @@ export default function Chat({
             )}
             {dedupState === "error" && (
               <div className="mb-2 rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-[10px] text-red-500 flex items-center justify-between">
-                <span>Deduplication failed — try again</span>
+                <span>{t("reflect.signals.dedupFailed")}</span>
                 <button onClick={() => setDedupState("idle")} className="text-red-300 hover:text-red-500 ml-2">×</button>
               </div>
             )}
@@ -706,10 +716,7 @@ export default function Chat({
             {graphState.evaluativeSignals.length === 0 ? (
               <div className="flex items-start justify-center pt-8">
                 <p className="text-xs text-stone-400 text-center leading-relaxed max-w-[240px]">
-                  No evaluative signals yet. Use the{" "}
-                  <span className="font-medium">+</span> button to upload documents
-                  or paste text, or describe the organisation in Chat to surface
-                  what it values and fears.
+                  {t("reflect.signals.emptyState")}
                 </p>
               </div>
             ) : (
@@ -738,8 +745,7 @@ export default function Chat({
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-[280px] text-center">
                   <p className="text-xs text-stone-500">
-                    Tell me about the organisation you&apos;re working with. Who are
-                    they, what do they do, and what are you trying to help them build?
+                    {t("chat.emptyState")}
                   </p>
                 </div>
               </div>
@@ -772,7 +778,7 @@ export default function Chat({
               /* Paste-text mode: large textarea + extract button */
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] text-stone-400">Paste narrative or transcript</span>
+                  <span className="text-[10px] text-stone-400">{t("chat.input.pasteLabel")}</span>
                   <button
                     onClick={() => { setPasteMode(false); setPasteInput(""); }}
                     className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
@@ -784,7 +790,7 @@ export default function Chat({
                   autoFocus
                   value={pasteInput}
                   onChange={(e) => setPasteInput(e.target.value)}
-                  placeholder="Paste a narrative, interview transcript, or meeting notes..."
+                  placeholder={t("chat.input.pastePlaceholder")}
                   rows={6}
                   className="w-full resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-800 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none"
                   disabled={isLoading}
@@ -794,7 +800,7 @@ export default function Chat({
                   disabled={!pasteInput.trim() || isLoading}
                   className="mt-2 w-full rounded-xl bg-stone-800 py-2 text-xs font-medium text-white hover:bg-stone-700 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
                 >
-                  {isLoading ? "Extracting..." : "Extract entities & relationships"}
+                  {isLoading ? t("chat.input.extractingButton") : t("chat.input.extractButton")}
                 </button>
               </div>
             ) : (
@@ -826,7 +832,7 @@ export default function Chat({
                           <polyline points="17 8 12 3 7 8" />
                           <line x1="12" y1="3" x2="12" y2="15" />
                         </svg>
-                        Upload documents
+                        {t("chat.plusMenu.upload")}
                       </button>
                       <button
                         onClick={() => { setPasteMode(true); setShowPlusMenu(false); }}
@@ -836,7 +842,7 @@ export default function Chat({
                           <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                           <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                         </svg>
-                        Paste text
+                        {t("chat.plusMenu.paste")}
                       </button>
                     </div>
                   )}
@@ -848,7 +854,7 @@ export default function Chat({
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Describe the organisation..."
+                  placeholder={t("chat.input.placeholder")}
                   rows={1}
                   className="flex-1 resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-800 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none"
                   disabled={isLoading}

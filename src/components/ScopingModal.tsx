@@ -17,6 +17,7 @@
  */
 
 import { useState, useRef, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import type { ProjectBrief } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ export default function ScopingModal({
   onSaveBrief,
   onClose,
 }: ScopingModalProps) {
+  const t = useTranslations();
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -98,10 +100,10 @@ export default function ScopingModal({
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-100">
           <div>
             <h2 className="text-sm font-semibold text-stone-800">
-              Project Scoping
+              {t("scoping.title")}
             </h2>
             <p className="text-[10px] text-stone-400">
-              Haiku will ask 4–5 questions to configure your project brief
+              {t("scoping.subtitle")}
             </p>
           </div>
           <button
@@ -119,18 +121,17 @@ export default function ScopingModal({
             <div className="h-full flex flex-col items-center justify-center text-center gap-4">
               <div className="space-y-1">
                 <p className="text-sm text-stone-700 font-medium">
-                  Ready to set up your project
+                  {t("scoping.readyTitle")}
                 </p>
                 <p className="text-xs text-stone-400 max-w-[280px] leading-relaxed">
-                  A short conversation will produce a project brief that guides
-                  how the AI extracts and synthesises your documents.
+                  {t("scoping.readyDesc")}
                 </p>
               </div>
               <button
-                onClick={() => onSend("Hello, let's set up this project.")}
+                onClick={() => onSend(t("scoping.beginMessage"))}
                 className="rounded-xl bg-stone-800 px-5 py-2 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
               >
-                Begin
+                {t("scoping.begin")}
               </button>
             </div>
           ) : (
@@ -171,7 +172,7 @@ export default function ScopingModal({
                 <div className="rounded-xl border border-stone-200 bg-stone-50 p-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-semibold text-stone-600 uppercase tracking-wide">
-                      Brief ready
+                      {t("scoping.briefReady")}
                     </p>
                     <span className="text-[10px] text-stone-400">
                       {pendingBrief.abstractionLayer.replace(/_/g, " ")}
@@ -180,13 +181,13 @@ export default function ScopingModal({
 
                   {pendingBrief.sector && (
                     <p className="text-xs text-stone-600">
-                      <span className="font-medium">Sector:</span>{" "}
+                      <span className="font-medium">{t("scoping.sector")}:</span>{" "}
                       {pendingBrief.sector}
                     </p>
                   )}
                   {pendingBrief.discoveryGoal && (
                     <p className="text-xs text-stone-600">
-                      <span className="font-medium">Goal:</span>{" "}
+                      <span className="font-medium">{t("scoping.goal")}:</span>{" "}
                       {pendingBrief.discoveryGoal}
                     </p>
                   )}
@@ -200,7 +201,7 @@ export default function ScopingModal({
                     onClick={() => onSaveBrief(pendingBrief)}
                     className="w-full rounded-lg bg-stone-800 py-2 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
                   >
-                    Save to project
+                    {t("scoping.saveBrief")}
                   </button>
                 </div>
               )}
@@ -218,7 +219,7 @@ export default function ScopingModal({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Your answer…"
+              placeholder={t("scoping.answerPlaceholder")}
               disabled={isLoading}
               className="flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-800 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none disabled:bg-stone-50"
             />

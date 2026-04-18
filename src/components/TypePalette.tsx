@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { EntityTypeConfig, AttractorConfig, NodeZone } from "@/types";
 
 interface TypePaletteProps {
@@ -22,10 +23,11 @@ export default function TypePalette({
   zoneFilter,
   onZoneFilterChange,
 }: TypePaletteProps) {
+  const t = useTranslations();
   return (
     <div className="flex items-center gap-1.5 px-3 py-2 border-b border-stone-200 bg-white overflow-x-auto">
       <span className="text-[10px] text-stone-400 uppercase tracking-wide shrink-0 mr-1">
-        Hubs
+        {t("typepalette.hubs")}
       </span>
 
       <button
@@ -36,7 +38,7 @@ export default function TypePalette({
             : "bg-stone-100 text-stone-500 hover:bg-stone-200"
         }`}
       >
-        All
+        {t("typepalette.all")}
       </button>
 
       {attractors.filter((a) => a.id !== "emergent").map((attractor) => (
@@ -81,7 +83,7 @@ export default function TypePalette({
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-stone-400" style={{ borderStyle: 'dashed' }} />
-            Emergent
+            {t("typepalette.emergent")}
             <span className={`ml-0.5 text-[9px] px-1 rounded-full ${
               zoneFilter === "emergent" ? "bg-white/20" : "bg-stone-200"
             }`}>

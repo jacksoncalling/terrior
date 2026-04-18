@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import type { Project, ProjectPhase, AttractorPreset } from '@/types';
 import { getProjects, createProject, adoptProject, unnestProject } from '@/lib/supabase';
 import { useProject } from '@/lib/project-context';
@@ -38,6 +39,7 @@ interface NewProjectModalProps {
 }
 
 function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModalProps & { parentProjectId?: string }) {
+  const t = useTranslations();
   const [name, setName] = useState('');
   const [sector, setSector] = useState('');
   const [description, setDescription] = useState('');
@@ -74,7 +76,7 @@ function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModa
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-stone-800">New Project</h2>
+          <h2 className="text-base font-semibold text-stone-800">{t("projects.newProjectModal.title")}</h2>
           <button
             onClick={onClose}
             className="text-stone-400 hover:text-stone-600 text-lg leading-none"
@@ -87,7 +89,7 @@ function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModa
           {/* Name */}
           <div>
             <label className="block text-xs font-medium text-stone-600 mb-1">
-              Project name <span className="text-red-400">*</span>
+              {t("projects.newProjectModal.name")} <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -102,7 +104,7 @@ function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModa
           {/* Sector */}
           <div>
             <label className="block text-xs font-medium text-stone-600 mb-1">
-              Sector <span className="text-stone-400">(optional)</span>
+              {t("projects.newProjectModal.sector")} <span className="text-stone-400">{t("projects.newProjectModal.sectorOptional")}</span>
             </label>
             <input
               type="text"
@@ -116,7 +118,7 @@ function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModa
           {/* Description */}
           <div>
             <label className="block text-xs font-medium text-stone-600 mb-1">
-              Description <span className="text-stone-400">(optional)</span>
+              {t("projects.newProjectModal.description")} <span className="text-stone-400">{t("projects.newProjectModal.sectorOptional")}</span>
             </label>
             <textarea
               value={description}
@@ -189,14 +191,14 @@ function NewProjectModal({ onClose, onCreated, parentProjectId }: NewProjectModa
               onClick={onClose}
               className="px-4 py-2 text-sm text-stone-500 hover:text-stone-700 transition-colors"
             >
-              Cancel
+              {t("projects.newProjectModal.cancel")}
             </button>
             <button
               type="submit"
               disabled={!name.trim() || saving}
               className="px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {saving ? 'Creating…' : 'Create project'}
+              {saving ? t("projects.newProjectModal.creating") : t("projects.newProjectModal.create")}
             </button>
           </div>
         </form>
@@ -369,6 +371,7 @@ function formatRelativeTime(date: Date): string {
 export default function ProjectsPage() {
   const router = useRouter();
   const { setProjectId } = useProject();
+  const t = useTranslations();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -438,14 +441,14 @@ export default function ProjectsPage() {
       <header className="border-b border-stone-200 bg-white px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-base font-semibold text-stone-800 tracking-tight">TERROIR</h1>
-            <p className="text-[11px] text-stone-400 mt-0.5">Organisational Listening</p>
+            <h1 className="text-base font-semibold text-stone-800 tracking-tight">{t("projects.title")}</h1>
+            <p className="text-[11px] text-stone-400 mt-0.5">{t("projects.subtitle")}</p>
           </div>
           <button
             onClick={() => setShowModal(true)}
             className="px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
           >
-            + New Project
+            {t("projects.newProject")}
           </button>
         </div>
       </header>
@@ -454,7 +457,7 @@ export default function ProjectsPage() {
       <main className="max-w-4xl mx-auto px-6 py-8">
         {loading && (
           <div className="flex items-center justify-center py-20">
-            <p className="text-sm text-stone-400">Loading projects…</p>
+            <p className="text-sm text-stone-400">{t("projects.loading")}</p>
           </div>
         )}
 
@@ -472,15 +475,15 @@ export default function ProjectsPage() {
 
         {!loading && !error && projects.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-stone-500 mb-2 text-sm">No projects yet</p>
+            <p className="text-stone-500 mb-2 text-sm">{t("projects.noProjects")}</p>
             <p className="text-stone-400 text-xs mb-6">
-              Create your first project to get started.
+              {t("projects.noProjectsDesc")}
             </p>
             <button
               onClick={() => setShowModal(true)}
               className="px-4 py-2 text-sm bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors"
             >
-              + New Project
+              {t("projects.newProject")}
             </button>
           </div>
         )}

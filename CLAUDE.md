@@ -51,6 +51,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Jagged border = emergent + high-intensity** — three-state border: solid / dotted / jagged clip-path. Threshold = 10. Tension red border wins priority.
 - **Session Delta narration** — `POST /api/session-delta` diffs last two snapshots, returns Sonnet prose. Collapsible card in Reflect tab. `007_graph_snapshots.sql` ✅ run.
 - **Gradient Signal Extraction** — prompt replaced with gradient model: `intensity`, `threshold_proximity`, `at_cost_of`. Cap 5 → 2; zero is valid. `008_gradient_signal_fields.sql` ✅ run. Gold examples are logistics-startup placeholders — **swap with real eoniq passages post-demo**.
+- **Bilingual UI (DE/EN)** — `next-intl` client-only locale, localStorage key `terroir_locale`, DE|EN toggle in project name bar. 10 surfaces translated: Sources, Chat, Reflect, Inspector, ProjectBrief, ScopingModal, TypePalette, projects page, top bar, bottom bar. Graph content (node labels, signals) is NOT translated — only UI strings. Haiku scoping dialogue runs in German when `locale === "de"` (injected via system prompt in `haiku.ts`).
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
@@ -180,6 +181,13 @@ All tables scoped by `project_id`.
 | `src/components/ScopingModal.tsx` | Full-screen Haiku scoping dialogue |
 | `src/components/SynthesisResults.tsx` | Synthesis results display |
 | `src/components/TypePalette.tsx` | Entity type filter bar above canvas |
+
+### i18n
+| File | Purpose |
+|------|---------|
+| `src/i18n/LocaleProvider.tsx` | Client context — reads/writes `terroir_locale` from localStorage, wraps `NextIntlClientProvider`, exports `useLocale()` |
+| `src/i18n/locales/en.json` | English UI strings (namespaced: common, chat, sources, reflect, inspector, scoping, typepalette, brief, projects, topbar, bottombar) |
+| `src/i18n/locales/de.json` | German UI strings (same namespace structure) |
 
 ### Library
 | File | Purpose |

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import type { GraphState, GraphNode, Relationship, ProjectBrief, AttractorConfig } from "@/types";
 import ProjectBriefPanel from "./ProjectBrief";
 
@@ -38,6 +39,7 @@ export default function Inspector({
   attractors = [],
   projectId,
 }: InspectorProps) {
+  const t = useTranslations();
   const selectedNode = selectedNodeId
     ? graphState.nodes.find((n) => n.id === selectedNodeId)
     : null;
@@ -95,7 +97,7 @@ export default function Inspector({
     return (
       <div className="h-full flex flex-col bg-white border-l border-stone-200">
         <div className="px-4 py-3 border-b border-stone-200">
-          <h3 className="text-sm font-semibold text-stone-800">Inspector</h3>
+          <h3 className="text-sm font-semibold text-stone-800">{t("inspector.title")}</h3>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
@@ -115,15 +117,14 @@ export default function Inspector({
             // No brief yet — CTA
             <div className="space-y-2.5">
               <p className="text-xs text-stone-400 leading-relaxed">
-                Set up your project to guide AI extraction and enable
-                cross-source synthesis.
+                {t("inspector.setupPrompt")}
               </p>
               {onStartScoping && (
                 <button
                   onClick={onStartScoping}
                   className="w-full rounded-xl bg-stone-800 py-2 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
                 >
-                  Set up project
+                  {t("inspector.setupButton")}
                 </button>
               )}
             </div>
@@ -132,15 +133,18 @@ export default function Inspector({
           {/* ── Graph Summary (always visible below brief) ───────────────── */}
           <div className="pt-3 border-t border-stone-100 text-xs text-stone-400 space-y-3">
             <div>
-              <h4 className="font-medium text-stone-600 mb-1">Graph Summary</h4>
+              <h4 className="font-medium text-stone-600 mb-1">{t("inspector.graphSummary")}</h4>
               <p>
-                {graphState.nodes.length} entities ·{" "}
-                {graphState.relationships.length} relationships
+                {t("inspector.entitiesRels", {
+                  nodes: graphState.nodes.length,
+                  rels: graphState.relationships.length,
+                })}
               </p>
               {unresolvedCount > 0 && (
                 <p className="text-red-500 mt-1">
-                  {unresolvedCount} unresolved{" "}
-                  {unresolvedCount === 1 ? "tension" : "tensions"}
+                  {unresolvedCount === 1
+                    ? t("inspector.unresolvedTension", { count: unresolvedCount })
+                    : t("inspector.unresolvedTensions", { count: unresolvedCount })}
                 </p>
               )}
             </div>
@@ -180,7 +184,7 @@ export default function Inspector({
                 disabled={syncLoading}
                 className="w-full rounded-xl border border-stone-200 py-2 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-50"
               >
-                {syncLoading ? "Syncing…" : "Sync to filesystem"}
+                {syncLoading ? t("inspector.syncing") : t("inspector.syncButton")}
               </button>
               {syncStatus && (
                 <p className={`text-[11px] leading-snug ${syncStatus.ok ? "text-green-600" : "text-red-500"}`}>
@@ -206,12 +210,12 @@ export default function Inspector({
     return (
       <div className="h-full flex flex-col bg-white border-l border-stone-200">
         <div className="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-800">Node</h3>
+          <h3 className="text-sm font-semibold text-stone-800">{t("inspector.node.title")}</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-xs">✕</button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           <div>
-            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Label</label>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">{t("inspector.node.label")}</label>
             <input
               value={editLabel}
               onChange={(e) => setEditLabel(e.target.value)}
@@ -222,7 +226,7 @@ export default function Inspector({
 
           {attractors.length > 0 && !selectedNode.is_hub && (
             <div>
-              <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Hub</label>
+              <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">{t("inspector.node.hub")}</label>
               <select
                 value={editAttractor}
                 onChange={(e) => {
@@ -241,15 +245,15 @@ export default function Inspector({
 
           {selectedNode.is_hub && (
             <div className="rounded-lg bg-stone-50 px-3 py-2 border border-stone-100">
-              <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Hub Node</span>
+              <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">{t("inspector.node.hubNode")}</span>
               <p className="text-[11px] text-stone-400 mt-0.5">
-                Structural anchor — entities connect to this hub. Rename via the label field above.
+                {t("inspector.node.hubNodeDesc")}
               </p>
             </div>
           )}
 
           <div>
-            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Type</label>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">{t("inspector.node.type")}</label>
             <select
               value={editType}
               onChange={(e) => {
@@ -266,7 +270,7 @@ export default function Inspector({
           </div>
 
           <div>
-            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Description</label>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">{t("inspector.node.description")}</label>
             <textarea
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
@@ -278,7 +282,7 @@ export default function Inspector({
 
           {connections.length > 0 && (
             <div>
-              <h4 className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Connections</h4>
+              <h4 className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">{t("inspector.node.connections")}</h4>
               <div className="mt-1 space-y-1">
                 {connections.map((rel) => {
                   const isSource = rel.sourceId === selectedNode.id;
@@ -299,7 +303,7 @@ export default function Inspector({
 
           {tensions.length > 0 && (
             <div>
-              <h4 className="text-[10px] font-medium text-red-500 uppercase tracking-wide">Tensions</h4>
+              <h4 className="text-[10px] font-medium text-red-500 uppercase tracking-wide">{t("inspector.node.tensions")}</h4>
               {tensions.map((t) => (
                 <div key={t.id} className="text-xs text-red-600 mt-0.5">
                   {t.status === "unresolved" ? "!" : "~"} {t.description}
@@ -324,7 +328,7 @@ export default function Inspector({
     return (
       <div className="h-full flex flex-col bg-white border-l border-stone-200">
         <div className="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-800">Relationship</h3>
+          <h3 className="text-sm font-semibold text-stone-800">{t("inspector.edge.title")}</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-xs">✕</button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -335,7 +339,7 @@ export default function Inspector({
           </div>
 
           <div>
-            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Type</label>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">{t("inspector.edge.type")}</label>
             <input
               value={editLabel}
               onChange={(e) => setEditLabel(e.target.value)}
@@ -345,7 +349,7 @@ export default function Inspector({
           </div>
 
           <div>
-            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Description</label>
+            <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">{t("inspector.edge.description")}</label>
             <textarea
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}

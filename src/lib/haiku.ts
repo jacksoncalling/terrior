@@ -112,17 +112,23 @@ function parseBriefFromResponse(
  */
 export async function runScopingDialogue(
   messages: ConversationMessage[],
-  projectContext?: { name?: string; sector?: string }
+  projectContext?: { name?: string; sector?: string },
+  locale: "en" | "de" = "en"
 ): Promise<ScopingDialogueResult> {
   const contextNote =
     projectContext?.name || projectContext?.sector
       ? `\n\nPROJECT CONTEXT: ${projectContext.name ? `Name: "${projectContext.name}". ` : ""}${projectContext.sector ? `Sector hint: ${projectContext.sector}.` : ""}`
       : "";
 
+  const languageInstruction =
+    locale === "de"
+      ? "\n\nLANGUAGE: Conduct this entire dialogue in German. Ask all questions and give all responses in German."
+      : "";
+
   const response = await client.messages.create({
     model: HAIKU_MODEL,
     max_tokens: 512,
-    system: `${SCOPING_SYSTEM}${contextNote}`,
+    system: `${SCOPING_SYSTEM}${contextNote}${languageInstruction}`,
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   });
 

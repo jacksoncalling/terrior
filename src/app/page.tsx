@@ -49,12 +49,16 @@ import {
 } from "@/lib/supabase";
 import { buildProjectBundle, downloadProjectBundle } from "@/lib/export";
 import { useProject } from "@/lib/project-context";
+import { useLocale } from "@/i18n/LocaleProvider";
+import { useTranslations } from "next-intl";
 
 // Debounce delay for Supabase saves (ms)
 const SAVE_DEBOUNCE_MS = 800;
 
 export default function Home() {
   const { projectId, project } = useProject();
+  const { locale, setLocale } = useLocale();
+  const t = useTranslations();
 
   const [graphState, setGraphState] = useState<GraphState>(emptyGraphState());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -708,6 +712,7 @@ export default function Home() {
             projectContext: project
               ? { name: project.name, sector: project.sector }
               : undefined,
+            locale,
           }),
         });
 
@@ -1030,27 +1035,27 @@ export default function Home() {
             onClick={handleReset}
             className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
           >
-            Reset all
+            {t("bottombar.resetAll")}
           </button>
           <span className="text-stone-200 select-none">|</span>
           <button
             onClick={handleImport}
             className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
           >
-            Import
+            {t("bottombar.import")}
           </button>
           <button
             onClick={handleExport}
             className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
           >
-            Export
+            {t("bottombar.export")}
           </button>
           <button
             onClick={handleExportBundle}
             className="text-[10px] text-stone-500 hover:text-stone-700 font-medium transition-colors"
             title="Export full project bundle (graph + synthesis + brief) as JSON"
           >
-            Bundle ↓
+            {t("bottombar.bundle")}
           </button>
           <button
             onClick={handleMigrateLegacy}
@@ -1064,14 +1069,14 @@ export default function Home() {
             href="/projects"
             className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
           >
-            ← All Projects
+            {t("bottombar.allProjects")}
           </Link>
           <span className="text-stone-200 select-none">|</span>
           <Link
             href="/compare"
             className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
           >
-            Compare →
+            {t("bottombar.compare")}
           </Link>
           <input
             ref={importFileRef}
@@ -1098,8 +1103,25 @@ export default function Home() {
               className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
               title="Copy shareable link — anyone with this URL can open this project"
             >
-              {shareCopied ? 'Copied!' : 'Share ↗'}
+              {shareCopied ? t("topbar.copied") : t("topbar.share")}
             </button>
+            <span className="text-stone-200 text-[10px] select-none mx-1">|</span>
+            {/* DE | EN language toggle */}
+            <div className="flex items-center gap-0.5 text-[10px] font-medium">
+              <button
+                onClick={() => setLocale("de")}
+                className={locale === "de" ? "text-stone-800 font-bold underline underline-offset-2" : "text-stone-400 hover:text-stone-600 transition-colors"}
+              >
+                {t("topbar.de")}
+              </button>
+              <span className="text-stone-300 select-none">|</span>
+              <button
+                onClick={() => setLocale("en")}
+                className={locale === "en" ? "text-stone-800 font-bold underline underline-offset-2" : "text-stone-400 hover:text-stone-600 transition-colors"}
+              >
+                {t("topbar.en")}
+              </button>
+            </div>
           </div>
         )}
         <TypePalette

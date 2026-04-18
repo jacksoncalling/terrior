@@ -29,9 +29,10 @@ export async function POST(req: NextRequest) {
       messages: { role: "user" | "assistant"; content: string }[];
       projectId: string;
       projectContext?: { name?: string; sector?: string };
+      locale?: "en" | "de";
     };
 
-    const { messages, projectId, projectContext } = body;
+    const { messages, projectId, projectContext, locale } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Run Haiku scoping exchange ────────────────────────────────────────────
-    const result = await runScopingDialogue(messages, projectContext);
+    const result = await runScopingDialogue(messages, projectContext, locale ?? "en");
 
     // ── Log session (fire and forget) ─────────────────────────────────────────
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");

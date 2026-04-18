@@ -1,0 +1,226 @@
+{
+  "common": {
+    "tryAgain": "Erneut versuchen",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "selectProjectFirst": "Zuerst ein Projekt auswählen",
+    "refresh": "Aktualisieren"
+  },
+  "chat": {
+    "title": "TERROIR",
+    "subtitle": "Organisationales Zuhören",
+    "tabs": {
+      "chat": "Chat",
+      "synthesis": "Synthese",
+      "reflect": "Reflexion"
+    },
+    "input": {
+      "placeholder": "Beschreibe die Organisation...",
+      "pasteLabel": "Erzählung oder Transkript einfügen",
+      "pastePlaceholder": "Erzählung, Interview-Transkript oder Besprechungsnotizen einfügen...",
+      "extractButton": "Entitäten & Beziehungen extrahieren",
+      "extractingButton": "Extrahiere..."
+    },
+    "plusMenu": {
+      "upload": "Dokumente hochladen",
+      "paste": "Text einfügen"
+    },
+    "emptyState": "Erzähl mir von der Organisation, mit der du arbeitest. Wer sind sie, was tun sie, und wobei möchtest du ihnen helfen?"
+  },
+  "sources": {
+    "modes": {
+      "upload": "Dateien hochladen",
+      "paste": "Text einfügen"
+    },
+    "upload": {
+      "dropzone": "Dateien ablegen oder klicken zum Hochladen",
+      "dropping": "Ablegen zum Hochladen",
+      "fileTypes": "PDF · DOCX · TXT · MD · JSON · max 4 MB"
+    },
+    "paste": {
+      "titlePlaceholder": "Dokumenttitel (z.B. Confluence: Teamprozesse)",
+      "contentPlaceholder": "Dokumentinhalt hier einfügen — Wiki-Seiten, Confluence-Exporte, Besprechungsnotizen, Interview-Transkripte...",
+      "addButton": "Dokument hinzufügen"
+    },
+    "summary": {
+      "extract": "extrahieren",
+      "caution": "prüfen",
+      "skip": "überspringen",
+      "extractButton": "{count} Dokumente extrahieren",
+      "hint": "Auf Verdikte klicken zum Überschreiben · SKIP-Dokumente werden nicht extrahiert",
+      "extracting": "Extrahiere…"
+    },
+    "integration": {
+      "title": "Dokumentenübergreifende Integration",
+      "description": "{count} Entitäten extrahiert — Duplikate zusammenführen, Verbindungen herstellen, Attraktoren korrigieren.",
+      "runButton": "Integration starten",
+      "running": "Integriere über Dokumente hinweg…",
+      "done": "Integration abgeschlossen",
+      "runAgain": "Erneut ausführen",
+      "failed": "Integration fehlgeschlagen — Konsole prüfen."
+    },
+    "checklist": {
+      "title": "Was hochladen",
+      "highValue": "Mit diesen beginnen (höchster Wert):",
+      "skipTitle": "Diese überspringen (werden automatisch gefiltert):",
+      "skipContent": "Rechtliche Textbausteine, Cookie-Richtlinien, AGB, Marketingbroschüren, Compliance-Vorlagen",
+      "exportTitle": "Export aus gängigen Quellen:",
+      "item1": "Prozessdokumente — wie Arbeit wirklich abläuft, Übergaben, Workflows",
+      "item2": "Organigramme & Rollenbeschreibungen — wer was macht, Berichtslinien",
+      "item3": "Besprechungsnotizen & Transkripte — wo die echte Sprache lebt",
+      "item4": "Strategiedokumente — Ziele, Prioritäten, Entscheidungsprotokolle"
+    },
+    "emptyLine1": "Dokumente hochladen oder Text einfügen, um Entitäten und Beziehungen auf der Leinwand zu extrahieren.",
+    "emptyLine2": "Dateien werden zunächst klassifiziert — rechtliche Textbausteine und Rauschen werden automatisch herausgefiltert.",
+    "status": {
+      "queued": "In der Warteschlange",
+      "uploading": "Hochladen…",
+      "classifying": "Klassifiziere…",
+      "extracting": "Extrahiere…",
+      "skipped": "Übersprungen",
+      "switchToPaste": "Zu Text einfügen wechseln →"
+    }
+  },
+  "reflect": {
+    "delta": {
+      "title": "Sitzungsdelta",
+      "describing": "Beschreibe Änderungen…",
+      "noSnapshots": "Eine Quellen-Integration ausführen, um dies zu aktivieren",
+      "prompt": "Änderungen seit letzter Integration beschreiben",
+      "failed": "Fehlgeschlagen — erneut versuchen",
+      "refresh": "Aktualisieren"
+    },
+    "tensions": {
+      "title": "Spannungen",
+      "unresolved": "{count} ungelöst",
+      "markResolved": "Als gelöst markieren"
+    },
+    "hypothesis": "Optimierungshypothese",
+    "signals": {
+      "title": "Evaluative Signale",
+      "rated": "{rated} von {total} bewertet",
+      "enrich": "Anreichern",
+      "reenrich": "Erneut anreichern",
+      "enriching": "Reichere an…",
+      "enrichFailed": "Fehlgeschlagen — erneut versuchen",
+      "dedup": "Deduplizieren",
+      "deduplicating": "Dedupliziere…",
+      "noDuplicates": "Keine Duplikate gefunden",
+      "dedupFailed": "Deduplizierung fehlgeschlagen — erneut versuchen",
+      "emptyState": "Noch keine evaluativen Signale. Den + Button nutzen, um Dokumente hochzuladen oder Text einzufügen, oder die Organisation im Chat beschreiben, um Werte und Befürchtungen sichtbar zu machen.",
+      "relevance": "Relevanz",
+      "intensity": "Intensität",
+      "addNote": "+ Notiz",
+      "notePlaceholder": "Notiz hinzufügen..."
+    }
+  },
+  "inspector": {
+    "title": "Inspektor",
+    "setupPrompt": "Richte dein Projekt ein, um die KI-Extraktion zu steuern und die quellenübergreifende Synthese zu ermöglichen.",
+    "setupButton": "Projekt einrichten",
+    "graphSummary": "Graphzusammenfassung",
+    "entitiesRels": "{nodes} Entitäten · {rels} Beziehungen",
+    "unresolvedTension": "{count} ungelöste Spannung",
+    "unresolvedTensions": "{count} ungelöste Spannungen",
+    "syncButton": "Mit Dateisystem synchronisieren",
+    "syncing": "Synchronisiere…",
+    "node": {
+      "title": "Knoten",
+      "label": "Bezeichnung",
+      "hub": "Hub",
+      "type": "Typ",
+      "description": "Beschreibung",
+      "connections": "Verbindungen",
+      "tensions": "Spannungen",
+      "hubNode": "Hub-Knoten",
+      "hubNodeDesc": "Strukturanker — Entitäten verbinden sich mit diesem Hub. Über das Bezeichnungsfeld oben umbenennen."
+    },
+    "edge": {
+      "title": "Beziehung",
+      "type": "Typ",
+      "description": "Beschreibung"
+    }
+  },
+  "scoping": {
+    "title": "Projektumfang",
+    "subtitle": "Haiku stellt 4–5 Fragen zur Konfiguration deines Projektbriefings",
+    "readyTitle": "Bereit zur Projekteinrichtung",
+    "readyDesc": "Ein kurzes Gespräch erstellt ein Projektbriefing, das die KI bei der Extraktion und Synthese deiner Dokumente leitet.",
+    "begin": "Beginnen",
+    "beginMessage": "Hallo, lass uns dieses Projekt einrichten.",
+    "answerPlaceholder": "Deine Antwort…",
+    "briefReady": "Briefing bereit",
+    "sector": "Branche",
+    "goal": "Ziel",
+    "saveBrief": "Im Projekt speichern"
+  },
+  "typepalette": {
+    "hubs": "Hubs",
+    "all": "Alle",
+    "emergent": "Emergent"
+  },
+  "brief": {
+    "title": "Projektbriefing",
+    "rescope": "Neu einrichten",
+    "orgSize": "Org-Größe",
+    "orgSizePlaceholder": "z.B. 50–200",
+    "sector": "Branche",
+    "sectorPlaceholder": "z.B. Luftfahrt",
+    "discoveryGoal": "Entdeckungsziel",
+    "discoveryGoalPlaceholder": "Was möchtest du verstehen?",
+    "extractionLens": "Extraktionslinse",
+    "keyThemes": "Schlüsselthemen",
+    "keyThemesPlaceholder": "Kommagetrennte Themen",
+    "reprocessing": "Graphen wird neu aufgebaut…",
+    "reprocessNoDocs": "Quellen neu verarbeiten (noch keine Dokumente)",
+    "reprocess": "{count} Quelle neu verarbeiten",
+    "reprocessPlural": "{count} Quellen neu verarbeiten",
+    "layers": {
+      "domain_objects": {
+        "label": "Domänenobjekte",
+        "description": "Was existiert — Teams, Tools, Systeme, Rollen"
+      },
+      "interaction_patterns": {
+        "label": "Interaktionsmuster",
+        "description": "Wie Arbeit sich bewegt — Workflows, Übergaben, Abhängigkeiten"
+      },
+      "concerns_themes": {
+        "label": "Anliegen & Themen",
+        "description": "Was zählt — Werte, Spannungen, Prioritäten"
+      }
+    }
+  },
+  "projects": {
+    "title": "TERROIR",
+    "subtitle": "Organisationales Zuhören",
+    "newProject": "+ Neues Projekt",
+    "loading": "Lade Projekte…",
+    "retry": "Erneut versuchen",
+    "noProjects": "Noch keine Projekte",
+    "noProjectsDesc": "Erstelle dein erstes Projekt, um loszulegen.",
+    "newProjectModal": {
+      "title": "Neues Projekt",
+      "name": "Projektname",
+      "sector": "Branche",
+      "sectorOptional": "(optional)",
+      "description": "Beschreibung",
+      "cancel": "Abbrechen",
+      "create": "Projekt erstellen",
+      "creating": "Wird erstellt…"
+    }
+  },
+  "topbar": {
+    "share": "Teilen ↗",
+    "copied": "Kopiert!",
+    "en": "EN",
+    "de": "DE"
+  },
+  "bottombar": {
+    "resetAll": "Alles zurücksetzen",
+    "import": "Importieren",
+    "export": "Exportieren",
+    "bundle": "Bundle ↓",
+    "allProjects": "← Alle Projekte",
+    "compare": "Vergleichen →"
+  }
+}
