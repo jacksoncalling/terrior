@@ -33,7 +33,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-18 (session 2)
+## Current State — Updated 2026-04-18
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
@@ -45,13 +45,12 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Enriched JSON export (v1.1)** — `meta` block with project brief, discovery goal, key themes, attractor preset, graph summary.
 - **Temporal horizons on evaluative signals** — `TemporalHorizon` type from Jabe Bloom's model. Extraction prompts classify by time scale.
 - **Signal-to-node linking** — `relatedNodeIds` on `EvaluativeSignal`, backed by `signal_node_links` junction table.
-- **Filesystem export** — `POST /api/export-to-files` writes a markdown folder projection to disk (`hubs/`, `nodes/`, `signals/`, `tensions/`, `_meta/export.json`). Triggered from Inspector "Sync to filesystem" button. Local dev only (Vercel guard). Set `TERROIR_EXPORT_ROOT` to override output path.
-- **Public read endpoint** — `GET /api/export?projectId=xxx` returns the full project bundle as JSON, live from Supabase. CORS open. Any agent (Mistral, Claude Code, curl) reads the graph with one HTTP request — no local server, no credentials.
-- **Node size = evaluative intensity** — `computeNodeIntensity` sums `intensity_score × relevance_score` for all signals linked to a node. Canvas maps this to circle diameter (compact mode, 12–26px) or card min-width (card mode, 140–210px). Hub nodes unaffected.
-- **Jagged border = emergent + high-intensity** — three-state border on both node types: integrated (solid), emergent+low (dotted grey), emergent+high-intensity (jagged clip-path). Threshold: `JAGGED_INTENSITY_THRESHOLD = 10`. Tension red border still wins priority.
-- **Session Delta narration** — `POST /api/session-delta` diffs the last two `graph_snapshots` and asks Sonnet to describe changes in plain prose. Collapsible card at top of Reflect tab. Requires `graph_snapshots` migration (see below).
-- **Graph snapshots** — one snapshot per integration run (fire-and-forget at end of `POST /api/integrate`). Stored in `graph_snapshots` table. `007_graph_snapshots.sql` ✅ run.
-- **Gradient Signal Extraction** — evaluative signal prompt replaced with gradient model: directional pressure with magnitude (`intensity`), `threshold_proximity` (how close to flipping), and `at_cost_of` (what is traded off). Per-doc cap 5 → 2; zero is a valid answer. Old `strength` column kept for backwards compat; `intensity` is the semantic alias. `008_gradient_signal_fields.sql` ✅ run. Gold examples use logistics-startup placeholders — **swap with real eoniq passages post-demo**.
+- **Filesystem export** — `POST /api/export-to-files` writes a markdown folder projection to disk. Local dev only.
+- **Public read endpoint** — `GET /api/export?projectId=xxx` returns full project bundle as JSON. CORS open.
+- **Node size = evaluative intensity** — intensity map drives circle diameter (12–26px compact) and card min-width (140–210px). Hub nodes unaffected.
+- **Jagged border = emergent + high-intensity** — three-state border: solid / dotted / jagged clip-path. Threshold = 10. Tension red border wins priority.
+- **Session Delta narration** — `POST /api/session-delta` diffs last two snapshots, returns Sonnet prose. Collapsible card in Reflect tab. `007_graph_snapshots.sql` ✅ run.
+- **Gradient Signal Extraction** — prompt replaced with gradient model: `intensity`, `threshold_proximity`, `at_cost_of`. Cap 5 → 2; zero is valid. `008_gradient_signal_fields.sql` ✅ run. Gold examples are logistics-startup placeholders — **swap with real eoniq passages post-demo**.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
@@ -60,9 +59,9 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Graph density in hotspots** — force layout clusters highly-connected nodes tightly.
 
 ### What's next
-1. **eoniq demo (April 21)** — create eoniq project in Terroir, run workshop with Matthias, share `GET /api/export?projectId=<eoniq-id>` URL with his dev for Mistral agent.
-2. **Canal PoC setup for Matthias** — add Matthias + dev Telegram user IDs to `ALLOWED_USER_IDS`, implement persistent per-user project routing (survives Render restarts), wire to eoniq project.
-3. **Bottom-up hub experiment** — spec at `.claude/designs/TERROIR_bottom_up_hub_experiment.md`. Run after 10+ documents ingested.
+1. **Reprocess eoniq with gradient prompt** — open eoniq project, hit Reprocess in Inspector, validate surviving signals with Matthias before April 21 demo.
+2. **Swap gradient gold examples** — replace 4 logistics-startup placeholders in `buildExtractionPrompt` (gemini.ts) with real eoniq passages post-demo.
+3. **Canal PoC setup for Matthias** — add Matthias + dev Telegram user IDs to `ALLOWED_USER_IDS`, implement persistent per-user project routing, wire to eoniq project.
 
 ---
 
