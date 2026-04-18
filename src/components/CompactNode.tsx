@@ -3,18 +3,17 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { AttractorConfig, NodeZone } from "@/types";
+import { normalizeIntensity, JAGGED_INTENSITY_THRESHOLD } from "@/lib/evaluative";
 
 /**
  * CompactNode — lightweight circle rendering for graphs with 40+ nodes.
  *
- * Renders a small colored circle (hub color as fill) with label on hover.
- * No label/description in the DOM — dramatically reduces paint cost at scale.
- *
- * Visual states:
- * - Hub nodes: larger circle (24px) with ring border
- * - Tension nodes: red ring indicator
- * - Emergent zone: dashed border + reduced opacity
- * - Readonly (parent project): reduced opacity
+ * Visual states (in priority order):
+ * - Hub nodes: larger circle (24px) with ring border — unaffected by intensity
+ * - Tension nodes: red ring — wins over jagged/emergent states
+ * - Emergent + high intensity (≥ threshold): jagged star clip-path shape
+ * - Emergent + low intensity: dotted ring, reduced opacity
+ * - Regular: solid fill, no border
  * - Highlighted (selected or neighbor): full opacity + glow
  * - Dimmed (not connected to selection): near-invisible
  */
@@ -34,6 +33,31 @@ interface CompactNodeData {
   hubColor?: string;
   highlighted?: boolean;
   dimmed?: boolean;
+  intensity?: number;
+}
+
+// CSS clip-path for a jagged 8-spike star (used when emergent + high intensity).
+// Generated from alternating outer (50%) and inner (30%) radius points around a circle.
+const JAGGED_CLIP_PATH = (() => {
+  const spikes = 8;
+  const outerR = 50;
+  const innerR = 30;
+  const points: string[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const angle = (i * Math.PI) / spikes - Math.PI / 2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    const x = 50 + r * Math.cos(angle);
+    const y = 50 + r * Math.sin(angle);
+    points.push(`${x.toFixed(1)}% ${y.toFixed(1)}%`);
+  }
+  return `polygon(${points.join(", ")})`;
+})();
+
+// Map normalized intensity (0–1) to circle diameter in px (non-hub nodes only).
+const SIZE_MIN = 12;
+const SIZE_MAX = 26;
+function mapIntensityToSize(normalized: number): number {
+  return SIZE_MIN + normalized * (SIZE_MAX - SIZE_MIN);
 }
 
 function CompactNodeComponent({ data }: NodeProps) {
@@ -49,9 +73,9 @@ function CompactNodeComponent({ data }: NodeProps) {
     hubColor,
     highlighted,
     dimmed,
+    intensity = 0,
   } = data as unknown as CompactNodeData;
 
-  // Resolve color from hub inheritance or attractor config
   const attractorConfig = (attractors || []).find(
     (a: AttractorConfig) => a.id === attractor
   );
@@ -60,13 +84,31 @@ function CompactNodeComponent({ data }: NodeProps) {
   const isEmergent = zone === "emergent";
   const isHub = is_hub === true;
   const isReadonly = readonly === true;
-  const size = isHub ? 24 : 16;
+  const isJagged = isEmergent && intensity >= JAGGED_INTENSITY_THRESHOLD && !hasTension;
 
-  // Opacity: dimmed > readonly/emergent > highlighted > normal
+  // Size: hub fixed at 24px; non-hub scaled by intensity
+  const normalized = normalizeIntensity(intensity);
+  const size = isHub ? 24 : mapIntensityToSize(normalized);
+
+  // Opacity: dimmed > readonly > emergent+low > normal
   let opacity = 1;
   if (dimmed) opacity = 0.15;
   else if (isReadonly) opacity = 0.5;
-  else if (isEmergent) opacity = 0.6;
+  else if (isEmergent && !isJagged) opacity = 0.6;
+
+  // Border state (tension wins over all; jagged uses clip-path so no border needed)
+  let border: string;
+  if (hasTension) {
+    border = "2px solid #f87171";
+  } else if (isHub) {
+    border = `2px solid ${color}`;
+  } else if (isJagged) {
+    border = "none";
+  } else if (isEmergent) {
+    border = "1.5px dashed #d6d3d1";
+  } else {
+    border = "1.5px solid transparent";
+  }
 
   return (
     <div
@@ -81,25 +123,20 @@ function CompactNodeComponent({ data }: NodeProps) {
       />
 
       <div
-        className="rounded-full transition-shadow duration-150"
+        className="transition-shadow duration-150"
         style={{
           width: size,
           height: size,
           backgroundColor: isHub ? `${color}20` : color,
-          border: hasTension
-            ? "2px solid #f87171"
-            : isHub
-              ? `2px solid ${color}`
-              : isEmergent
-                ? "1.5px dashed #d6d3d1"
-                : "1.5px solid transparent",
+          border,
+          borderRadius: isJagged ? undefined : "50%",
+          clipPath: isJagged ? JAGGED_CLIP_PATH : undefined,
           boxShadow: highlighted
             ? `0 0 8px 2px ${color}60`
             : undefined,
         }}
       />
 
-      {/* Show label below circle only for the selected (clicked) node */}
       {selected && (
         <div
           className="absolute whitespace-nowrap text-center pointer-events-none select-none"

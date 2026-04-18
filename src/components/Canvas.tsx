@@ -26,6 +26,7 @@ import OntologyEdge from "./OntologyEdge";
 import type { GraphState, GraphNode, EntityTypeConfig, AttractorConfig, NodeZone } from "@/types";
 import { HUB_RELATIONSHIP_TYPE } from "@/types";
 import { computeGraphZones } from "@/lib/entity-types";
+import { computeIntensityMap } from "@/lib/evaluative";
 import { autoLayout } from "@/lib/layout";
 
 /** Node count threshold — above this, render compact circles instead of full cards */
@@ -68,6 +69,12 @@ function graphStateToFlow(
 
   // Compute zones locally if not provided
   const nodeZones = zones ?? computeGraphZones(graphState.nodes, graphState.relationships);
+
+  // Compute evaluative intensity per node (once per render, O(nodes × signals))
+  const intensityMap = computeIntensityMap(
+    graphState.nodes.map((n) => n.id),
+    graphState.evaluativeSignals
+  );
 
   // Build an index of nodes by ID for O(1) lookups (avoids O(N×M) at scale)
   const nodeById = new Map<string, GraphNode>();
@@ -123,6 +130,7 @@ function graphStateToFlow(
       hubColor: node.is_hub
         ? (node.properties?.color ?? "#78716c")
         : nodeHubColorMap.get(node.id),
+      intensity: intensityMap.get(node.id) ?? 0,
       // Highlight state: only applied when a node is selected
       highlighted: hasSelection && neighborIds.has(node.id),
       dimmed: hasSelection && !neighborIds.has(node.id),

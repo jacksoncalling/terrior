@@ -33,6 +33,7 @@ import {
   reassignAttractors,
   loadOntology,
   logSession,
+  createSnapshot,
 } from "@/lib/supabase";
 import type { ProjectBrief, IntegrationResult } from "@/types";
 
@@ -146,6 +147,11 @@ export async function POST(req: NextRequest) {
       relationshipsAdded,
       attractorsReassigned,
     };
+
+    // ── Snapshot post-integration state (fire and forget) ────────────────────
+    createSnapshot(projectId, "integration").catch((err) =>
+      console.warn("[integrate] Snapshot failed (non-fatal):", err)
+    );
 
     // ── Log session (fire and forget) ─────────────────────────────────────────
     logSession({

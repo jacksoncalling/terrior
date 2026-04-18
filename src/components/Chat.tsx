@@ -314,6 +314,11 @@ export default function Chat({
   const [dedupState, setDedupState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [dedupSummary, setDedupSummary] = useState<string>("");
 
+  // ── Session Delta state ───────────────────────────────────────────────────
+  const [deltaState, setDeltaState] = useState<"idle" | "running" | "done" | "no_snapshots" | "error">("idle");
+  const [deltaNarration, setDeltaNarration] = useState<string>("");
+  const [deltaOpen, setDeltaOpen] = useState(false);
+
   // ── Topology enrichment state ─────────────────────────────────────────────
   const [enrichState, setEnrichState] = useState<"idle" | "running" | "done" | "error">("idle");
 
@@ -428,6 +433,34 @@ export default function Chat({
     }
   };
 
+  // ── Session Delta handler ────────────────────────────────────────────────
+  const handleSessionDelta = async () => {
+    if (!projectId || deltaState === "running") return;
+    setDeltaState("running");
+    setDeltaOpen(true);
+    try {
+      const res = await fetch("/api/session-delta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Session delta failed");
+      }
+      const { narration, error } = await res.json();
+      if (error === "no_snapshots") {
+        setDeltaState("no_snapshots");
+      } else {
+        setDeltaNarration(narration);
+        setDeltaState("done");
+      }
+    } catch (err) {
+      console.error("[session-delta]", err);
+      setDeltaState("error");
+    }
+  };
+
   // ── Topology enrichment handler ──────────────────────────────────────────
   const handleEnrich = async () => {
     if (!projectId || enrichState === "running") return;
@@ -526,6 +559,49 @@ export default function Chat({
       {/* ── Reflect tab ───────────────────────────────────────────────────── */}
       {mode === "reflect" && (
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+
+          {/* ── Session Delta card ───────────────────────────────────────── */}
+          <div className="rounded-lg border border-stone-200 bg-white overflow-hidden">
+            <button
+              onClick={() => {
+                if (deltaState === "idle" || deltaState === "error") {
+                  handleSessionDelta();
+                } else {
+                  setDeltaOpen((v) => !v);
+                }
+              }}
+              disabled={!projectId || deltaState === "running"}
+              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-stone-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">
+                Session Delta
+              </span>
+              <span className="text-[10px] text-stone-400">
+                {deltaState === "running"
+                  ? "Describing changes…"
+                  : deltaState === "no_snapshots"
+                    ? "Run a Sources integration to enable"
+                    : deltaState === "done"
+                      ? (deltaOpen ? "▲" : "▼")
+                      : deltaState === "error"
+                        ? "Failed — try again"
+                        : "Describe changes since last integration"}
+              </span>
+            </button>
+            {deltaOpen && deltaState === "done" && deltaNarration && (
+              <div className="px-3 pb-3 pt-0 border-t border-stone-100">
+                <p className="text-xs text-stone-700 leading-relaxed whitespace-pre-wrap">
+                  {deltaNarration}
+                </p>
+                <button
+                  onClick={handleSessionDelta}
+                  className="mt-2 text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* ── Tensions section ─────────────────────────────────────────── */}
           {unresolvedTensionCount > 0 && (

@@ -33,7 +33,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-17
+## Current State — Updated 2026-04-18
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
@@ -47,6 +47,10 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Signal-to-node linking** — `relatedNodeIds` on `EvaluativeSignal`, backed by `signal_node_links` junction table.
 - **Filesystem export** — `POST /api/export-to-files` writes a markdown folder projection to disk (`hubs/`, `nodes/`, `signals/`, `tensions/`, `_meta/export.json`). Triggered from Inspector "Sync to filesystem" button. Local dev only (Vercel guard). Set `TERROIR_EXPORT_ROOT` to override output path.
 - **Public read endpoint** — `GET /api/export?projectId=xxx` returns the full project bundle as JSON, live from Supabase. CORS open. Any agent (Mistral, Claude Code, curl) reads the graph with one HTTP request — no local server, no credentials.
+- **Node size = evaluative intensity** — `computeNodeIntensity` sums `intensity_score × relevance_score` for all signals linked to a node. Canvas maps this to circle diameter (compact mode, 12–26px) or card min-width (card mode, 140–210px). Hub nodes unaffected.
+- **Jagged border = emergent + high-intensity** — three-state border on both node types: integrated (solid), emergent+low (dotted grey), emergent+high-intensity (jagged clip-path). Threshold: `JAGGED_INTENSITY_THRESHOLD = 10`. Tension red border still wins priority.
+- **Session Delta narration** — `POST /api/session-delta` diffs the last two `graph_snapshots` and asks Sonnet to describe changes in plain prose. Collapsible card at top of Reflect tab. Requires `graph_snapshots` migration (see below).
+- **Graph snapshots** — one snapshot per integration run (fire-and-forget at end of `POST /api/integrate`). Stored in `graph_snapshots` table. Requires **007_graph_snapshots.sql** migration (pending).
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
@@ -127,6 +131,7 @@ All tables scoped by `project_id`.
 | `documents` | Uploaded/pasted source documents |
 | `document_chunks` | Chunked content for vector search |
 | `sessions` | AI interaction logs (Haiku, Sonnet, Gemini calls) |
+| `graph_snapshots` | Periodic graph state snapshots (one per integration run). Cols: `id`, `project_id`, `snapshot_json` (jsonb full GraphState), `trigger` ("integration" or "manual"), `created_at`. Used by Session Delta to diff changes. |
 
 ### Migrations run in Supabase
 - `001_entity_type_unique_constraint.sql` — unique index on `(project_id, type_id)`
@@ -135,6 +140,7 @@ All tables scoped by `project_id`.
 - `004_attractor_and_nesting.sql` — adds `attractor` TEXT to `ontology_nodes`, `parent_project_id` UUID to `projects`, index on parent ✅ run
 - `005_hub_nodes.sql` — adds `is_hub` BOOLEAN to `ontology_nodes`, index on `(project_id) WHERE is_hub = true` ⬜ pending
 - `006_embedding_768d.sql` — resizes `document_chunks.embedding` from vector(384) to vector(768), truncates old chunks, recreates search RPCs ✅ run
+- `007_graph_snapshots.sql` — creates `graph_snapshots` table (id, project_id, snapshot_json jsonb, trigger text, created_at) + index on (project_id, created_at DESC) ⬜ pending
 
 ---
 

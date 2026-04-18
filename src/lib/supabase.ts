@@ -1044,3 +1044,61 @@ export async function searchChunks(
   if (error) throw new Error(`searchChunks: ${error.message}`);
   return data ?? [];
 }
+
+// ── Graph snapshots ──────────────────────────────────────────────────────────
+//
+// One snapshot per integration run, stored in `graph_snapshots`.
+// The Session Delta narration diffs the latest two snapshots to describe
+// what changed since the last integration.
+//
+// SQL migration (007_graph_snapshots.sql) — paste into Supabase SQL Editor:
+//
+//   CREATE TABLE IF NOT EXISTS graph_snapshots (
+//     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+//     project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+//     snapshot_json JSONB NOT NULL,
+//     trigger     TEXT,
+//     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+//   );
+//   CREATE INDEX ON graph_snapshots (project_id, created_at DESC);
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Serialize the current graph state for a project and store it as a snapshot.
+ * Called at the end of /api/integrate so each integration run is checkpointed.
+ */
+export async function createSnapshot(
+  projectId: string,
+  trigger: "integration" | "manual" = "integration"
+): Promise<void> {
+  const state = await loadOntology(projectId);
+  const { error } = await supabase.from("graph_snapshots").insert({
+    project_id: projectId,
+    snapshot_json: state as unknown as Record<string, unknown>,
+    trigger,
+  });
+  if (error) throw new Error(`createSnapshot: ${error.message}`);
+}
+
+/**
+ * Load the two most recent snapshots for a project (newest first).
+ * Returns an empty array if the table doesn't exist yet (pre-migration).
+ */
+export async function getLatestTwoSnapshots(
+  projectId: string
+): Promise<{ id: string; snapshot_json: GraphState; created_at: string }[]> {
+  try {
+    const { data, error } = await supabase
+      .from("graph_snapshots")
+      .select("id, snapshot_json, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(2);
+    if (error) throw error;
+    return (data ?? []) as { id: string; snapshot_json: GraphState; created_at: string }[];
+  } catch (err) {
+    console.warn("[getLatestTwoSnapshots] Failed (non-fatal):", err);
+    return [];
+  }
+}
