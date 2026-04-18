@@ -58,11 +58,12 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
 - **`enrichState` stale after external signal change** — needs `useEffect` reset on signal count change.
 - **Graph density in hotspots** — force layout clusters highly-connected nodes tightly.
+- **`window.confirm` for reprocess is EN-only** — the confirm dialog body string in `ProjectBrief.tsx:76` is hardcoded English even when locale is DE.
 
 ### What's next
 1. **Reprocess eoniq with gradient prompt** — open eoniq project, hit Reprocess in Inspector, validate surviving signals with Matthias before April 21 demo.
 2. **Swap gradient gold examples** — replace 4 logistics-startup placeholders in `buildExtractionPrompt` (gemini.ts) with real eoniq passages post-demo.
-3. **Canal PoC setup for Matthias** — add Matthias + dev Telegram user IDs to `ALLOWED_USER_IDS`, implement persistent per-user project routing, wire to eoniq project.
+3. **Fix reprocess confirm dialog translation** — add `brief.reprocessConfirm` key to both locale files and use `t()` in `ProjectBrief.tsx:76`.
 
 ---
 
