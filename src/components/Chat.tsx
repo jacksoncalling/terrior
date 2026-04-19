@@ -329,6 +329,9 @@ export default function Chat({
   // ── Topology enrichment state ─────────────────────────────────────────────
   const [enrichState, setEnrichState] = useState<"idle" | "running" | "done" | "error">("idle");
 
+  // ── Meta-tension (fault line) state ──────────────────────────────────────
+  const [metaTensionState, setMetaTensionState] = useState<"idle" | "running" | "done" | "error">("idle");
+
   // ── + menu state ──────────────────────────────────────────────────────────
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const plusMenuRef = useRef<HTMLDivElement>(null);
@@ -491,6 +494,29 @@ export default function Chat({
     }
   };
 
+  // ── Meta-tension (fault line) handler ───────────────────────────────────
+  const handleMetaTensions = async () => {
+    if (!projectId || metaTensionState === "running") return;
+    setMetaTensionState("running");
+    try {
+      const res = await fetch("/api/meta-tensions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Fault line detection failed");
+      }
+      const { updatedGraph } = await res.json();
+      onGraphUpdate(updatedGraph, []);
+      setMetaTensionState("done");
+    } catch (err) {
+      console.error("[meta-tensions]", err);
+      setMetaTensionState("error");
+    }
+  };
+
   // ── Tab button renderer ───────────────────────────────────────────────────
   // When in sources mode, the pre-sources tab stays visually active so the
   // user always knows where they came from and how to get back.
@@ -552,7 +578,7 @@ export default function Chat({
 
       {/* ── Synthesis tab ─────────────────────────────────────────────────── */}
       {mode === "synthesis" && (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           <SynthesisResults
             result={synthesisResult ?? null}
             documentCount={documentCount}
@@ -560,6 +586,37 @@ export default function Chat({
             onRunSynthesis={onRunSynthesis ?? (() => {})}
             onAskInChat={handleAskInChat}
           />
+          {/* ── Fault line trigger — appears once hub nodes exist ─────────── */}
+          {graphState.nodes.some((n) => n.is_hub) && (
+            <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">
+                  Cross-graph fault lines
+                </span>
+                {metaTensionState === "done" && (
+                  <span className="text-[10px] text-red-400 normal-case">
+                    {graphState.tensions.filter((t) => t.scope === "cross-graph").length} fault{" "}
+                    {graphState.tensions.filter((t) => t.scope === "cross-graph").length === 1 ? "line" : "lines"} surfaced
+                  </span>
+                )}
+                {metaTensionState === "error" && (
+                  <span className="text-[10px] text-red-400 normal-case">Detection failed — try again</span>
+                )}
+              </div>
+              <button
+                onClick={handleMetaTensions}
+                disabled={metaTensionState === "running" || !projectId}
+                className="text-[10px] text-red-600 hover:text-red-800 transition-colors border border-red-200 rounded px-2 py-0.5 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                title="Surface cross-hub structural tensions using somatic pattern recognition"
+              >
+                {metaTensionState === "running"
+                  ? "Detecting…"
+                  : metaTensionState === "done"
+                  ? "Re-run"
+                  : "Surface fault lines"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -610,29 +667,59 @@ export default function Chat({
             )}
           </div>
 
-          {/* ── Tensions section ─────────────────────────────────────────── */}
-          {unresolvedTensionCount > 0 && (
-            <div>
-              <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-2">
-                {t("reflect.tensions.title")}
-                <span className="ml-1.5 normal-case font-normal text-red-500">
-                  — {t("reflect.tensions.unresolved", { count: unresolvedTensionCount })}
-                </span>
-              </p>
-              <div className="space-y-2">
-                {graphState.tensions
-                  .filter((t) => t.status === "unresolved")
-                  .map((t) => (
+          {/* ── Local tensions section ───────────────────────────────────── */}
+          {(() => {
+            const localUnresolved = graphState.tensions.filter(
+              (t) => t.status === "unresolved" && (t.scope ?? "local") === "local"
+            );
+            return localUnresolved.length > 0 ? (
+              <div>
+                <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-2">
+                  {t("reflect.tensions.title")}
+                  <span className="ml-1.5 normal-case font-normal text-red-500">
+                    — {t("reflect.tensions.unresolved", { count: localUnresolved.length })}
+                  </span>
+                </p>
+                <div className="space-y-2">
+                  {localUnresolved.map((tension) => (
                     <TensionCard
-                      key={t.id}
-                      tension={t}
+                      key={tension.id}
+                      tension={tension}
                       nodes={graphState.nodes}
                       onResolve={onTensionResolve}
                     />
                   ))}
+                </div>
               </div>
-            </div>
-          )}
+            ) : null;
+          })()}
+
+          {/* ── Meta tensions section (cross-graph fault lines) ──────────── */}
+          {(() => {
+            const metaUnresolved = graphState.tensions.filter(
+              (t) => t.status === "unresolved" && t.scope === "cross-graph"
+            );
+            return metaUnresolved.length > 0 ? (
+              <div>
+                <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-2">
+                  Meta tensions
+                  <span className="ml-1.5 normal-case font-normal text-red-500">
+                    — {metaUnresolved.length} fault {metaUnresolved.length === 1 ? "line" : "lines"}
+                  </span>
+                </p>
+                <div className="space-y-2">
+                  {metaUnresolved.map((tension) => (
+                    <TensionCard
+                      key={tension.id}
+                      tension={tension}
+                      nodes={graphState.nodes}
+                      onResolve={onTensionResolve}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
 
           {/* ── Optimisation hypothesis card ─────────────────────────────── */}
           {optimizationHypothesis && (

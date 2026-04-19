@@ -304,9 +304,15 @@ export default function Inspector({
           {tensions.length > 0 && (
             <div>
               <h4 className="text-[10px] font-medium text-red-500 uppercase tracking-wide">{t("inspector.node.tensions")}</h4>
-              {tensions.map((t) => (
-                <div key={t.id} className="text-xs text-red-600 mt-0.5">
-                  {t.status === "unresolved" ? "!" : "~"} {t.description}
+              {tensions.map((tension) => (
+                <div key={tension.id} className="text-xs text-red-600 mt-0.5">
+                  <span className="mr-1">{tension.status === "unresolved" ? "!" : "~"}</span>
+                  {tension.scope === "cross-graph" && (
+                    <span className="inline-block text-[9px] font-medium bg-red-100 text-red-500 rounded px-1 py-px mr-1 uppercase tracking-wide leading-none">
+                      Cross-graph
+                    </span>
+                  )}
+                  {tension.description}
                 </div>
               ))}
             </div>

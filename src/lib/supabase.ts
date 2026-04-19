@@ -733,6 +733,7 @@ export async function loadOntology(projectId: string): Promise<GraphState> {
     description: row.description,
     relatedNodeIds: row.related_node_ids ?? [],
     status: row.status,
+    scope: (row.scope as "local" | "cross-graph") ?? "local",
   }));
 
   // ── Load signal-to-node links (junction table) ──────────────────────────
@@ -876,6 +877,7 @@ export async function saveOntology(projectId: string, state: GraphState): Promis
         description: t.description,
         related_node_ids: t.relatedNodeIds,
         status: t.status,
+        scope: t.scope ?? "local",
       })),
       { onConflict: 'id', ignoreDuplicates: false }
     );

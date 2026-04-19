@@ -69,6 +69,8 @@ export interface TensionMarker {
   description: string;
   relatedNodeIds: string[];
   status: "unresolved" | "resolved";
+  /** "local" = intra-document structural conflict; "cross-graph" = hub-level fault line */
+  scope?: "local" | "cross-graph";
 }
 
 /**

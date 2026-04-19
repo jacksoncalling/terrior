@@ -167,13 +167,21 @@ function buildExtractionPrompt(
 ): string {
   const budget = estimateEntityBudget(text.length);
   // Build the existing-graph context block (dedup guard)
+  const existingTensionBlock =
+    graphState.tensions.filter((t) => t.status === "unresolved").length > 0
+      ? `\n\nExisting unresolved tensions already in the graph (do NOT re-flag these):\n${graphState.tensions
+          .filter((t) => t.status === "unresolved")
+          .map((t) => `  - ${t.description}`)
+          .join("\n")}`
+      : "";
+
   const existingContext =
     graphState.nodes.length > 0
       ? `\n\nExisting entities already in the graph (avoid duplicates, connect to these where relevant):\n${graphState.nodes
           .map((n) => `- "${n.label}" (${n.type}) [id: ${n.id}]`)
           .join(
             "\n"
-          )}\n\nExisting entity types: ${graphState.entityTypes.map((t) => t.id).join(", ")}`
+          )}\n\nExisting entity types: ${graphState.entityTypes.map((t) => t.id).join(", ")}${existingTensionBlock}`
       : "";
 
   // Build the project context block (when a brief is available)
@@ -435,6 +443,31 @@ Reason: no trade-off named. Protecting ethical practices from what? At the cost 
 
 Final check:
 Before writing any gradient, re-read your candidate against the three test questions above. If you cannot answer all three from the source passage, leave it out. An empty evaluative_signals array is a valid and often correct answer.
+
+TENSION RULES:
+
+What counts as a tension:
+A tension is a genuine structural conflict between two or more entities that cannot both be fully satisfied simultaneously — not a challenge, a preference difference, or a solvable coordination problem. Both sides must be active and pulling against each other right now. If the conflict could be resolved by a single decision, a meeting, or more resources, it is not a tension — it is a problem. Tensions persist even when everyone agrees they exist.
+
+Hard limits:
+- Extract AT MOST 1 tension per document. Most documents should return ZERO — that is the correct answer for documents without active structural conflict.
+- Do NOT re-flag a tension already listed in the existing graph context above. If the same conflict reappears in a new document, it reinforces an existing tension, not a new one.
+- Do NOT extract a tension just because two entities have a "challenges" relationship — that relationship already captures friction. A tension must be more fundamental than a single edge.
+
+Exclusions (do NOT extract):
+- Disagreements that are acknowledged and being actively resolved
+- Tradeoffs the organisation has already decided (choosing A over B is a decision, not a tension)
+- Minor friction between roles or teams with no structural consequence
+- Anything that could be fixed by clearer communication, a process change, or a meeting
+- Concerns, risks, or problems — these are different from tensions
+
+Required for a tension:
+- "description" — one sentence naming BOTH sides of the conflict and why satisfying one undermines the other. Format: "[Entity A] pulls toward [X], while [Entity B] requires [Y] — both cannot be fully satisfied without compromising the other." Must be specific to this organisation; should not be copy-pasteable onto a generic company.
+- "related_labels" — the two (or occasionally three) entities that are in direct conflict. Name the specific entities from this extraction or from the existing graph.
+
+Test each candidate with these two questions. If either answer is "no," do not extract:
+1. If this organisation solved everything else, would this conflict still exist?
+2. Can I name the specific mechanism by which satisfying one side damages the other?
 
 DOCUMENT:
 ${text}`;
@@ -1305,4 +1338,196 @@ export async function enrichSignalsWithTopology(
   }));
 
   return parsed;
+}
+
+// ── Meta-tension (cross-graph fault line) pass ────────────────────────────────
+//
+// A single Gemini pass that traverses the hub topology to surface fault lines
+// that only become visible when holding the whole graph at once — not any single
+// document. Uses somatic vocabulary as the diagnostic frame:
+//
+//   contracted — the org is pulling inward, playing small, not expanding
+//   blocked    — stagnation across multiple hubs; the same pattern repeating
+//   pulled     — scattered attention, method-over-value, too much emergent
+//
+// Returns 2–4 TensionMarkers with scope: "cross-graph" and relatedNodeIds
+// pointing to hub nodes involved in each fault line.
+
+interface MetaTensionOutput {
+  faultLines: {
+    description: string;
+    somaticPattern: "contracted" | "blocked" | "pulled";
+    relatedHubSlugs: string[];
+  }[];
+}
+
+/**
+ * Builds the meta-tension prompt from the hub topology payload.
+ * Input is the same compact payload used by the topology-signal enrichment pass.
+ */
+function buildMetaTensionPrompt(
+  payload: import("@/lib/topology").TopologyPayload
+): string {
+  const hubSummary = payload.hubs
+    .map(
+      (h) =>
+        `  - "${h.id}" (${h.label}): ${h.memberCount} members, ${h.internalConnections} internal connections, ${h.tensionCount} local tensions`
+    )
+    .join("\n");
+
+  const crossHubSummary =
+    payload.crossHubConnections.length > 0
+      ? payload.crossHubConnections
+          .slice(0, 10)
+          .map((c) => `  - ${c.from} ↔ ${c.to}: ${c.count} cross-hub relationships`)
+          .join("\n")
+      : "  (none detected)";
+
+  const signalSummary =
+    payload.signals.length > 0
+      ? payload.signals
+          .map((s) => `  - [${s.direction}] ${s.label}`)
+          .join("\n")
+      : "  (none)";
+
+  const existingTensions =
+    payload.topTensions.length > 0
+      ? payload.topTensions.map((t) => `  - ${t}`).join("\n")
+      : "  (none)";
+
+  return `You are TERROIR's cross-graph fault line detector. Your task is to surface structural tensions that only become visible when holding the full hub topology simultaneously — not tensions inside any single document.
+
+WHAT TERROIR IS:
+An organisational listening tool that builds a knowledge graph from documents. Entities belong to hub categories (Domain, Capability, Culture, etc.). The topology below shows which hubs are dense, which are thin, where connections cross hub boundaries, and where evaluative signals are pulling.
+
+PROJECT CONTEXT:
+- Sector: ${payload.brief.sector ?? "not specified"}
+- Org size: ${payload.brief.orgSize ?? "not specified"}
+- Discovery goal: ${payload.brief.discoveryGoal ?? "not specified"}
+- Total entities: ${payload.totalEntities} (${payload.emergentCount} emergent / isolated)
+- Total relationships: ${payload.totalRelationships}
+
+HUB TOPOLOGY:
+${hubSummary}
+
+CROSS-HUB CONNECTIONS (semantic bridges between hubs):
+${crossHubSummary}
+
+EVALUATIVE SIGNALS (what the org is moving toward/away from):
+${signalSummary}
+
+EXISTING LOCAL TENSIONS (already captured — do NOT re-flag these):
+${existingTensions}
+
+YOUR DIAGNOSTIC FRAME — three somatic patterns:
+
+CONTRACTED: The organisation is pulling inward — playing small, staying close to what it already knows. Indicators: one or two hubs dominate the graph while others are thin or empty; evaluative signals are protecting rather than moving toward; high emergent count with few cross-hub bridges; the org's vocabulary loops around the same cluster of concepts without expanding outward.
+
+BLOCKED: Stagnation across multiple hubs — no forward movement, the same structural pattern repeating. Indicators: two or more hubs have high local tension counts; cross-hub connections exist but carry low relationship counts (shallow bridges, not real integration); evaluative signals pulling in opposite directions across different hubs; the org keeps naming the same challenge in different documents without resolution. Something needs to give for development to continue.
+
+PULLED: Attention scattered across multiple directions without value concentration. Indicators: high emergent count relative to total entities (method-over-value); many cross-hub connections but shallow (breadth without depth); evaluative signals span incompatible temporal horizons (operational and foundational simultaneously); the capability and domain hubs are weakly connected while emergent entities multiply.
+
+TASK:
+Identify 2–4 cross-graph fault lines using the topology above. Each fault line must:
+1. Be visible ONLY by holding two or more hubs simultaneously — not from any single document
+2. Name the specific hubs on each side of the conflict
+3. Be described as a structural reality, not a recommendation ("the org is X", not "the org should Y")
+4. Use the somatic pattern label (contracted / blocked / pulled) that best characterises the organisational felt-sense
+
+Hard limits:
+- Maximum 4 fault lines. Many topology profiles will only warrant 2. Zero is not valid — if there are entities in the graph there are structural patterns worth naming.
+- Do NOT invent tensions. Every fault line must be derivable from the numbers above.
+- Do NOT re-flag any tension already listed under EXISTING LOCAL TENSIONS.
+- The description must name the specific hubs involved and the mechanism of conflict. Generic descriptions ("there is tension between capability and culture") are rejected.
+
+GOLD EXAMPLES (logistics startup context — adapt to actual sector):
+
+Example — CONTRACTED:
+{
+  "description": "The Domain hub (18 members, 12 internal connections) is densely self-referential while the Capability hub has only 3 members and 1 cross-hub connection to Domain — the org knows its field deeply but is not building the structural bridges needed to translate that knowledge into capability.",
+  "somaticPattern": "contracted",
+  "relatedHubSlugs": ["domain", "capability"]
+}
+
+Example — BLOCKED:
+{
+  "description": "The Culture hub and the Process hub each carry 4 local tensions, and the single cross-hub connection between them is the lowest-weight bridge in the graph — the org's values and its operating procedures are not in contact with each other, so the same friction surfaces in every document without resolution.",
+  "somaticPattern": "blocked",
+  "relatedHubSlugs": ["culture", "process"]
+}
+
+Example — PULLED:
+{
+  "description": "31 of 87 entities are emergent (isolated), while the Capability and Domain hubs have only 2 cross-hub connections between them — the organisation is generating concepts faster than it can integrate them, and the gap between what it can do and what it knows keeps widening.",
+  "somaticPattern": "pulled",
+  "relatedHubSlugs": ["capability", "domain"]
+}
+
+Respond with valid JSON only — no markdown, no code blocks:
+{
+  "faultLines": [
+    {
+      "description": "string — specific, structural, names hubs and mechanism",
+      "somaticPattern": "contracted|blocked|pulled",
+      "relatedHubSlugs": ["hub-slug-1", "hub-slug-2"]
+    }
+  ]
+}`;
+}
+
+/**
+ * Runs the cross-graph meta-tension (fault line) pass via Gemini 2.5 Flash.
+ * Returns TensionMarkers with scope: "cross-graph" ready to merge into GraphState.
+ *
+ * @param payload    Compact topology summary from buildTopologyPayload()
+ * @param hubNodes   Hub nodes from the current GraphState (used to resolve slugs → node IDs)
+ * @returns          TensionMarkers with scope "cross-graph"
+ */
+export async function detectMetaTensions(
+  payload: import("@/lib/topology").TopologyPayload,
+  hubNodes: import("@/types").GraphNode[]
+): Promise<import("@/types").TensionMarker[]> {
+  const prompt  = buildMetaTensionPrompt(payload);
+  const raw     = await callGemini(prompt, 8192, false, true); // no JSON mode, no thinking
+  const rawJson = stripJsonFences(raw);
+
+  let parsed: MetaTensionOutput | null = null;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    throw new Error("detectMetaTensions: failed to parse Gemini response as JSON");
+  }
+
+  if (!Array.isArray(parsed?.faultLines)) {
+    throw new Error("detectMetaTensions: response missing faultLines array");
+  }
+
+  // Build a slug → node ID map from the hub nodes
+  const slugToId: Record<string, string> = {};
+  for (const hub of hubNodes) {
+    const slug = hub.properties?.attractor_id ?? hub.label.toLowerCase();
+    slugToId[slug] = hub.id;
+  }
+
+  // Convert fault lines to TensionMarkers — drop any with unresolvable hub slugs
+  const tensions: import("@/types").TensionMarker[] = [];
+  for (const fl of parsed.faultLines) {
+    if (!fl.description || !fl.relatedHubSlugs?.length) continue;
+
+    const relatedNodeIds = fl.relatedHubSlugs
+      .map((slug) => slugToId[slug])
+      .filter(Boolean) as string[];
+
+    if (relatedNodeIds.length === 0) continue;
+
+    tensions.push({
+      id: uuidv4(),
+      description: fl.description,
+      relatedNodeIds,
+      status: "unresolved",
+      scope: "cross-graph",
+    });
+  }
+
+  return tensions;
 }
