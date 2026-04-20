@@ -237,47 +237,39 @@ export default function Home() {
 
   // ── Supabase Realtime: live graph sync for collaborators ─────────────────
   //
-  // Watches ontology_nodes for any remote change on this project.
-  // When a collaborator's save arrives, we re-load the full ontology so their
-  // graph changes appear on screen without a page refresh.
+  // TODO: re-enable after step 2 (proper loop-break + position preservation fix)
+  // useEffect(() => {
+  //   if (!projectId || !hydrated) return;
   //
-  // Echo suppression: we stamp lastLocalSaveRef when we save. Any Realtime event
-  // within 5 seconds of our own save is treated as our echo and ignored, so we
-  // don't overwrite local state mid-drag or mid-edit.
+  //   const channel = supabase
+  //     .channel(`terroir-project-${projectId}`)
+  //     .on(
+  //       'postgres_changes',
+  //       {
+  //         event: '*',
+  //         schema: 'public',
+  //         table: 'ontology_nodes',
+  //         filter: `project_id=eq.${projectId}`,
+  //       },
+  //       () => {
+  //         // Ignore if we caused this change ourselves (within 5s of our last save)
+  //         if (Date.now() - lastLocalSaveRef.current < 5000) return;
   //
-  // Prerequisite: run supabase/migrations/002_enable_realtime.sql in Supabase.
-  useEffect(() => {
-    if (!projectId || !hydrated) return;
-
-    const channel = supabase
-      .channel(`terroir-project-${projectId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ontology_nodes',
-          filter: `project_id=eq.${projectId}`,
-        },
-        () => {
-          // Ignore if we caused this change ourselves (within 5s of our last save)
-          if (Date.now() - lastLocalSaveRef.current < 5000) return;
-
-          loadOntology(projectId)
-            .then((remoteGraph) => {
-              if (remoteGraph.nodes.length > 0 || remoteGraph.relationships.length > 0) {
-                setGraphState(remoteGraph);
-              }
-            })
-            .catch((err) => console.warn('[realtime] Graph reload failed (non-fatal):', err));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [projectId, hydrated]);
+  //         loadOntology(projectId)
+  //           .then((remoteGraph) => {
+  //             if (remoteGraph.nodes.length > 0 || remoteGraph.relationships.length > 0) {
+  //               setGraphState(remoteGraph);
+  //             }
+  //           })
+  //           .catch((err) => console.warn('[realtime] Graph reload failed (non-fatal):', err));
+  //       }
+  //     )
+  //     .subscribe();
+  //
+  //   return () => {
+  //     supabase.removeChannel(channel);
+  //   };
+  // }, [projectId, hydrated]);
 
   // ── Share handler ─────────────────────────────────────────────────────────
 
