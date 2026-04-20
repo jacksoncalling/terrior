@@ -836,7 +836,7 @@ export default function Home() {
         totalUpdates: number;
       } = await response.json();
 
-      setGraphState(result.updatedGraph);
+      setGraphState(autoLayout(result.updatedGraph));
       setDocumentCount(result.documentCount);
 
       // Add a system message in chat so the consultant knows the graph changed
