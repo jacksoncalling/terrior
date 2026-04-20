@@ -34,6 +34,8 @@ interface CompactNodeData {
   highlighted?: boolean;
   dimmed?: boolean;
   intensity?: number;
+  /** Set by the synthesis Invitation block — renders a distinct amber ring */
+  synthesisHighlighted?: boolean;
 }
 
 // CSS clip-path for a jagged 8-spike star (used when emergent + high intensity).
@@ -74,6 +76,7 @@ function CompactNodeComponent({ data }: NodeProps) {
     highlighted,
     dimmed,
     intensity = 0,
+    synthesisHighlighted,
   } = data as unknown as CompactNodeData;
 
   const attractorConfig = (attractors || []).find(
@@ -123,7 +126,7 @@ function CompactNodeComponent({ data }: NodeProps) {
       />
 
       <div
-        className="transition-shadow duration-150"
+        className={`transition-shadow duration-150${synthesisHighlighted ? " animate-pulse" : ""}`}
         style={{
           width: size,
           height: size,
@@ -131,9 +134,12 @@ function CompactNodeComponent({ data }: NodeProps) {
           border,
           borderRadius: isJagged ? undefined : "50%",
           clipPath: isJagged ? JAGGED_CLIP_PATH : undefined,
-          boxShadow: highlighted
-            ? `0 0 8px 2px ${color}60`
-            : undefined,
+          // Synthesis highlight wins — amber ring; otherwise selection glow
+          boxShadow: synthesisHighlighted
+            ? `0 0 0 3px #f59e0b, 0 0 12px 4px #fbbf2460`
+            : highlighted
+              ? `0 0 8px 2px ${color}60`
+              : undefined,
         }}
       />
 

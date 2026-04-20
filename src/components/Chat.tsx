@@ -47,6 +47,8 @@ interface ChatProps {
   optimizationHypothesis?: string | null;
   /** Called after topology enrichment completes — updates signals + hypothesis in page state. */
   onEnrichSignals?: (updatedSignals: EvaluativeSignal[], hypothesis: string) => void;
+  /** Called when the user clicks a node chip in the Invitation block — highlights nodes on canvas */
+  onHighlightNodes?: (nodeNames: string[]) => void;
 }
 
 // ── Direction icon map ────────────────────────────────────────────────────────
@@ -327,6 +329,7 @@ export default function Chat({
   onSignalDedup,
   optimizationHypothesis,
   onEnrichSignals,
+  onHighlightNodes,
 }: ChatProps) {
   const t = useTranslations();
 
@@ -612,6 +615,7 @@ export default function Chat({
             isLoading={isSynthesisLoading}
             onRunSynthesis={onRunSynthesis ?? (() => {})}
             onAskInChat={handleAskInChat}
+            onHighlightNodes={onHighlightNodes ?? (() => {})}
           />
           {/* ── Fault line trigger — appears once hub nodes exist ─────────── */}
           {graphState.nodes.some((n) => n.is_hub) && (

@@ -868,7 +868,13 @@ function buildSynthesisPrompt(
     .map((doc, i) => `--- DOCUMENT ${i + 1}: "${doc.title}" ---\n${doc.content}`)
     .join("\n\n");
 
-  return `You are TERROIR's synthesis engine. Read across all ${documents.length} documents and the knowledge graph to surface cross-source patterns that no single source reveals on its own.
+  return `You are TERROIR's winemaker — a synthesis presence for organisational listening.
+
+Your job is not to analyse these documents. It is to listen to them.
+
+A winemaker does not impose a formula on the soil. They attend to what is already happening — the accumulated seasons of practice, the tensions that don't resolve, the intelligence that is irreducibly local. You do the same with this organisation's documents.
+
+After reading across all ${documents.length} documents and the graph, you will surface cross-source patterns. But before you do, you will step back and ask: what does this organisation keep returning to? What does the pattern of what was brought to this graph reveal about where they are in their own understanding? That observation — the soil_note — leads everything.
 
 ${briefSection}
 
@@ -877,19 +883,22 @@ ${graphSection}
 DOCUMENTS TO SYNTHESISE (${documents.length} sources):
 ${docSections}
 
-YOUR FOUR TASKS:
+YOUR TASKS:
 
-1. TERM COLLISIONS — the same concept called different names across sources. Suggest a canonical term.
+1. SOIL NOTE — before mapping anything, read the pattern of attention across all documents. What is this organisation consistently circling? What does that reveal about where they are in their own understanding? One or two quiet sentences. This is the most important output. Return null only if genuinely nothing coherent emerges — do not default to null.
 
-2. CONNECTING THREADS — recurring themes or structural patterns that span multiple sources.
+2. TERM COLLISIONS — the same concept called different names across sources. Suggest a canonical term.
 
-3. SIGNAL CONVERGENCE — places where sources agree or disagree on something evaluative (values, fears, priorities).
+3. CONNECTING THREADS — recurring themes or structural patterns that span multiple sources.
 
-4. GRAPH GAPS — meaningful concepts in the documents but absent or underrepresented in the graph. For each gap, suggest an exact follow-up question the consultant should ask.
+4. SIGNAL CONVERGENCE — places where sources agree or disagree on something evaluative (values, fears, priorities).
+
+5. GRAPH GAPS — meaningful concepts in the documents but absent or underrepresented in the graph. Identify ALL gaps in the graphGaps array. Then, from those gaps, select the single most generative one — the gap whose exploration would move the organisation's understanding furthest — and surface it as the invitation. Provide: (a) a question the consultant should ask, (b) the names of 2–3 existing graph nodes most relevant to that gap (use exact node labels from the graph above).
 
 Return valid JSON matching this schema exactly — no markdown, no code blocks:
 {
   "narrativeSummary": "string — 2-3 paragraphs describing the key cross-source findings",
+  "soilNote": "string | null — one or two sentences about what the pattern of documents reveals about this organisation's attention right now. Not about content — about attention.",
   "termCollisions": [
     { "variants": ["string"], "sources": ["document title"], "suggestedCanonical": "string", "context": "string" }
   ],
@@ -901,7 +910,9 @@ Return valid JSON matching this schema exactly — no markdown, no code blocks:
   ],
   "graphGaps": [
     { "description": "string", "suggestedQuestion": "string", "relatedNodeIds": ["string"] }
-  ]
+  ],
+  "invitationQuestion": "string | null — one question surfacing the most generative graph gap",
+  "invitationNodeNames": ["string — exact node label from the graph"]
 }`;
 }
 
@@ -935,12 +946,14 @@ export async function runGeminiSynthesis(
   } catch {
     console.error("[gemini] Synthesis returned invalid JSON:", rawJson.slice(0, 300));
     parsed = {
-      narrativeSummary:
-        "Synthesis could not be parsed. Please try again — the model may have returned malformed output.",
-      termCollisions:    [],
-      connectingThreads: [],
-      signalConvergence: [],
-      graphGaps:         [],
+      narrativeSummary:    "Synthesis could not be parsed. Please try again — the model may have returned malformed output.",
+      soilNote:            null,
+      termCollisions:      [],
+      connectingThreads:   [],
+      signalConvergence:   [],
+      graphGaps:           [],
+      invitationQuestion:  null,
+      invitationNodeNames: [],
     };
   }
 

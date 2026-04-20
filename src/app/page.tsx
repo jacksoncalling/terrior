@@ -84,6 +84,8 @@ export default function Home() {
   // ── Phase 2: synthesis state ───────────────────────────────────────────────
   const [synthesisResult, setSynthesisResult] = useState<SynthesisResult | null>(null);
   const [isSynthesisLoading, setIsSynthesisLoading] = useState(false);
+  // Node names highlighted by the synthesis Invitation block; cleared on canvas click
+  const [highlightedNodeNames, setHighlightedNodeNames] = useState<string[]>([]);
 
   // ── Share button state ────────────────────────────────────────────────────
   const [shareCopied, setShareCopied] = useState(false);
@@ -157,6 +159,7 @@ export default function Home() {
     setIsReprocessing(false);
     setSynthesisResult(null);
     setIsSynthesisLoading(false);
+    setHighlightedNodeNames([]);
 
     // Load scoping messages from localStorage (keyed per project)
     const scopingKey = `terroir_scoping_${projectId}`;
@@ -1028,6 +1031,7 @@ export default function Home() {
           onSignalDedup={handleSignalDedup}
           optimizationHypothesis={optimizationHypothesis}
           onEnrichSignals={handleEnrichSignals}
+          onHighlightNodes={setHighlightedNodeNames}
         />
         {/* Bottom actions */}
         <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-3">
@@ -1153,6 +1157,8 @@ export default function Home() {
             attractors={activeAttractors}
             graphZones={graphZones}
             totalNodeCount={graphState.nodes.filter((n) => !n.is_hub).length}
+            synthesisHighlightedNodeNames={highlightedNodeNames}
+            onClearSynthesisHighlight={() => setHighlightedNodeNames([])}
           />
         </div>
       </div>

@@ -50,6 +50,10 @@ interface CanvasProps {
   graphZones?: Map<string, NodeZone>;
   /** Total node count across the unfiltered graph — used to show "Showing X of Y" */
   totalNodeCount?: number;
+  /** Node labels to highlight via the synthesis Invitation block */
+  synthesisHighlightedNodeNames?: string[];
+  /** Called when the user clicks the empty canvas — clears the synthesis highlight */
+  onClearSynthesisHighlight?: () => void;
 }
 
 const nodeTypes = { ontology: OntologyNode, compact: CompactNode };
@@ -131,9 +135,10 @@ function graphStateToFlow(
         ? (node.properties?.color ?? "#78716c")
         : nodeHubColorMap.get(node.id),
       intensity: intensityMap.get(node.id) ?? 0,
-      // Highlight state: only applied when a node is selected
+      // Highlight/dim applied in the overlay memo; defaults here for base pass
       highlighted: hasSelection && neighborIds.has(node.id),
       dimmed: hasSelection && !neighborIds.has(node.id),
+      synthesisHighlighted: false,
     },
   }));
 
@@ -192,6 +197,8 @@ export default function Canvas({
   attractors,
   graphZones,
   totalNodeCount,
+  synthesisHighlightedNodeNames = [],
+  onClearSynthesisHighlight,
 }: CanvasProps) {
   const [showNewNodeDialog, setShowNewNodeDialog] = useState<{
     x: number;
@@ -206,17 +213,23 @@ export default function Canvas({
   const [newEdgeType, setNewEdgeType] = useState("related_to");
 
   // Two-phase computation: base structure (expensive, changes with graphState)
-  // then highlight overlay (cheap, changes with selectedNodeId)
+  // then highlight overlay (cheap, changes with selectedNodeId or synthesis highlight)
   const { nodes: baseNodes, edges: baseEdges } = useMemo(
     () => graphStateToFlow(graphState, attractors, graphZones, null),
     [graphState, attractors, graphZones]
   );
 
-  // Lightweight highlight pass — only recomputes neighbor set + opacity overrides
-  const { nodes: flowNodes, edges: flowEdges } = useMemo(() => {
-    if (!selectedNodeId) return { nodes: baseNodes, edges: baseEdges };
+  // Lightweight highlight pass — selection neighbour glow + synthesis invitation glow
+  const synthesisHighlightSet = useMemo(
+    () => new Set(synthesisHighlightedNodeNames),
+    [synthesisHighlightedNodeNames]
+  );
+  const hasSynthesisHighlight = synthesisHighlightSet.size > 0;
 
-    const neighborIds = new Set<string>([selectedNodeId]);
+  const { nodes: flowNodes, edges: flowEdges } = useMemo(() => {
+    if (!selectedNodeId && !hasSynthesisHighlight) return { nodes: baseNodes, edges: baseEdges };
+
+    const neighborIds = new Set<string>(selectedNodeId ? [selectedNodeId] : []);
     const highlightedEdgeIds = new Set<string>();
     for (const rel of graphState.relationships) {
       if (rel.sourceId === selectedNodeId || rel.targetId === selectedNodeId) {
@@ -230,15 +243,18 @@ export default function Canvas({
       ...node,
       data: {
         ...node.data,
-        highlighted: neighborIds.has(node.id),
-        dimmed: !neighborIds.has(node.id),
+        highlighted: selectedNodeId ? neighborIds.has(node.id) : false,
+        dimmed: selectedNodeId ? !neighborIds.has(node.id) : false,
         selected: node.id === selectedNodeId,
+        // Synthesis highlight: pulsing ring when named by the Invitation block
+        synthesisHighlighted: hasSynthesisHighlight && synthesisHighlightSet.has(node.data.label as string),
       },
     }));
 
     const edges = baseEdges.map((edge) => {
       const isHighlighted = highlightedEdgeIds.has(edge.id);
-      const isDimmed = !isHighlighted;
+      // Only dim edges when a node is selected — synthesis highlight alone should not grey the graph
+      const isDimmed = selectedNodeId ? !isHighlighted : false;
       const isHubEdge = (edge.data as Record<string, unknown>)?.isHubEdge === true;
       const useCompact = graphState.nodes.length >= COMPACT_MODE_THRESHOLD;
       const rawLabel = ((edge.data as Record<string, unknown>)?.rawLabel as string) ?? "";
@@ -269,7 +285,7 @@ export default function Canvas({
     });
 
     return { nodes, edges };
-  }, [baseNodes, baseEdges, selectedNodeId, graphState.relationships, graphState.nodes.length]);
+  }, [baseNodes, baseEdges, selectedNodeId, graphState.relationships, graphState.nodes.length, synthesisHighlightSet, hasSynthesisHighlight]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(flowEdges);
@@ -309,7 +325,9 @@ export default function Canvas({
   const handlePaneClick = useCallback(() => {
     onNodeSelect(null);
     onEdgeSelect(null);
-  }, [onNodeSelect, onEdgeSelect]);
+    // Clear any synthesis Invitation highlight when the user clicks empty canvas
+    onClearSynthesisHighlight?.();
+  }, [onNodeSelect, onEdgeSelect, onClearSynthesisHighlight]);
 
   const handleDoubleClick = useCallback(
     (event: React.MouseEvent) => {

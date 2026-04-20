@@ -21,6 +21,8 @@ interface OntologyNodeData {
   highlighted?: boolean;
   dimmed?: boolean;
   intensity?: number;
+  /** Set by the synthesis Invitation block — renders a distinct amber ring */
+  synthesisHighlighted?: boolean;
 }
 
 // Map normalized intensity (0–1) to min-width px (non-hub nodes only).
@@ -65,6 +67,7 @@ function OntologyNodeComponent({ data }: NodeProps) {
     highlighted,
     dimmed,
     intensity = 0,
+    synthesisHighlighted,
   } = data as unknown as OntologyNodeData;
 
   const attractorConfig = (attractors || []).find((a: AttractorConfig) => a.id === attractor);
@@ -86,12 +89,14 @@ function OntologyNodeComponent({ data }: NodeProps) {
   if (isHub) {
     return (
       <div
-        className="rounded-xl border-2 shadow-md min-w-[180px] max-w-[220px] transition-all duration-150"
+        className={`rounded-xl border-2 shadow-md min-w-[180px] max-w-[220px] transition-all duration-150${synthesisHighlighted ? " animate-pulse" : ""}`}
         style={{
           borderColor: attractorColor,
           backgroundColor: `${attractorColor}10`,
           opacity: dimmed ? 0.15 : 1,
-          boxShadow: highlighted ? `0 0 12px 3px ${attractorColor}40` : undefined,
+          boxShadow: synthesisHighlighted
+            ? `0 0 0 3px #f59e0b, 0 0 16px 4px #fbbf2460`
+            : highlighted ? `0 0 12px 3px ${attractorColor}40` : undefined,
         }}
       >
         <Handle
@@ -138,20 +143,22 @@ function OntologyNodeComponent({ data }: NodeProps) {
 
   return (
     <div
-      className={`rounded-lg border-2 bg-white shadow-sm transition-all duration-150 ${borderClass}`}
+      className={`rounded-lg border-2 bg-white shadow-sm transition-all duration-150 ${borderClass}${synthesisHighlighted ? " animate-pulse" : ""}`}
       style={{
         minWidth: `${minWidth}px`,
         maxWidth: "210px",
         borderTopColor: hasTension ? undefined : attractorColor,
         borderTopWidth: "3px",
         opacity: opacityStyle,
-        // Jagged: amber SVG outline overlay; clip-path for the card shape itself
         clipPath: isJagged ? JAGGED_CARD_CLIP : undefined,
-        boxShadow: highlighted
-          ? `0 0 10px 2px ${attractorColor}40`
-          : isJagged
-            ? "0 0 0 2px #f59e0b"
-            : undefined,
+        // Synthesis highlight wins over selection glow — distinct amber ring
+        boxShadow: synthesisHighlighted
+          ? `0 0 0 3px #f59e0b, 0 0 16px 4px #fbbf2460`
+          : highlighted
+            ? `0 0 10px 2px ${attractorColor}40`
+            : isJagged
+              ? "0 0 0 2px #f59e0b"
+              : undefined,
       }}
     >
       <Handle

@@ -82,13 +82,15 @@ export async function POST(req: NextRequest) {
       project_id: projectId,
       type:       "synthesis",
       agent:      "gemini",
-      summary:    `Synthesis across ${documents.length} documents — ${result.termCollisions.length} collisions, ${result.connectingThreads.length} threads, ${result.graphGaps.length} gaps`,
+      summary:    `Synthesis across ${documents.length} documents — ${result.termCollisions.length} collisions, ${result.connectingThreads.length} threads, ${result.graphGaps.length} gaps${result.soilNote ? " · soil note present" : ""}`,
       raw_output: {
-        documentCount:     result.documentCount,
-        termCollisions:    result.termCollisions.length,
-        connectingThreads: result.connectingThreads.length,
-        signalConvergence: result.signalConvergence.length,
-        graphGaps:         result.graphGaps.length,
+        documentCount:      result.documentCount,
+        termCollisions:     result.termCollisions.length,
+        connectingThreads:  result.connectingThreads.length,
+        signalConvergence:  result.signalConvergence.length,
+        graphGaps:          result.graphGaps.length,
+        hasSoilNote:        !!result.soilNote,
+        hasInvitation:      !!result.invitationQuestion,
       },
     }).catch((err) => console.warn("[synthesis] Session log failed (non-fatal):", err));
 

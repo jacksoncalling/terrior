@@ -1,17 +1,21 @@
 "use client";
 
 /**
- * SynthesisResults — displays the structured output from a Haiku cross-source
- * synthesis pass.
+ * SynthesisResults — The Winemaker's Reading
  *
- * Four sections (only rendered when they contain results):
- *   1. Narrative Summary    — 2-3 paragraph prose overview
- *   2. Term Collisions      — same concept, different names across sources
- *   3. Connecting Threads   — recurring themes that span multiple documents
- *   4. Signal Convergence   — agreement / disagreement on evaluative dimensions
- *   5. Graph Gaps           — concepts missing from the graph + follow-up questions
+ * Three-part structure replacing the flat report layout:
  *
- * Pre-run and loading states are handled internally so Chat.tsx stays clean.
+ *   Opening   — soil_note surfaced first, alone. The winemaker's observation
+ *               about the organisation's pattern of attention. Rendered in a
+ *               distinct register: larger, quieter, set apart. Not a section.
+ *
+ *   Map        — the four knowledge-map sections as supporting evidence.
+ *               Term Collisions / Connecting Threads / Signal Convergence /
+ *               Graph Gaps. Visually subordinate — they explain the opening,
+ *               they don't replace it.
+ *
+ *   Invitation — the single most generative graph gap, surfaced as one
+ *               question with node chips that light up on the canvas.
  */
 
 import type {
@@ -31,6 +35,8 @@ interface SynthesisResultsProps {
   onRunSynthesis: () => void;
   /** Switches to the Chat tab and pre-fills the input with a suggested question */
   onAskInChat: (question: string) => void;
+  /** Highlights the named nodes on the canvas; call with [] to clear */
+  onHighlightNodes: (nodeNames: string[]) => void;
 }
 
 // ── Convergence badge config ──────────────────────────────────────────────────
@@ -86,7 +92,6 @@ function SourceChips({ sources }: { sources: string[] }) {
 function TermCollisionCard({ item }: { item: TermCollision }) {
   return (
     <div className="rounded-xl border border-stone-200 bg-white p-3 space-y-2">
-      {/* Variants as chips */}
       <div className="flex flex-wrap gap-1">
         {item.variants.map((v) => (
           <span
@@ -97,14 +102,11 @@ function TermCollisionCard({ item }: { item: TermCollision }) {
           </span>
         ))}
       </div>
-      {/* Suggested canonical */}
       <p className="text-[11px] text-stone-600">
         <span className="font-medium text-stone-500">Canonical: </span>
         {item.suggestedCanonical}
       </p>
-      {/* Context note */}
       <p className="text-[10px] text-stone-400 leading-relaxed">{item.context}</p>
-      {/* Sources */}
       <SourceChips sources={item.sources} />
     </div>
   );
@@ -148,7 +150,6 @@ function GraphGapCard({
   return (
     <div className="rounded-xl border border-stone-200 bg-white p-3 space-y-2">
       <p className="text-[10px] text-stone-500 leading-relaxed">{item.description}</p>
-      {/* Suggested question — acts as a pre-filled prompt */}
       <div className="rounded-lg bg-stone-50 border border-stone-100 px-2.5 py-2">
         <p className="text-[10px] text-stone-600 leading-relaxed italic">
           "{item.suggestedQuestion}"
@@ -156,6 +157,73 @@ function GraphGapCard({
       </div>
       <button
         onClick={() => onAskInChat(item.suggestedQuestion)}
+        className="text-[10px] font-medium text-stone-600 hover:text-stone-800 underline underline-offset-2 transition-colors"
+      >
+        Ask in Chat →
+      </button>
+    </div>
+  );
+}
+
+// ── Invitation — the traversal close ─────────────────────────────────────────
+//
+// Renders the single most generative gap as a question + node chips.
+// Clicking a chip highlights that node on the canvas; clicking the
+// question button pre-fills Chat. The whole block has a distinct
+// treatment — it's an invitation to move, not a finding to read.
+
+function InvitationBlock({
+  question,
+  nodeNames,
+  onAskInChat,
+  onHighlightNodes,
+}: {
+  question: string;
+  nodeNames: string[];
+  onAskInChat: (question: string) => void;
+  onHighlightNodes: (names: string[]) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-stone-300 bg-stone-50 p-3.5 space-y-3">
+      {/* Label */}
+      <p className="text-[9px] font-medium text-stone-400 uppercase tracking-widest">
+        Where to go next
+      </p>
+
+      {/* The question */}
+      <p className="text-[12px] text-stone-700 leading-relaxed font-medium">
+        {question}
+      </p>
+
+      {/* Node chips — clicking lights up the canvas */}
+      {nodeNames.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {nodeNames.map((name) => (
+            <button
+              key={name}
+              onClick={() => onHighlightNodes([name])}
+              className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1 text-[10px] text-stone-600 hover:border-stone-500 hover:text-stone-800 transition-colors"
+              title={`Highlight "${name}" on canvas`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-stone-400 shrink-0" />
+              {name}
+            </button>
+          ))}
+          {/* Highlight all at once */}
+          {nodeNames.length > 1 && (
+            <button
+              onClick={() => onHighlightNodes(nodeNames)}
+              className="inline-flex items-center rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 text-[10px] text-stone-500 hover:border-stone-400 hover:text-stone-700 transition-colors"
+            >
+              Show all
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Ask in chat */}
+      <button
+        onClick={() => onAskInChat(question)}
         className="text-[10px] font-medium text-stone-600 hover:text-stone-800 underline underline-offset-2 transition-colors"
       >
         Ask in Chat →
@@ -172,6 +240,7 @@ export default function SynthesisResults({
   isLoading,
   onRunSynthesis,
   onAskInChat,
+  onHighlightNodes,
 }: SynthesisResultsProps) {
   // ── Loading state ────────────────────────────────────────────────────────
 
@@ -191,7 +260,7 @@ export default function SynthesisResults({
     );
   }
 
-  // ── Pre-run state (no results yet) ──────────────────────────────────────
+  // ── Pre-run state ────────────────────────────────────────────────────────
 
   if (!result) {
     const hasEnoughDocs = documentCount >= 2;
@@ -207,7 +276,6 @@ export default function SynthesisResults({
           </p>
         </div>
 
-        {/* Warning for single document */}
         {hasAnyDocs && !hasEnoughDocs && (
           <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2 max-w-[260px]">
             <p className="text-[10px] text-amber-700 leading-relaxed">
@@ -234,16 +302,25 @@ export default function SynthesisResults({
 
   const {
     narrativeSummary,
+    soilNote,
     termCollisions,
     connectingThreads,
     signalConvergence,
     graphGaps,
+    invitationQuestion,
+    invitationNodeNames,
     documentCount: docCount,
     generatedAt,
   } = result;
 
+  const hasMapContent =
+    termCollisions.length > 0 ||
+    connectingThreads.length > 0 ||
+    signalConvergence.length > 0 ||
+    graphGaps.length > 0;
+
   return (
-    <div className="h-full overflow-y-auto px-4 py-3 space-y-4">
+    <div className="h-full overflow-y-auto px-4 py-3 space-y-5">
 
       {/* ── Meta + re-run ────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
@@ -259,16 +336,37 @@ export default function SynthesisResults({
         </button>
       </div>
 
-      {/* ── Narrative summary ────────────────────────────────────────────── */}
+      {/* ── OPENING: The winemaker's soil note ───────────────────────────── */}
+      {/* Rendered before everything else. Not a section, not a card — a
+          presence. The observation about the organisation's pattern of
+          attention sets the interpretive frame for all the map below. */}
+      {soilNote && (
+        <div className="py-1">
+          <p className="text-[13px] text-stone-500 leading-relaxed italic font-light">
+            {soilNote}
+          </p>
+        </div>
+      )}
+
+      {/* Divider between opening and map */}
+      {soilNote && hasMapContent && (
+        <div className="border-t border-stone-100" />
+      )}
+
+      {/* ── MAP: The four knowledge-map sections ─────────────────────────── */}
+      {/* These are supporting evidence for the soil note — they show what
+          the winemaker listened to, not what you should conclude. */}
+
+      {/* Narrative summary (subordinate — smaller, lighter) */}
       {narrativeSummary && (
         <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
-          <p className="text-[11px] text-stone-600 leading-relaxed whitespace-pre-line">
+          <p className="text-[10px] text-stone-500 leading-relaxed whitespace-pre-line">
             {narrativeSummary}
           </p>
         </div>
       )}
 
-      {/* ── Term collisions ──────────────────────────────────────────────── */}
+      {/* Term collisions */}
       {termCollisions.length > 0 && (
         <div>
           <SectionHeader title="Term Collisions" count={termCollisions.length} />
@@ -280,7 +378,7 @@ export default function SynthesisResults({
         </div>
       )}
 
-      {/* ── Connecting threads ───────────────────────────────────────────── */}
+      {/* Connecting threads */}
       {connectingThreads.length > 0 && (
         <div>
           <SectionHeader title="Connecting Threads" count={connectingThreads.length} />
@@ -292,7 +390,7 @@ export default function SynthesisResults({
         </div>
       )}
 
-      {/* ── Signal convergence ───────────────────────────────────────────── */}
+      {/* Signal convergence */}
       {signalConvergence.length > 0 && (
         <div>
           <SectionHeader title="Signal Convergence" count={signalConvergence.length} />
@@ -304,7 +402,7 @@ export default function SynthesisResults({
         </div>
       )}
 
-      {/* ── Graph gaps ───────────────────────────────────────────────────── */}
+      {/* Graph gaps (full list — invitation is a separate, elevated pick) */}
       {graphGaps.length > 0 && (
         <div>
           <SectionHeader title="Graph Gaps" count={graphGaps.length} />
@@ -316,18 +414,31 @@ export default function SynthesisResults({
         </div>
       )}
 
-      {/* All sections empty edge case */}
-      {termCollisions.length === 0 &&
-        connectingThreads.length === 0 &&
-        signalConvergence.length === 0 &&
-        graphGaps.length === 0 && (
-          <div className="rounded-xl border border-stone-100 bg-stone-50 p-4 text-center">
-            <p className="text-xs text-stone-400">
-              No cross-source patterns detected. Try adding more documents or
-              using a different abstraction layer.
-            </p>
-          </div>
-        )}
+      {/* Empty map edge case */}
+      {!hasMapContent && (
+        <div className="rounded-xl border border-stone-100 bg-stone-50 p-4 text-center">
+          <p className="text-xs text-stone-400">
+            No cross-source patterns detected. Try adding more documents or
+            using a different abstraction layer.
+          </p>
+        </div>
+      )}
+
+      {/* Divider before invitation */}
+      {invitationQuestion && <div className="border-t border-stone-100" />}
+
+      {/* ── INVITATION: One question + canvas highlight ───────────────────── */}
+      {/* The close of the reading. Not a list of gaps — one question, the
+          most generative one. Node chips let the consultant light up the
+          canvas and lead the client through the landscape. */}
+      {invitationQuestion && (
+        <InvitationBlock
+          question={invitationQuestion}
+          nodeNames={invitationNodeNames ?? []}
+          onAskInChat={onAskInChat}
+          onHighlightNodes={onHighlightNodes}
+        />
+      )}
 
       {/* Bottom padding so last card isn't cut off */}
       <div className="h-4" />

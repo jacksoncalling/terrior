@@ -276,13 +276,21 @@ export interface IntegrationResult {
   attractorsReassigned: number;
 }
 
-/** Full output from the Haiku cross-source synthesis pass */
+/** Full output from the Gemini cross-source synthesis pass */
 export interface SynthesisResult {
-  narrativeSummary: string;       // 2-3 paragraph prose overview of findings
+  narrativeSummary: string;           // 2-3 paragraph prose overview of findings
+  /** One or two sentences about the *pattern of attention* across documents —
+   *  what the organisation keeps returning to, not what the documents contain.
+   *  The winemaker's opening observation. Null when no coherent pattern emerges. */
+  soilNote: string | null;
   termCollisions: TermCollision[];
   connectingThreads: ConnectingThread[];
   signalConvergence: SignalConvergence[];
   graphGaps: GraphGap[];
-  documentCount: number;          // number of documents read
-  generatedAt: string;            // ISO timestamp
+  /** The single most generative graph gap, surfaced as a traversal invitation */
+  invitationQuestion: string | null;
+  /** Exact node labels from the graph most relevant to the invitation gap (2–3) */
+  invitationNodeNames: string[];
+  documentCount: number;              // number of documents read
+  generatedAt: string;                // ISO timestamp
 }
