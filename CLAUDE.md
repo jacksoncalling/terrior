@@ -56,6 +56,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Meta-tensions (cross-graph fault lines)** — `POST /api/meta-tensions` runs Gemini topology pass using somatic vocabulary (contracted / blocked / pulled). Returns 2–4 hub-level fault lines. "Surface fault lines" button in Synthesis tab. `scope: "local" | "cross-graph"` on `TensionMarker`. Reflect tab splits local vs meta tensions. Inspector shows `Cross-graph` badge.
 - **Signal label expand-on-click** — clicking a signal card in Reflect tab expands to show full label, `at_cost_of`, source excerpt (160 chars), and timestamp. Collapsed view stays scannable.
 - **Blank canvas after reprocess fixed** — `autoLayout` applied to reprocess result before setting state, matching the chat handler pattern.
+- **Synthesis: Winemaker's Reading** — Gemini synthesis prompt rebuilt with winemaker persona. Three-part UI: (1) `soilNote` — opening observation about the org's pattern of attention; (2) knowledge map (term collisions, connecting threads, signal convergence, graph gaps); (3) Invitation block — the most generative gap as one question with node chips that trigger an amber pulse highlight on the canvas. New fields: `soilNote`, `invitationQuestion`, `invitationNodeNames` on `SynthesisResult`.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
@@ -64,7 +65,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **`window.confirm` for reprocess is EN-only** — the confirm dialog body string in `ProjectBrief.tsx:76` is hardcoded English even when locale is DE.
 
 ### What's next
-1. **Swap gradient gold examples** — replace 4 logistics-startup placeholders in `buildExtractionPrompt` (gemini.ts) with real eoniq passages post-demo.
+1. **Run synthesis on Terroir/eoniq project** — first real test of the winemaker persona and soil note with the Matthias demo corpus. Swap gradient gold examples with real eoniq passages post-demo.
 2. **Fix reprocess confirm dialog translation** — add `brief.reprocessConfirm` key to both locale files and use `t()` in `ProjectBrief.tsx:76`.
 3. **Resizable panel splitter** — plan in `.claude/plans/ui-improvements.md` Step 3; gives users flexible layout for longer signal/synthesis content.
 
