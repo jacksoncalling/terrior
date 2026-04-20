@@ -33,7 +33,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-18
+## Current State — Updated 2026-04-20
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
@@ -50,20 +50,23 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Node size = evaluative intensity** — intensity map drives circle diameter (12–26px compact) and card min-width (140–210px). Hub nodes unaffected.
 - **Jagged border = emergent + high-intensity** — three-state border: solid / dotted / jagged clip-path. Threshold = 10. Tension red border wins priority.
 - **Session Delta narration** — `POST /api/session-delta` diffs last two snapshots, returns Sonnet prose. Collapsible card in Reflect tab. `007_graph_snapshots.sql` ✅ run.
-- **Gradient Signal Extraction** — prompt replaced with gradient model: `intensity`, `threshold_proximity`, `at_cost_of`. Cap 5 → 2; zero is valid. `008_gradient_signal_fields.sql` ✅ run. Gold examples are logistics-startup placeholders — **swap with real eoniq passages post-demo**.
+- **Gradient Signal Extraction** — gradient model: `intensity`, `threshold_proximity`, `at_cost_of`. Cap 2 per doc; zero is valid. `008_gradient_signal_fields.sql` ✅ run. Gold examples are logistics-startup placeholders — **swap with real eoniq passages post-demo**.
 - **Bilingual UI (DE/EN)** — `next-intl` client-only locale, localStorage key `terroir_locale`, DE|EN toggle in project name bar. 10 surfaces translated: Sources, Chat, Reflect, Inspector, ProjectBrief, ScopingModal, TypePalette, projects page, top bar, bottom bar. Graph content (node labels, signals) is NOT translated — only UI strings. Haiku scoping dialogue runs in German when `locale === "de"` (injected via system prompt in `haiku.ts`).
+- **Tightened tension extraction** — AT MOST 1 tension per document; existing tensions injected as dedup context; hard exclusion rules. `009_tension_scope.sql` ✅ run.
+- **Meta-tensions (cross-graph fault lines)** — `POST /api/meta-tensions` runs Gemini topology pass using somatic vocabulary (contracted / blocked / pulled). Returns 2–4 hub-level fault lines. "Surface fault lines" button in Synthesis tab. `scope: "local" | "cross-graph"` on `TensionMarker`. Reflect tab splits local vs meta tensions. Inspector shows `Cross-graph` badge.
+- **Signal label expand-on-click** — clicking a signal card in Reflect tab expands to show full label, `at_cost_of`, source excerpt (160 chars), and timestamp. Collapsed view stays scannable.
+- **Blank canvas after reprocess fixed** — `autoLayout` applied to reprocess result before setting state, matching the chat handler pattern.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
 - **Realtime unconfirmed** — `ontology_relationships` may not be published to Realtime.
 - **`enrichState` stale after external signal change** — needs `useEffect` reset on signal count change.
-- **Graph density in hotspots** — force layout clusters highly-connected nodes tightly.
 - **`window.confirm` for reprocess is EN-only** — the confirm dialog body string in `ProjectBrief.tsx:76` is hardcoded English even when locale is DE.
 
 ### What's next
-1. **Reprocess eoniq with gradient prompt** — open eoniq project, hit Reprocess in Inspector, validate surviving signals with Matthias before April 21 demo.
-2. **Swap gradient gold examples** — replace 4 logistics-startup placeholders in `buildExtractionPrompt` (gemini.ts) with real eoniq passages post-demo.
-3. **Fix reprocess confirm dialog translation** — add `brief.reprocessConfirm` key to both locale files and use `t()` in `ProjectBrief.tsx:76`.
+1. **Swap gradient gold examples** — replace 4 logistics-startup placeholders in `buildExtractionPrompt` (gemini.ts) with real eoniq passages post-demo.
+2. **Fix reprocess confirm dialog translation** — add `brief.reprocessConfirm` key to both locale files and use `t()` in `ProjectBrief.tsx:76`.
+3. **Resizable panel splitter** — plan in `.claude/plans/ui-improvements.md` Step 3; gives users flexible layout for longer signal/synthesis content.
 
 ---
 
