@@ -11,7 +11,7 @@ import {
 import type { GraphState } from "@/types";
 import { HUB_RELATIONSHIP_TYPE } from "@/types";
 
-/** Compact mode threshold — mirrors Canvas.tsx */
+/** Above this node count, use force-directed layout (organic globe) — mirrors Canvas.tsx */
 const COMPACT_THRESHOLD = 40;
 
 /**
@@ -47,7 +47,7 @@ function forceLayout(state: GraphState): GraphState {
 
   // Seed positions in a compact random circle — avoids inheriting any
   // previous vertical/hierarchical layout that would bias the simulation
-  const radius = Math.sqrt(nodeCount) * 10;
+  const radius = Math.sqrt(nodeCount) * 6;
   const simNodes: ForceNode[] = state.nodes.map((n, i) => {
     const angle = (i / nodeCount) * 2 * Math.PI + (Math.random() - 0.5) * 0.5;
     const r = radius * (0.3 + Math.random() * 0.7);
@@ -78,18 +78,16 @@ function forceLayout(state: GraphState): GraphState {
   // - Strong link force pulls connected nodes together (clustering)
   // - Center force keeps the whole graph from drifting
   // - Collision prevents overlap at the circle radius
-  const repulsion = -15 - Math.min(nodeCount * 0.05, 10);
-
   const sim = forceSimulation<ForceNode>(simNodes)
     .force(
       "link",
       forceLink<ForceNode, SimulationLinkDatum<ForceNode>>(simLinks)
-        .distance(35)
-        .strength(0.7)
+        .distance(18)
+        .strength(1.0)
     )
-    .force("charge", forceManyBody<ForceNode>().strength(repulsion))
-    .force("center", forceCenter(0, 0).strength(0.2))
-    .force("collide", forceCollide<ForceNode>(14))
+    .force("charge", forceManyBody<ForceNode>().strength(-5))
+    .force("center", forceCenter(0, 0).strength(0.3))
+    .force("collide", forceCollide<ForceNode>(8))
     .stop();
 
   // Run simulation to convergence (no animation — instant layout)
@@ -113,11 +111,12 @@ function dagreLayout(
   state: GraphState,
   direction: "TB" | "LR",
   nodeWidth: number,
-  nodeHeight: number
+  nodeHeight: number,
+  sep: { nodesep: number; ranksep: number } = { nodesep: 80, ranksep: 120 }
 ): GraphState {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: direction, nodesep: 80, ranksep: 120 });
+  g.setGraph({ rankdir: direction, nodesep: sep.nodesep, ranksep: sep.ranksep });
 
   for (const node of state.nodes) {
     g.setNode(node.id, { width: nodeWidth, height: nodeHeight });

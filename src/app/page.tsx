@@ -118,7 +118,7 @@ export default function Home() {
         if (supabaseGraph.nodes.length > 0 || supabaseGraph.relationships.length > 0) {
           // Migrate to hub nodes if this project predates the hub system
           const migrated = migrateToHubNodes(supabaseGraph, preset);
-          setGraphState(migrated);
+          setGraphState(autoLayout(migrated));
 
           // If migration added hubs, save back to Supabase
           if (migrated !== supabaseGraph) {

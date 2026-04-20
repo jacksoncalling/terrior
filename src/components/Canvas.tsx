@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -291,6 +291,7 @@ export default function Canvas({
   const [edges, setEdges, onEdgesChange] = useEdgesState(flowEdges);
   const rfInstance = useRef<ReactFlowInstance | null>(null);
   const fitViewPending = useRef(false);
+  const initialFitDone = useRef(false);
 
   // Sync React Flow state with graphState when it changes externally
   useMemo(() => {
@@ -305,6 +306,16 @@ export default function Canvas({
       return () => clearTimeout(timer);
     }
   }, [flowNodes, flowEdges, setNodes, setEdges]);
+
+  // fitView fires at mount when graph is empty; this one-shot fires after the first real load
+  useEffect(() => {
+    if (!initialFitDone.current && nodes.length > 0) {
+      initialFitDone.current = true;
+      setTimeout(() => {
+        rfInstance.current?.fitView({ padding: 0.15, duration: 300 });
+      }, 300);
+    }
+  }, [nodes.length]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
