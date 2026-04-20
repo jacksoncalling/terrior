@@ -113,6 +113,8 @@ function relativeTime(isoString: string): string {
 // ── SignalCard ────────────────────────────────────────────────────────────────
 // Interactive card for a single evaluative signal in the Reflect tab.
 // Auto-saves scores to /api/reflect on each change (fire-and-forget).
+// Clicking the label area expands the card to show the full label, at_cost_of,
+// and a source excerpt — collapsed by default to keep the list scannable.
 function SignalCard({
   signal,
   projectId,
@@ -123,6 +125,7 @@ function SignalCard({
   onReflect: (updates: Partial<Pick<EvaluativeSignal, "relevanceScore" | "intensityScore" | "reflectedAt" | "userNote">>) => void;
 }) {
   const t = useTranslations();
+  const [expanded, setExpanded] = useState(false);
   const [noteOpen, setNoteOpen] = useState(!!signal.userNote);
   const [noteValue, setNoteValue] = useState(signal.userNote ?? "");
 
@@ -180,29 +183,53 @@ function SignalCard({
           : "border-stone-100 bg-stone-50"
       }`}
     >
-      {/* Header: direction icon + label + timestamp */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+      {/* Header: direction icon + label + expand toggle */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-start justify-between gap-2 text-left"
+        title={expanded ? "Collapse" : "Expand to read full signal"}
+      >
+        <div className="flex items-start gap-2 min-w-0">
           <span
-            className="shrink-0 text-sm text-stone-400"
+            className="shrink-0 text-sm text-stone-400 mt-px"
             title={signal.direction.replace("_", " ")}
           >
             {DIRECTION_ICON[signal.direction] ?? "→"}
           </span>
           <span
-            className={`text-xs font-medium leading-tight truncate ${
-              isRated ? "text-stone-700" : "text-stone-500"
-            }`}
+            className={`text-xs font-medium leading-tight ${
+              expanded ? "whitespace-normal" : "truncate"
+            } ${isRated ? "text-stone-700" : "text-stone-500"}`}
           >
             {signal.label}
           </span>
         </div>
-        {signal.reflectedAt && (
-          <span className="shrink-0 text-[10px] text-stone-300">
-            {relativeTime(signal.reflectedAt)}
-          </span>
-        )}
-      </div>
+        <span className="shrink-0 text-[10px] text-stone-300 mt-px select-none">
+          {expanded ? "▲" : "▼"}
+        </span>
+      </button>
+
+      {/* Expanded detail: at_cost_of + source excerpt */}
+      {expanded && (
+        <div className="pl-5 space-y-1.5 pb-0.5">
+          {signal.atCostOf && (
+            <p className="text-[11px] text-stone-500 leading-snug">
+              <span className="font-medium text-stone-400">At cost of: </span>
+              {signal.atCostOf}
+            </p>
+          )}
+          {signal.sourceDescription && (
+            <p className="text-[11px] text-stone-400 leading-snug italic">
+              "{signal.sourceDescription.slice(0, 160)}{signal.sourceDescription.length > 160 ? "…" : ""}"
+            </p>
+          )}
+          {signal.reflectedAt && (
+            <p className="text-[10px] text-stone-300">
+              {relativeTime(signal.reflectedAt)}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Score pickers */}
       <div className="space-y-1 pl-5">

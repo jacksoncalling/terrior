@@ -1,6 +1,6 @@
 # Feature Implementation Plan — UI Improvements
 
-**Overall Progress:** `33%`
+**Overall Progress:** `67%`
 
 ## TLDR
 Three independent UI fixes: (1) signal labels expand on click so full text is readable, (2) resizable chat/canvas panel splitter for flexible layout, (3) blank canvas after reprocess — already fixed.
@@ -16,12 +16,12 @@ Three independent UI fixes: (1) signal labels expand on click so full text is re
   - [x] 🟩 In `page.tsx` reprocess handler, apply `autoLayout(result.updatedGraph)` before `setGraphState` — same as chat handler already does
   - [x] 🟩 Also apply in `handleGraphUpdate` so Sources integration + meta-tensions don't leave blank canvas
 
-- [ ] 🟥 **Step 2: Signal label expand on click (Option 2)**
-  - [ ] 🟥 Add `expandedId: string | null` state to the Reflect tab in `Chat.tsx`
-  - [ ] 🟥 On `SignalCard` click, toggle expanded state for that signal
-  - [ ] 🟥 When expanded: show full label (wrapped, no truncation) + `at_cost_of` if present + `sourceDescription` excerpt (first 120 chars)
-  - [ ] 🟥 When collapsed: existing truncated single-line label
-  - [ ] 🟥 Smooth height transition with `transition-all` on the card
+- [x] 🟩 **Step 2: Signal label expand on click (Option 2)**
+  - [x] 🟩 Add `expanded` local state to `SignalCard` in `Chat.tsx`
+  - [x] 🟩 Header row is a button — click toggles expand, ▼/▲ chevron indicates state
+  - [x] 🟩 When expanded: full wrapped label + `at_cost_of` + source excerpt (160 chars) + timestamp
+  - [x] 🟩 When collapsed: existing truncated single-line label
+  - [x] 🟩 `reflectedAt` timestamp moved into expanded section (cleaner collapsed view)
 
 - [ ] 🟥 **Step 3: Resizable panel splitter (Option 3)**
   - [ ] 🟥 Add `chatWidth` state to `page.tsx` (default 360px, min 260px, max 560px)
