@@ -97,6 +97,9 @@ export default function Home() {
   // Track when we last saved to Supabase so we can suppress realtime echo
   // (our own saves trigger Realtime events — we don't want to re-load those)
   const lastLocalSaveRef = useRef<number>(0);
+  // Prevents saving stale data from the previous project into the new project's localStorage
+  // key during the render cycle when projectId changes (before hydrated resets)
+  const isLoadingProjectRef = useRef(false);
 
   // ── Load ontology on mount / project switch ──────────────────────────────
 
@@ -105,6 +108,7 @@ export default function Home() {
     // Skip if already loaded for this project
     if (loadedProjectRef.current === projectId) return;
 
+    isLoadingProjectRef.current = true;
     setHydrated(false);
     loadedProjectRef.current = projectId;
 
@@ -142,6 +146,7 @@ export default function Home() {
         if (local) setGraphState(local);
       })
       .finally(() => {
+        isLoadingProjectRef.current = false;
         setHydrated(true);
       });
 
@@ -209,7 +214,7 @@ export default function Home() {
   // ── Save to localStorage (immediate, for resilience — project-scoped) ───────
 
   useEffect(() => {
-    if (hydrated && projectId) saveToLocalStorage(graphState, projectId);
+    if (hydrated && projectId && !isLoadingProjectRef.current) saveToLocalStorage(graphState, projectId);
   }, [graphState, hydrated, projectId]);
 
   useEffect(() => {

@@ -29,8 +29,8 @@ import { computeGraphZones } from "@/lib/entity-types";
 import { computeIntensityMap } from "@/lib/evaluative";
 import { autoLayout } from "@/lib/layout";
 
-/** Node count threshold — above this, render compact circles instead of full cards */
-const COMPACT_MODE_THRESHOLD = 40;
+/** Always use compact circles — threshold set to 0 */
+const COMPACT_MODE_THRESHOLD = 0;
 
 interface CanvasProps {
   graphState: GraphState;
