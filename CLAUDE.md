@@ -33,7 +33,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-20
+## Current State — Updated 2026-04-22
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
@@ -47,16 +47,11 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Signal-to-node linking** — `relatedNodeIds` on `EvaluativeSignal`, backed by `signal_node_links` junction table.
 - **Filesystem export** — `POST /api/export-to-files` writes a markdown folder projection to disk. Local dev only.
 - **Public read endpoint** — `GET /api/export?projectId=xxx` returns full project bundle as JSON. CORS open.
-- **Node size = evaluative intensity** — intensity map drives circle diameter (12–26px compact) and card min-width (140–210px). Hub nodes unaffected.
-- **Jagged border = emergent + high-intensity** — three-state border: solid / dotted / jagged clip-path. Threshold = 10. Tension red border wins priority.
-- **Session Delta narration** — `POST /api/session-delta` diffs last two snapshots, returns Sonnet prose. Collapsible card in Reflect tab. `007_graph_snapshots.sql` ✅ run.
-- **Gradient Signal Extraction** — gradient model: `intensity`, `threshold_proximity`, `at_cost_of`. Cap 2 per doc; zero is valid. `008_gradient_signal_fields.sql` ✅ run. Gold examples are logistics-startup placeholders — **swap with real eoniq passages post-demo**.
-- **Bilingual UI (DE/EN)** — `next-intl` client-only locale, localStorage key `terroir_locale`, DE|EN toggle in project name bar. 10 surfaces translated: Sources, Chat, Reflect, Inspector, ProjectBrief, ScopingModal, TypePalette, projects page, top bar, bottom bar. Graph content (node labels, signals) is NOT translated — only UI strings. Haiku scoping dialogue runs in German when `locale === "de"` (injected via system prompt in `haiku.ts`).
-- **Tightened tension extraction** — AT MOST 1 tension per document; existing tensions injected as dedup context; hard exclusion rules. `009_tension_scope.sql` ✅ run.
-- **Meta-tensions (cross-graph fault lines)** — `POST /api/meta-tensions` runs Gemini topology pass using somatic vocabulary (contracted / blocked / pulled). Returns 2–4 hub-level fault lines. "Surface fault lines" button in Synthesis tab. `scope: "local" | "cross-graph"` on `TensionMarker`. Reflect tab splits local vs meta tensions. Inspector shows `Cross-graph` badge.
-- **Signal label expand-on-click** — clicking a signal card in Reflect tab expands to show full label, `at_cost_of`, source excerpt (160 chars), and timestamp. Collapsed view stays scannable.
-- **Blank canvas after reprocess fixed** — `autoLayout` applied to reprocess result before setting state, matching the chat handler pattern.
-- **Synthesis: Winemaker's Reading** — Gemini synthesis prompt rebuilt with winemaker persona. Three-part UI: (1) `soilNote` — opening observation about the org's pattern of attention; (2) knowledge map (term collisions, connecting threads, signal convergence, graph gaps); (3) Invitation block — the most generative gap as one question with node chips that trigger an amber pulse highlight on the canvas. New fields: `soilNote`, `invitationQuestion`, `invitationNodeNames` on `SynthesisResult`.
+- **Node size = evaluative intensity**, **Jagged border = emergent + high-intensity**, **Session Delta narration**, **Gradient Signal Extraction**, **Bilingual UI (DE/EN)**, **Tightened tension extraction**, **Meta-tensions**, **Signal label expand-on-click**, **Synthesis: Winemaker's Reading** — all live.
+- **Terroir v1 API** — authenticated HTTP surface at `/api/v1/`. 7 endpoints: `list_projects`, `get_project`, `query_graph`, `add_source`, `add_node`, `add_signal`, `run_synthesis`. Bearer tokens SHA-256 hashed at rest, per-consumer, optionally project-scoped. Migration `010_api_tokens.sql` applied. Auth in `src/lib/api-auth.ts`, handlers in `src/lib/api-handlers.ts`.
+- **MCP server** — `mcp-server/` at repo root. Imports handlers directly (no HTTP dependency). Register with `claude mcp add terroir node /path/to/mcp-server/dist/index.js`. See `mcp-server/README.md`.
+- **Token minting** — `npm run mint-token -- --name "..." --scopes read,write,synthesis [--project <uuid>]`. Plaintext shown once; only SHA-256 hash stored.
+- **Canal migrated** — `genau/context/terroir-context.js` reads from `/api/v1/` instead of direct Supabase. `TERROIR_SUPABASE_URL` / `TERROIR_SUPABASE_ANON_KEY` can be removed from Render after production smoke test confirms.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
@@ -65,9 +60,9 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **`window.confirm` for reprocess is EN-only** — the confirm dialog body string in `ProjectBrief.tsx:76` is hardcoded English even when locale is DE.
 
 ### What's next
-1. **Run synthesis on Terroir/eoniq project** — first real test of the winemaker persona and soil note with the Matthias demo corpus. Swap gradient gold examples with real eoniq passages post-demo.
-2. **Fix reprocess confirm dialog translation** — add `brief.reprocessConfirm` key to both locale files and use `t()` in `ProjectBrief.tsx:76`.
-3. **Resizable panel splitter** — plan in `.claude/plans/ui-improvements.md` Step 3; gives users flexible layout for longer signal/synthesis content.
+1. **Build + register MCP server** — `cd mcp-server && npm install && npm run build`, then `claude mcp add terroir`. First live test of Claude Code ↔ graph interaction.
+2. **Canal production smoke test** — forward a URL to Medicus on Render, confirm signal resonance still shows. Then remove `TERROIR_SUPABASE_URL` / `TERROIR_SUPABASE_ANON_KEY` from Render env.
+3. **Mint Matthias eoniq token** — project-scoped token for his Mistral harness when ready: `npm run mint-token -- --name "Matthias eoniq" --scopes read --project <eoniq-id>`.
 
 ---
 
