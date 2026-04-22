@@ -231,6 +231,7 @@ Or use the VS Code launch config (`terroir-dev`).
 - Second export of the same project cleanly overwrites the first (wipe-then-write). Known limitation: concurrent exports of the same project will race — acceptable for v1.
 
 **Architecture**
+- **Two-surface, one handler:** MCP server and HTTP API both import `src/lib/api-handlers.ts` directly — no duplication. Add new tools to handlers first, surfaces second. See `~/.claude/learnings/2026-04-22-two-surface-one-handler-api.md`
 - **Three-agent division:** Gemini = all document work (extract + classify + synthesise). Sonnet = chat + graph tools. Haiku = scoping dialogue only. Never cross these boundaries.
 - **Abstraction layer is explicit:** three presets fed to Gemini — never default to "extract everything". Set in ProjectBrief, passed to every Gemini extraction call.
 - **Signals live in Reflect tab only** — not on the canvas overlay, not in the Inspector. One source of truth.
