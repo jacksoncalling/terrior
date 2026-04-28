@@ -1,13 +1,218 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { GraphState, GraphNode, Relationship, TensionMarker, EntityTypeConfig } from "@/types";
+import { HUB_RELATIONSHIP_TYPE } from "@/types";
 import { v4 as uuidv4 } from "uuid";
-import { ensureTypeExists } from "./entity-types";
+import { ensureTypeExists, getHubNodes, getHubMembers } from "./entity-types";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 interface ExtractionResult {
   updatedGraph: GraphState;
   graphUpdates: { type: string; label: string }[];
+  hubAssignments?: number;
+  crossGraphRels?: number;
+}
+
+interface BridgeAssignment {
+  entity_label: string;
+  hub_slug: string;
+  relationships_to_existing: {
+    target_label: string;
+    type: string;
+    rationale: string;
+  }[];
+}
+
+/**
+ * Second-pass Sonnet call: assigns newly extracted entities to hubs and
+ * finds relationships to existing graph nodes.
+ *
+ * Skipped if the graph has no hub nodes (legacy projects without hub scaffolding).
+ * New entities with no existing connections are still valid — they just get a hub assignment.
+ */
+async function bridgeToGraph(
+  graph: GraphState,
+  newNodeIds: Set<string>
+): Promise<{ updatedGraph: GraphState; hubAssignments: number; crossGraphRels: number }> {
+  const hubNodes = getHubNodes(graph);
+  if (hubNodes.length === 0) {
+    return { updatedGraph: graph, hubAssignments: 0, crossGraphRels: 0 };
+  }
+
+  const newNodes = graph.nodes.filter((n) => newNodeIds.has(n.id));
+  if (newNodes.length === 0) {
+    return { updatedGraph: graph, hubAssignments: 0, crossGraphRels: 0 };
+  }
+
+  // Build label→id map for the whole graph (used to resolve Sonnet's label references)
+  const labelToId: Record<string, string> = {};
+  for (const n of graph.nodes) labelToId[n.label.toLowerCase()] = n.id;
+
+  // Build hub listing with their current members (condensed: label + type only).
+  // Mark the broadest/catch-all hub as the recommended fallback so the prompt
+  // reference is a real ID, not the literal string "emergent".
+  const fallbackHub = hubNodes.find((h) =>
+    /emergent|other|misc|general/i.test(h.label)
+  ) ?? hubNodes[hubNodes.length - 1];
+
+  const hubListing = hubNodes.map((hub) => {
+    const members = getHubMembers(hub.id, graph);
+    const memberLines = members
+      .slice(0, 20)
+      .map((m) => `    - "${m.label}" (${m.type})`)
+      .join("\n");
+    const overflow = members.length > 20 ? `\n    ... and ${members.length - 20} more` : "";
+    const fallbackNote = hub.id === fallbackHub.id ? " ← use this when uncertain" : "";
+    return `  Hub: "${hub.label}" (slug: ${hub.id})${fallbackNote}\n  Description: ${hub.description || "—"}\n  Current members:\n${memberLines || "    (none yet)"}${overflow}`;
+  }).join("\n\n");
+
+  // Condense existing (non-hub, non-new) nodes for cross-graph connection scanning
+  const existingNodes = graph.nodes.filter((n) => !n.is_hub && !newNodeIds.has(n.id));
+  const existingListing = existingNodes
+    .map((n) => `  - "${n.label}" (${n.type})${n.description ? `: ${n.description.slice(0, 80)}` : ""}`)
+    .join("\n");
+
+  const newEntityListing = newNodes
+    .map((n) => `  - "${n.label}" (${n.type})${n.description ? `: ${n.description.slice(0, 80)}` : ""}`)
+    .join("\n");
+
+  const bridgePrompt = `You are TERROIR's graph integration engine.
+
+You have just extracted new entities from a narrative. Your task is to:
+1. Assign each new entity to the most appropriate hub (structural category)
+2. Identify any meaningful relationships between new entities and existing graph nodes
+
+## Available Hubs
+
+${hubListing}
+
+## Existing Graph Nodes (for cross-graph connections)
+
+${existingNodes.length > 0 ? existingListing : "  (no existing entities yet)"}
+
+## Newly Extracted Entities
+
+${newEntityListing}
+
+## Instructions
+
+For each new entity:
+- Choose the hub whose description best matches the entity's structural role
+- Use the hub's exact slug (shown in parentheses) as hub_slug
+- If uncertain, use the hub marked "← use this when uncertain"
+- Scan existing nodes for genuine semantic connections: cause/effect, dependency,
+  parent/child, contrast, instrument, context. Only create connections that reflect
+  real organisational meaning from the source text.
+- A new entity with NO connections to existing nodes is perfectly valid — assign to hub and leave relationships_to_existing empty.
+- Bias toward fewer, stronger connections over many weak ones.
+
+LANGUAGE CONSISTENCY: Use the same language as the entity labels.
+
+Respond with valid JSON only — no markdown, no explanation:
+{
+  "assignments": [
+    {
+      "entity_label": "string",
+      "hub_slug": "string",
+      "relationships_to_existing": [
+        { "target_label": "string", "type": "string", "rationale": "string" }
+      ]
+    }
+  ]
+}`;
+
+  let response;
+  try {
+    response = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2048,
+      messages: [{ role: "user", content: bridgePrompt }],
+    });
+  } catch (err) {
+    // Bridge pass is best-effort — a network error or rate limit should not
+    // discard the already-completed extraction result.
+    console.warn("[bridge] Sonnet API call failed — returning unbridged graph:", err);
+    return { updatedGraph: graph, hubAssignments: 0, crossGraphRels: 0 };
+  }
+
+  const textBlock = response.content.find(
+    (b): b is Anthropic.TextBlock => b.type === "text"
+  );
+  if (!textBlock) return { updatedGraph: graph, hubAssignments: 0, crossGraphRels: 0 };
+
+  let jsonStr = textBlock.text;
+  const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) jsonStr = jsonMatch[1];
+
+  let parsed: { assignments: BridgeAssignment[] };
+  try {
+    parsed = JSON.parse(jsonStr.trim());
+  } catch {
+    console.warn("[bridge] Failed to parse bridge response — skipping hub assignment");
+    return { updatedGraph: graph, hubAssignments: 0, crossGraphRels: 0 };
+  }
+
+  let currentGraph = structuredClone(graph);
+  let hubAssignments = 0;
+  let crossGraphRels = 0;
+
+  for (const assignment of parsed.assignments ?? []) {
+    const nodeId = labelToId[assignment.entity_label?.toLowerCase()];
+    if (!nodeId) continue;
+
+    // Resolve hub_slug to a hub node ID — the model uses the hub node's ID as slug
+    const hubNode = hubNodes.find(
+      (h) => h.id === assignment.hub_slug || h.label.toLowerCase() === assignment.hub_slug?.toLowerCase()
+    );
+    if (!hubNode) {
+      console.warn(`[bridge] Unknown hub slug "${assignment.hub_slug}" for entity "${assignment.entity_label}" — skipping`);
+      continue;
+    }
+
+    // Check if belongs_to_hub already exists (extraction pass may have created it)
+    const alreadyConnected = currentGraph.relationships.some(
+      (r) => r.sourceId === nodeId && r.targetId === hubNode.id && r.type === HUB_RELATIONSHIP_TYPE
+    );
+
+    if (!alreadyConnected) {
+      const hubRel: Relationship = {
+        id: uuidv4(),
+        sourceId: nodeId,
+        targetId: hubNode.id,
+        type: HUB_RELATIONSHIP_TYPE,
+        description: `Assigned to ${hubNode.label} hub during bridge pass`,
+      };
+      currentGraph = { ...currentGraph, relationships: [...currentGraph.relationships, hubRel] };
+      hubAssignments++;
+    }
+
+    // Create cross-graph relationships to existing nodes
+    for (const rel of assignment.relationships_to_existing ?? []) {
+      const targetId = labelToId[rel.target_label?.toLowerCase()];
+      if (!targetId || targetId === nodeId) continue;
+
+      // Skip if this relationship already exists in either direction
+      const duplicate = currentGraph.relationships.some(
+        (r) =>
+          r.type === rel.type &&
+          ((r.sourceId === nodeId && r.targetId === targetId) ||
+            (r.sourceId === targetId && r.targetId === nodeId))
+      );
+      if (duplicate) continue;
+
+      const crossRel: Relationship = {
+        id: uuidv4(),
+        sourceId: nodeId,
+        targetId,
+        type: rel.type,
+        description: rel.rationale,
+      };
+      currentGraph = { ...currentGraph, relationships: [...currentGraph.relationships, crossRel] };
+      crossGraphRels++;
+    }
+  }
+
+  return { updatedGraph: currentGraph, hubAssignments, crossGraphRels };
 }
 
 const extractionPrompt = `You are TERROIR's extraction engine. Given a narrative text about an organisation, extract ALL entities and relationships.
@@ -89,6 +294,10 @@ export async function extractFromNarrative(
     labelToId[node.label.toLowerCase()] = node.id;
   }
 
+  // Track IDs of nodes created in this pass — passed directly to bridgeToGraph
+  // to avoid the roundabout label→id re-lookup (which breaks on label collisions).
+  const newNodeIds = new Set<string>();
+
   // Create entities
   const entities = extracted.entities || [];
   let col = 0;
@@ -117,6 +326,7 @@ export async function extractFromNarrative(
     };
 
     labelToId[entity.label.toLowerCase()] = id;
+    newNodeIds.add(id);
     updates.push({ type: "node_created", label: entity.label });
   }
 
@@ -196,5 +406,21 @@ export async function extractFromNarrative(
     }
   }
 
-  return { updatedGraph: currentGraph, graphUpdates: updates };
+  // ── Bridge pass ───────────────────────────────────────────────────────────
+  // Assign each new entity to a hub and find relationships to existing nodes.
+  // Skipped automatically if no hub nodes exist (legacy projects).
+  const { updatedGraph: bridgedGraph, hubAssignments, crossGraphRels } = await bridgeToGraph(
+    currentGraph,
+    newNodeIds
+  );
+
+  // Append bridge updates to the activity log
+  if (hubAssignments > 0) {
+    updates.push({ type: "hub_assignments", label: `${hubAssignments} entities assigned to hubs` });
+  }
+  if (crossGraphRels > 0) {
+    updates.push({ type: "cross_graph_relationships", label: `${crossGraphRels} connections to existing nodes` });
+  }
+
+  return { updatedGraph: bridgedGraph, graphUpdates: updates, hubAssignments, crossGraphRels };
 }

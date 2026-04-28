@@ -33,13 +33,15 @@ export async function POST(request: NextRequest) {
       const relCount = result.graphUpdates?.filter(
         (u: { type: string }) => u.type === 'relationship_created'
       ).length ?? 0;
+      const hubAssignments = result.hubAssignments ?? 0;
+      const crossGraphRels = result.crossGraphRels ?? 0;
 
       logSession({
         project_id: projectId,
         type: 'extraction',
         agent: 'sonnet',
-        summary: `Extracted ${nodeCount} entities and ${relCount} relationships from narrative`,
-        raw_output: { graphUpdates: result.graphUpdates },
+        summary: `Extracted ${nodeCount} entities and ${relCount} relationships from narrative. Bridge pass: ${hubAssignments} hub assignments, ${crossGraphRels} connections to existing nodes.`,
+        raw_output: { graphUpdates: result.graphUpdates, hubAssignments, crossGraphRels },
       }).catch(err => console.warn('Session logging failed (non-fatal):', err));
     }
 
