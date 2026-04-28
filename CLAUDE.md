@@ -33,7 +33,7 @@ Read `.claude/plans/` at session start if working on a named feature.
 
 ---
 
-## Current State — Updated 2026-04-22
+## Current State — Updated 2026-04-28
 
 ### What's working
 - Full 3-panel editor live on Vercel (Chat / Sources+Synthesis+Reflect / Canvas / Inspector)
@@ -49,9 +49,10 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **Public read endpoint** — `GET /api/export?projectId=xxx` returns full project bundle as JSON. CORS open.
 - **Node size = evaluative intensity**, **Jagged border = emergent + high-intensity**, **Session Delta narration**, **Gradient Signal Extraction**, **Bilingual UI (DE/EN)**, **Tightened tension extraction**, **Meta-tensions**, **Signal label expand-on-click**, **Synthesis: Winemaker's Reading** — all live.
 - **Terroir v1 API** — authenticated HTTP surface at `/api/v1/`. 7 endpoints: `list_projects`, `get_project`, `query_graph`, `add_source`, `add_node`, `add_signal`, `run_synthesis`. Bearer tokens SHA-256 hashed at rest, per-consumer, optionally project-scoped. Migration `010_api_tokens.sql` applied. Auth in `src/lib/api-auth.ts`, handlers in `src/lib/api-handlers.ts`.
-- **MCP server** — `mcp-server/` at repo root. Imports handlers directly (no HTTP dependency). Register with `claude mcp add terroir node /path/to/mcp-server/dist/index.js`. See `mcp-server/README.md`.
+- **MCP server** — built and registered as `terroir`. `mcp-server/` at repo root. Imports handlers directly (no HTTP dependency).
 - **Token minting** — `npm run mint-token -- --name "..." --scopes read,write,synthesis [--project <uuid>]`. Plaintext shown once; only SHA-256 hash stored.
 - **Canal migrated** — `genau/context/terroir-context.js` reads from `/api/v1/` instead of direct Supabase. `TERROIR_SUPABASE_URL` / `TERROIR_SUPABASE_ANON_KEY` can be removed from Render after production smoke test confirms.
+- **Two-pass Sonnet bridge on transcript extraction** — after `extractFromNarrative()`, a second Sonnet call assigns each new entity to a hub (`belongs_to_hub` created in code) and identifies semantic connections to existing graph nodes. Best-effort: bridge failure returns unbridged graph rather than dropping extraction. Fallback hub resolved dynamically.
 
 ### Known bugs
 - **Entity type UUID bug** — entity type IDs use slugs not UUIDs → `entity_type_configs` upsert returns 400. Non-fatal.
@@ -60,9 +61,8 @@ Read `.claude/plans/` at session start if working on a named feature.
 - **`window.confirm` for reprocess is EN-only** — the confirm dialog body string in `ProjectBrief.tsx:76` is hardcoded English even when locale is DE.
 
 ### What's next
-1. **Build + register MCP server** — `cd mcp-server && npm install && npm run build`, then `claude mcp add terroir`. First live test of Claude Code ↔ graph interaction.
+1. **Test bridge pass end-to-end** — upload a transcript with existing graph nodes, verify hub assignments + cross-graph connections appear on canvas.
 2. **Canal production smoke test** — forward a URL to Medicus on Render, confirm signal resonance still shows. Then remove `TERROIR_SUPABASE_URL` / `TERROIR_SUPABASE_ANON_KEY` from Render env.
-3. **Mint Matthias eoniq token** — project-scoped token for his Mistral harness when ready: `npm run mint-token -- --name "Matthias eoniq" --scopes read --project <eoniq-id>`.
 
 ---
 
