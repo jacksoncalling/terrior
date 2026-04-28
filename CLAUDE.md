@@ -235,6 +235,7 @@ Or use the VS Code launch config (`terroir-dev`).
 - **Three-agent division:** Gemini = all document work (extract + classify + synthesise). Sonnet = chat + graph tools. Haiku = scoping dialogue only. Never cross these boundaries.
 - **Abstraction layer is explicit:** three presets fed to Gemini — never default to "extract everything". Set in ProjectBrief, passed to every Gemini extraction call.
 - **Signals live in Reflect tab only** — not on the canvas overlay, not in the Inspector. One source of truth.
+- **Two-pass extraction bridge:** Extraction (what's in the text) and integration (where it fits in the graph) are separate tasks — never combine them in one prompt. Add a bridge pass after extraction for any new input method. See `~/.claude/learnings/2026-04-28-two-pass-bridge-extraction.md`
 
 **Data**
 - **saveOntology ID interpolation:** NOT IN filter uses string-interpolated UUIDs — safe for UUIDs, watch if slug IDs ever contain special chars.
