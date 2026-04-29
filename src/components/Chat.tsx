@@ -41,6 +41,13 @@ interface ChatProps {
   ) => void;
   /** Called when the user resolves a tension in the Reflect tab. */
   onTensionResolve?: (tensionId: string) => void;
+  /**
+   * Tensions Sonnet found beyond the auto-apply cap during paste-text extraction.
+   * Shown in the Reflect tab as a "pending review" section.
+   */
+  pendingTensions?: { id: string; description: string; relatedLabels: string[] }[];
+  /** Called when the consultant promotes a pending tension to the graph. */
+  onTensionAdd?: (tension: { id: string; description: string; relatedLabels: string[] }) => void;
   /** Called after signal deduplication completes — updates graphState with merged signals. */
   onSignalDedup?: (updatedSignals: EvaluativeSignal[]) => void;
   /** Optimisation hypothesis from the topology-signal pass — null until first enrichment. */
@@ -330,6 +337,8 @@ export default function Chat({
   optimizationHypothesis,
   onEnrichSignals,
   onHighlightNodes,
+  pendingTensions = [],
+  onTensionAdd,
 }: ChatProps) {
   const t = useTranslations();
 
@@ -697,6 +706,46 @@ export default function Chat({
               </div>
             )}
           </div>
+
+          {/* ── Pending tensions (suppressed by auto-apply cap) ──────────── */}
+          {/* Shown when a paste-text Sonnet extraction found more tensions    */}
+          {/* than the 3-tension cap. Consultant reviews and adds individually. */}
+          {pendingTensions.length > 0 && (
+            <div>
+              <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-2">
+                Tensions — review
+                <span className="ml-1.5 normal-case font-normal text-amber-500">
+                  — {pendingTensions.length} flagged for review
+                </span>
+              </p>
+              <div className="space-y-2">
+                {pendingTensions.map((tension) => {
+                  const linkedLabels = tension.relatedLabels.filter(Boolean);
+                  return (
+                    <div
+                      key={tension.id}
+                      className="rounded-lg border border-amber-100 bg-amber-50/40 px-3 py-2.5 space-y-1.5"
+                    >
+                      <p className="text-xs text-stone-700 leading-snug">{tension.description}</p>
+                      {linkedLabels.length > 0 && (
+                        <p className="text-[10px] text-stone-400 leading-tight">
+                          {linkedLabels.join(" · ")}
+                        </p>
+                      )}
+                      {onTensionAdd && (
+                        <button
+                          onClick={() => onTensionAdd(tension)}
+                          className="text-[10px] text-stone-500 hover:text-stone-700 transition-colors border border-stone-200 rounded px-2 py-0.5 hover:bg-white"
+                        >
+                          {t("reflect.tensions.addToGraph")}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── Local tensions section ───────────────────────────────────── */}
           {(() => {

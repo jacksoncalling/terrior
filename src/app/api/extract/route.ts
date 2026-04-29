@@ -35,13 +35,14 @@ export async function POST(request: NextRequest) {
       ).length ?? 0;
       const hubAssignments = result.hubAssignments ?? 0;
       const crossGraphRels = result.crossGraphRels ?? 0;
+      const suppressedCount = result.suppressedTensions?.length ?? 0;
 
       logSession({
         project_id: projectId,
         type: 'extraction',
         agent: 'sonnet',
-        summary: `Extracted ${nodeCount} entities and ${relCount} relationships from narrative. Bridge pass: ${hubAssignments} hub assignments, ${crossGraphRels} connections to existing nodes.`,
-        raw_output: { graphUpdates: result.graphUpdates, hubAssignments, crossGraphRels },
+        summary: `Extracted ${nodeCount} entities and ${relCount} relationships from narrative. Bridge pass: ${hubAssignments} hub assignments, ${crossGraphRels} connections to existing nodes. Tensions: ${suppressedCount} suppressed for review.`,
+        raw_output: { graphUpdates: result.graphUpdates, hubAssignments, crossGraphRels, suppressedCount },
       }).catch(err => console.warn('Session logging failed (non-fatal):', err));
     }
 

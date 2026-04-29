@@ -93,7 +93,8 @@
     "tensions": {
       "title": "Spannungen",
       "unresolved": "{count} ungelöst",
-      "markResolved": "Als gelöst markieren"
+      "markResolved": "Als gelöst markieren",
+      "addToGraph": "Zum Graph hinzufügen"
     },
     "hypothesis": "Optimierungshypothese",
     "signals": {

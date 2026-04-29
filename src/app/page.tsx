@@ -385,10 +385,21 @@ export default function Home() {
         const laidOut = autoLayout(result.updatedGraph);
         setGraphState(laidOut);
 
+        // Surface any tensions Sonnet found beyond the auto-apply cap for review
+        if (result.suppressedTensions?.length > 0) {
+          setPendingTensions(result.suppressedTensions);
+        } else {
+          setPendingTensions([]);
+        }
+
+        const suppressedNote = result.suppressedTensions?.length > 0
+          ? ` ${result.suppressedTensions.length} additional tension${result.suppressedTensions.length > 1 ? "s" : ""} flagged for review in the Reflect tab.`
+          : "";
+
         const assistantMessage: ChatMessage = {
           id: uuidv4(),
           role: "assistant",
-          content: `Extracted ${result.graphUpdates.filter((u: GraphUpdate) => u.type === "node_created").length} entities and ${result.graphUpdates.filter((u: GraphUpdate) => u.type === "relationship_created").length} relationships from the narrative. Review the canvas and edit as needed.`,
+          content: `Extracted ${result.graphUpdates.filter((u: GraphUpdate) => u.type === "node_created").length} entities and ${result.graphUpdates.filter((u: GraphUpdate) => u.type === "relationship_created").length} relationships from the narrative. Review the canvas and edit as needed.${suppressedNote}`,
           timestamp: Date.now(),
         };
 
@@ -586,6 +597,45 @@ export default function Home() {
       ),
     }));
   }, []);
+
+  // ── Suppressed tensions — await consultant review ─────────────────────────
+  // Populated after a Sonnet paste-text extraction when Sonnet found more
+  // tensions than the auto-apply cap (3). Reset on each new extraction.
+  const [pendingTensions, setPendingTensions] = useState<
+    { id: string; description: string; relatedLabels: string[] }[]
+  >([]);
+
+  // Promotes a suppressed tension to the graph (consultant-triggered).
+  const handleTensionAdd = useCallback(
+    (tension: { id: string; description: string; relatedLabels: string[] }) => {
+      setGraphState((prev) => {
+        // Resolve related labels to node IDs from the current graph
+        const labelToId: Record<string, string> = {};
+        for (const n of prev.nodes) labelToId[n.label.toLowerCase()] = n.id;
+        const relatedNodeIds = tension.relatedLabels
+          .map((l) => labelToId[l.toLowerCase()])
+          .filter(Boolean) as string[];
+
+        return {
+          ...prev,
+          tensions: [
+            ...prev.tensions,
+            {
+              id: uuidv4(),
+              description: tension.description,
+              relatedNodeIds,
+              status: "unresolved" as const,
+            },
+          ],
+        };
+      });
+      // Remove by stable id — avoids removing duplicate-description cards
+      setPendingTensions((prev) =>
+        prev.filter((t) => t.id !== tension.id)
+      );
+    },
+    []
+  );
 
   // ── Signal dedup handler ─────────────────────────────────────────────────
   const handleSignalDedup = useCallback((updatedSignals: import("@/types").EvaluativeSignal[]) => {
@@ -1029,6 +1079,9 @@ export default function Home() {
           optimizationHypothesis={optimizationHypothesis}
           onEnrichSignals={handleEnrichSignals}
           onHighlightNodes={setHighlightedNodeNames}
+          // ── Suppressed tensions (paste-text extraction) ──────────────────
+          pendingTensions={pendingTensions}
+          onTensionAdd={handleTensionAdd}
         />
         {/* Bottom actions */}
         <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-3">

@@ -93,7 +93,8 @@
     "tensions": {
       "title": "Tensions",
       "unresolved": "{count} unresolved",
-      "markResolved": "Mark resolved"
+      "markResolved": "Mark resolved",
+      "addToGraph": "Add to graph"
     },
     "hypothesis": "Optimisation Hypothesis",
     "signals": {

@@ -11,6 +11,8 @@ interface ExtractionResult {
   graphUpdates: { type: string; label: string }[];
   hubAssignments?: number;
   crossGraphRels?: number;
+  /** Tensions Sonnet found beyond the auto-applied cap, returned for consultant review */
+  suppressedTensions?: { id: string; description: string; relatedLabels: string[] }[];
 }
 
 interface BridgeAssignment {
@@ -221,7 +223,7 @@ Follow the Cutler workflow:
 1. FIND all entities mentioned in the text (concepts, people roles, systems, processes, documents, goals, values, etc.)
 2. CLASSIFY each entity with an appropriate type. Types are emergent — use what fits the domain.
 3. RELATE entities to each other with descriptive relationship types.
-4. FLAG any tensions or conflicts between entities.
+4. FLAG tensions — see TENSION RULES below.
 
 IMPORTANT: Extract COMPREHENSIVELY. Capture every meaningful entity and relationship, not just the main topic.
 
@@ -229,6 +231,36 @@ LANGUAGE CONSISTENCY (critical — do not mix languages):
 - Detect the primary language of the source text.
 - ALL entity labels, types, and descriptions MUST be in that same language. If the text is in German, output German. If in English, output English. Do NOT mix languages.
 - Relationship types and descriptions should match the source language.
+
+TENSION RULES:
+
+What counts as a tension:
+A tension is a genuine structural conflict between two or more entities that cannot both be fully satisfied simultaneously — not a challenge, a preference difference, or a solvable coordination problem. Both sides must be active and pulling against each other right now. If the conflict could be resolved by a single decision, a meeting, or more resources, it is not a tension — it is a problem. Tensions persist even when everyone agrees they exist.
+
+This source is an interview or spoken narrative. Listen for:
+- Hedging language: "yes, but...", "on the one hand... on the other...", "we want X but we also need Y"
+- Repeated frustrations: a topic the speaker returns to more than once with friction
+- Implicit contradictions: two things the speaker clearly values that structurally cannot coexist
+- Energy shifts: places where the speaker's language becomes heavier, slower, or more guarded
+
+Extract ALL tensions you find — up to 5. Rate each by confidence (1–5). The system will apply only the highest-confidence ones automatically; lower-confidence ones are surfaced for the consultant to review.
+
+Exclusions (do NOT extract):
+- Disagreements that are acknowledged and being actively resolved
+- Tradeoffs the organisation has already decided (choosing A over B is a decision, not a tension)
+- Minor friction between roles or teams with no structural consequence
+- Anything that could be fixed by clearer communication, a process change, or a meeting
+- Concerns, risks, or problems — these are different from tensions
+
+Required for each tension:
+- "description" — one sentence naming BOTH sides of the conflict and why satisfying one undermines the other. Format: "[Entity A] pulls toward [X], while [Entity B] requires [Y] — both cannot be fully satisfied without compromising the other." Must be specific to this organisation.
+- "related_labels" — the two or three entities in direct conflict.
+- "confidence" — integer 1–5. 5 = unmistakable structural conflict with explicit evidence; 1 = faint signal, plausible but speculative.
+
+Test each candidate:
+1. If this organisation solved everything else, would this conflict still exist?
+2. Can I name the specific mechanism by which satisfying one side damages the other?
+If either answer is "no," do not extract it.
 
 Respond with valid JSON in this exact format:
 {
@@ -239,7 +271,7 @@ Respond with valid JSON in this exact format:
     { "source_label": "string", "target_label": "string", "type": "string", "description": "string" }
   ],
   "tensions": [
-    { "description": "string", "related_labels": ["string"] }
+    { "description": "string", "related_labels": ["string"], "confidence": 1 }
   ],
   "evaluative_signals": [
     { "label": "string", "direction": "toward|away_from|protecting", "strength": 1-5, "temporal_horizon": "operational|tactical|strategic|foundational", "related_entity_labels": ["string"], "source": "string" }
@@ -353,14 +385,25 @@ export async function extractFromNarrative(
     updates.push({ type: "relationship_created", label: `${rel.source_label} → ${rel.target_label}` });
   }
 
-  // Create tensions
-  const tensions = extracted.tensions || [];
-  for (const t of tensions) {
+  // Create tensions — apply the highest-confidence ones (up to 3), collect the rest
+  // as suppressedTensions for the consultant to review in the Sources panel.
+  const TENSION_AUTO_APPLY_LIMIT = 3;
+  const tensions = (extracted.tensions || []) as { description: string; related_labels: string[]; confidence?: number }[];
+
+  // Sort by confidence descending (missing confidence treated as 3)
+  const sortedTensions = [...tensions].sort((a, b) => (b.confidence ?? 3) - (a.confidence ?? 3));
+
+  const suppressedTensions: { id: string; description: string; relatedLabels: string[] }[] = [];
+
+  sortedTensions.forEach((t, index) => {
     const relatedIds = (t.related_labels || [])
       .map((label: string) => labelToId[label?.toLowerCase()])
       .filter(Boolean);
 
-    if (relatedIds.length > 0) {
+    if (index < TENSION_AUTO_APPLY_LIMIT && relatedIds.length > 0) {
+      // Auto-apply top tensions to the graph — only when at least one entity
+      // resolved. A tension with zero resolvable IDs falls through to suppressed
+      // rather than silently consuming an auto-apply slot.
       const tension: TensionMarker = {
         id: uuidv4(),
         description: t.description,
@@ -372,8 +415,17 @@ export async function extractFromNarrative(
         tensions: [...currentGraph.tensions, tension],
       };
       updates.push({ type: "tension_flagged", label: t.description });
+    } else {
+      // Collect suppressed tensions — returned for consultant review.
+      // Store related_labels (strings) + a stable id so the UI can key
+      // and remove individual cards without description-matching.
+      suppressedTensions.push({
+        id: uuidv4(),
+        description: t.description,
+        relatedLabels: t.related_labels || [],
+      });
     }
-  }
+  });
 
   // Create evaluative signals
   const signals = extracted.evaluative_signals || [];
@@ -422,5 +474,5 @@ export async function extractFromNarrative(
     updates.push({ type: "cross_graph_relationships", label: `${crossGraphRels} connections to existing nodes` });
   }
 
-  return { updatedGraph: bridgedGraph, graphUpdates: updates, hubAssignments, crossGraphRels };
+  return { updatedGraph: bridgedGraph, graphUpdates: updates, hubAssignments, crossGraphRels, suppressedTensions };
 }
