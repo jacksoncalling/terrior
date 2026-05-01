@@ -12,7 +12,13 @@ import { createClient } from "@supabase/supabase-js";
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? "";
+  // Prefer service key — RLS blocks anon reads on api_tokens, by design.
+  // Falls back to anon key for environments where SUPABASE_SERVICE_KEY isn't set.
+  const key =
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    "";
   if (!url || !key) throw new AuthError(401, "Auth not configured — missing Supabase env vars");
   return createClient(url, key);
 }
